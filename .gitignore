@@ -23,3 +23,5 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+script.py.mako
+

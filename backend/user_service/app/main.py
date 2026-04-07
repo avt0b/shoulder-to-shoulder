@@ -1,19 +1,35 @@
+"""Main FastAPI application for User Service."""
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from backend.user_service.app.core.config import settings
+from backend.user_service.app.api.v1.auth import router as auth_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version="0.1.0",
+    description="User Service для приложения «Плечом к плечу»",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    #TODO: Ксюше - поменять на конкретный домен в production'е
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
     return {
-        "message": f"{settings.PROJECT_NAME} запущен",
+        "message": f"{settings.PROJECT_NAME} is running",
         "environment": settings.ENVIRONMENT,
         "docs": "/docs"
     }
@@ -21,4 +37,4 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {"status": "healthy", "service": "user-service"}
