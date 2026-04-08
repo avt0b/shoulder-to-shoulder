@@ -140,8 +140,8 @@
         <span>Карта</span>
       </a>
       <a href="#" class="nav-item" :class="{ active: activeNav === 'groups' }" @click.prevent="handleNavClick('groups')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'groups' }">group</span>
-        <span>Группы</span>
+        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'groups' }">event</span>
+        <span>Ивенты</span>
       </a>
       <a href="#" class="nav-item" :class="{ active: activeNav === 'routes' }" @click.prevent="handleNavClick('routes')">
         <span class="material-symbols-outlined" :class="{ filled: activeNav === 'routes' }">directions_run</span>
@@ -161,7 +161,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, api } from '../config'
 
-const emit = defineEmits(['expand-map'])
+const emit = defineEmits(['expand-map', 'navigate'])
 
 const activeNav = ref('map')
 const mapRef = ref(null)
@@ -336,6 +336,10 @@ async function leaveMeetup(meetupId, userId) {
 // ============================================
 
 const handleNavClick = (nav) => {
+  if (nav === 'groups') {
+    emit('navigate', 'events')
+    return
+  }
   activeNav.value = nav
 }
 
