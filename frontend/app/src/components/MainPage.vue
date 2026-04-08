@@ -99,12 +99,12 @@
               <div class="join-section">
                 <span class="join-count">{{ meetup.participants }}/{{ meetup.maxParticipants }} участников</span>
                 <button
-                  class="join-btn join-btn-joined"
-                  @click="handleLeaveMeetup(meetup.id)"
-                  title="Отписаться"
+                  class="join-btn"
+                  :class="{ 'join-btn-joined': meetup.isJoined }"
+                  @click="meetup.isJoined ? handleLeaveMeetup(meetup.id) : handleJoinMeetup(meetup.id)"
                 >
-                  <span class="material-symbols-outlined">cancel</span>
-                  <span>Отписаться</span>
+                  <span class="material-symbols-outlined">{{ meetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
+                  <span>{{ meetup.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
                 </button>
               </div>
             </div>
@@ -510,8 +510,37 @@ function submitEvent() {
 }
 
 // ============================================
-// 🚪 Отписаться от мероприятия (API + localStorage)
+// 🤝 Присоединиться / Отписаться (API + localStorage)
 // ============================================
+
+async function handleJoinMeetup(meetupId, userId = 1) {
+  try {
+    const res = await fetch(api(`/meetups/${meetupId}/join`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
+    })
+    const data = await res.json()
+
+    const meetup = myMeetups.value.find(m => m.id === meetupId)
+    if (meetup) {
+      meetup.isJoined = true
+      meetup.participants = data.participants
+    }
+
+    return data
+  } catch (e) {
+    if (config.isDebug) console.warn(`handleJoinMeetup: API недоступен, localStorage`)
+
+    const meetup = myMeetups.value.find(m => m.id === meetupId)
+    if (meetup && meetup.participants < meetup.maxParticipants && !meetup.isJoined) {
+      meetup.isJoined = true
+      meetup.participants++
+      saveToLocalStorage(myMeetups.value)
+    }
+    return null
+  }
+}
 
 async function handleLeaveMeetup(meetupId, userId = 1) {
   try {
@@ -1088,7 +1117,9 @@ onMounted(async () => {
 .join-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 4px;
+  min-width: 155px;
   background: var(--primary-container);
   color: white;
   padding: 8px 14px;
@@ -1097,8 +1128,9 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, transform 0.2s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
 }
 
 .join-btn:hover {

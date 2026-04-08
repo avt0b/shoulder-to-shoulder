@@ -1004,7 +1004,9 @@ onMounted(async () => {
 .action-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  min-width: 155px;
   background: var(--primary-container);
   color: white;
   padding: 8px 14px;
@@ -1013,8 +1015,9 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, transform 0.2s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .action-btn:hover {
