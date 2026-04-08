@@ -40,3 +40,9 @@ class PublicUserInfoResponse(BaseModel):
     reliability_score: float
     badges: list[str] = Field(default_factory=list)
     # phone_number и email НЕ показываем публично
+
+class RatingResponse(BaseModel):
+    empathy_score: int
+    reliability_score: float
+    total_events: int
+    completed_events: int

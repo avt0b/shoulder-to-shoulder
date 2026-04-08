@@ -4,6 +4,11 @@ backend/user_service/.env
 script.py.mako
 
 __pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+venv/
 *.py[cod]
 *$py.class
 *.so
@@ -25,3 +30,5 @@ wheels/
 *.egg
 script.py.mako
 
+
+*.egg

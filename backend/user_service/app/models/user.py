@@ -21,7 +21,6 @@ class User(Base):
         index=True,
     )
 
-    # Основной идентификатор для входа
     phone_number = Column(
         String(20),
         unique=True,
@@ -29,7 +28,6 @@ class User(Base):
         index=True,
     )
 
-    # Email теперь опциональный
     email = Column(
         String(255),
         unique=True,

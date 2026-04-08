@@ -1,66 +1,45 @@
-"""Authentication routes."""
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from fastapi import APIRouter, HTTPException, status
-from fastapi import Depends
-
-from backend.user_service.app.core.dependencies import get_user_repository
-from backend.user_service.app.domain.repositories.user_repository import UserRepository
-from backend.user_service.app.domain.schemas.auth import (
-    UserRegisterRequest,
-    UserLoginRequest,
-    TokenResponse,
-)
+from backend.user_service.app.api.dependencies import get_auth_service
+from backend.user_service.app.schemas.auth import UserRegisterRequest, UserLoginRequest, TokenResponse
+from backend.user_service.app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(
-    user_data: UserRegisterRequest,
-    auth_service: UserRepository = Depends(get_user_repository),
+    data: UserRegisterRequest,
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    """Register a new user."""
-
     try:
         return await auth_service.register_user(
-            phone_number=user_data.phone_number,
-            password=user_data.password,
-            display_name=user_data.display_name,
-            email=user_data.email,
+            phone_number=data.phone_number,
+            password=data.password,
+            display_name=data.display_name,
+            email=data.email,
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        ) from e
-    except Exception as e:
-        print(str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при регистрации",
-        ) from e
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login_user(
-    login_data: UserLoginRequest,
-    auth_service: UserRepository = Depends(get_user_repository),
+    data: UserLoginRequest,
+    auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
-    """Login user by phone number and password."""
-
     try:
         return await auth_service.authenticate_user(
-            phone_number=login_data.phone_number,
-            password=login_data.password,
+            phone_number=data.phone_number,
+            password=data.password,
         )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
-        ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Ошибка при входе",
-        ) from e
+        )
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
