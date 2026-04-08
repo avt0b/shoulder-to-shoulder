@@ -284,6 +284,7 @@ function resetFilters() {
 
 async function applyFilters() {
   await fetchPlaces()
+  showFilters.value = false
 }
 
 // Получить места с бэкенда (с фильтрами)
@@ -467,7 +468,8 @@ const openPlacePopup = (place) => {
 
 // Добавление маркеров на карту
 const addPlaceMarkers = () => {
-  markers = places.map(place => createPlaceMarker(place))
+  removePlaceMarkers()
+  markers = places.value.map(place => createPlaceMarker(place))
 }
 
 // Удаление маркеров (для очистки)
