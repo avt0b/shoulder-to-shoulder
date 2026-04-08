@@ -1,8 +1,7 @@
 from uuid import UUID
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.user_service.app.models.user import User
-
+from sqlalchemy import select, update, func
 
 class UserRepository:
     def __init__(self, db: AsyncSession):
@@ -28,3 +27,16 @@ class UserRepository:
         self.db.add(user)
         await self.db.flush()
         return user
+
+    async def update(self, user_id: UUID | str, update_data: dict) -> User | None:
+        """Update fields in the 'users' table (e.g., email, is_active)."""
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+        stmt = (
+            update(User)
+            .where(User.id == user_id)
+            .values(**update_data, updated_at=func.now())
+            .returning(User)
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()

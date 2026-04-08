@@ -16,8 +16,11 @@ class UserProfileUpdateRequest(BaseModel):
     age: int | None = Field(None, ge=18)
     fitness_level: Literal["beginner", "intermediate", "advanced"] | None = None
     bio: str | None = None
-    email: EmailStr | None = None
     preferences: dict | None = None
+
+
+class UserContactUpdateRequest(BaseModel):
+    email: EmailStr | None = None
 
 
 class UserProfileResponse(BaseModel):

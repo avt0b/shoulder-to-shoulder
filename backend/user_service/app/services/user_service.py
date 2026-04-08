@@ -65,34 +65,6 @@ class UserService:
             badges=badges,
         )
 
-    async def update_profile(self, user_id: UUID | str, update_data: dict) -> UserProfileResponse | None:
-        if isinstance(user_id, str):
-            user_id = UUID(user_id)
-        user = await self.user_repo.get_by_id(user_id)
-        if not user:
-            return None
-
-        try:
-            updated_profile = await self.profile_repo.update(user_id, update_data)
-            if not updated_profile:
-                return None
-            await self.user_repo.db.commit()
-
-            return UserProfileResponse(
-                user_id=str(user.id),
-                phone_number=user.phone_number,
-                email=user.email,
-                display_name=updated_profile.display_name,
-                age=updated_profile.age,
-                fitness_level=updated_profile.fitness_level,
-                bio=updated_profile.bio,
-                avatar_url=updated_profile.avatar_url,
-                preferences=updated_profile.preferences or {},
-            )
-        except Exception:
-            await self.user_repo.db.rollback()
-            logger.exception("Profile update failed")
-            raise
 
     async def get_rating(self, user_id: UUID | str) -> RatingResponse | None:
         rating = await self.rating_repo.get_by_user_id(user_id)
@@ -152,3 +124,61 @@ class UserService:
 
     async def get_badges(self, user_id: UUID | str) -> list[str]:
         return await self.badge_repo.get_by_user_id(user_id)
+
+    async def update_profile(self, user_id: UUID | str, update_data: dict) -> UserProfileResponse | None:
+        """Update non-sensitive profile fields."""
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            return None
+
+        try:
+            updated_profile = await self.profile_repo.update(user_id, update_data)
+            if not updated_profile:
+                return None
+
+            await self.user_repo.db.commit()
+
+            return UserProfileResponse(
+                user_id=str(user.id),
+                phone_number=user.phone_number,
+                email=user.email,
+                display_name=updated_profile.display_name,
+                age=updated_profile.age,
+                fitness_level=updated_profile.fitness_level,
+                bio=updated_profile.bio,
+                avatar_url=updated_profile.avatar_url,
+                preferences=updated_profile.preferences or {},
+            )
+        except Exception:
+            await self.user_repo.db.rollback()
+            logger.exception("Profile update failed")
+            raise
+
+    async def update_contact_info(self, user_id: UUID | str, update_data: dict) -> dict:
+        """Update sensitive contact fields (email, phone). Returns updated fields."""
+        if isinstance(user_id, str):
+            user_id = UUID(user_id)
+
+        if "email" in update_data and update_data["email"]:
+            existing = await self.user_repo.get_by_email(update_data["email"])
+            if existing and existing.id != user_id:
+                raise ValueError("Email already registered")
+
+        try:
+            updated_user = await self.user_repo.update(user_id, update_data)
+            if not updated_user:
+                return None
+
+            await self.user_repo.db.commit()
+
+            return {
+                "email": updated_user.email,
+                "phone_number": updated_user.phone_number,
+            }
+        except Exception:
+            await self.user_repo.db.rollback()
+            logger.exception("Contact info update failed")
+            raise
