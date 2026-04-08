@@ -1,5 +1,5 @@
 from uuid import UUID
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, Numeric
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.user_service.app.models.rating import UserRating
 
@@ -39,7 +39,7 @@ class UserRatingRepository:
             user_id = UUID(user_id)
         new_completed = UserRating.completed_events + (1 if success else 0)
         new_total = UserRating.total_events + 1
-        reliability = (100.0 * new_completed / new_total).cast("numeric(5,2)")
+        reliability = (100.0 * new_completed / new_total).cast(Numeric(5, 2))
 
         stmt = (
             update(UserRating)

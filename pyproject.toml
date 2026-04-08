@@ -20,6 +20,8 @@ dependencies = [
     "python-dotenv>=1.2.2",
     # Auth & security
     "python-jose[cryptography]>=3.3.0",
+    "passlib>=1.7.4",
+    "nats-py>=2.5.0",
     "bcrypt==3.2.2",
     "passlib==1.7.4",
     # File uploads & HTTP client

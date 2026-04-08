@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     REDIS_URL: str = "redis://localhost:6379/0"
+    NATS_URL: str = "nats://localhost:4222"
 
     FIRST_SUPERUSER_EMAIL: str | None = None
     FIRST_SUPERUSER_PASSWORD: str | None = None

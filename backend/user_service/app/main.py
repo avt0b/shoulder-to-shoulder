@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.user_service.app.core.config import settings
 from backend.user_service.app.api.v1.auth import router as auth_router
 from backend.user_service.app.api.v1.users import router as users_router
-
+from backend.user_service.app.core.nats_client import connect_nats, close_nats, handle_workout_event, nc
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -19,7 +19,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    #TODO: Ксюше - поменять на конкретный домен в production'е
+    # TODO: Ксюше - поменять на конкретный домен в production'е
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
@@ -28,6 +28,19 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+async def startup():
+    await connect_nats()
+    await nc.subscribe("workout.completed", cb=handle_workout_event)
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_nats()
+
+
 @app.get("/")
 async def root():
     return {
