@@ -37,6 +37,13 @@ class User(Base):
 
     hashed_password = Column(String(255), nullable=False)
 
+    role = Column(
+        String(20),
+        default="user",  # user, moderator, superuser(иными словами просто root накидываем)
+        nullable=False,
+        index=True,
+    )
+
     is_active = Column(Boolean, default=True, nullable=False)
     is_phone_verified = Column(Boolean, default=False, nullable=False)
 

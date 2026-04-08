@@ -57,8 +57,8 @@ class AuthService:
             raise
 
         return TokenResponse(
-            access_token=create_access_token(subject=str(user.id)),
-            refresh_token=create_refresh_token(subject=str(user.id)),
+            access_token=create_access_token(subject=str(user.id), role=user.role),
+            refresh_token = create_refresh_token(subject=str(user.id), role=user.role)
         )
 
     async def authenticate_user(self, phone_number: str, password: str) -> TokenResponse:
@@ -69,6 +69,6 @@ class AuthService:
             raise ValueError("Аккаунт деактивирован")
 
         return TokenResponse(
-            access_token=create_access_token(subject=str(user.id)),
-            refresh_token=create_refresh_token(subject=str(user.id)),
+            access_token=create_access_token(subject=str(user.id), role=user.role),
+            refresh_token = create_refresh_token(subject=str(user.id), role=user.role)
         )

@@ -6,6 +6,9 @@ CREATE TABLE users (
 
     hashed_password     VARCHAR(255) NOT NULL,
 
+    role                VARCHAR(20) DEFAULT 'user' NOT NULL,
+    CONSTRAINT chk_users_role CHECK (role IN ('user', 'moderator', 'superuser')),
+
     is_active           BOOLEAN DEFAULT true NOT NULL,
     is_phone_verified   BOOLEAN DEFAULT false NOT NULL,
 
@@ -50,6 +53,8 @@ CREATE TABLE badges (
 
 CREATE INDEX idx_users_phone_number ON users(phone_number);
 CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX idx_users_role ON users(role);
+
 
 CREATE INDEX idx_ratings_empathy ON user_ratings(empathy_score DESC);
 CREATE INDEX idx_ratings_reliability ON user_ratings(reliability_score DESC);

@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.user_service.app.core.config import settings
 from backend.user_service.app.api.v1.auth import router as auth_router
 from backend.user_service.app.api.v1.users import router as users_router
-from backend.user_service.app.core.nats_client import connect_nats, close_nats, handle_workout_event, nc
+from backend.user_service.app.core.nats_client import connect_nats, close_nats, handle_workout_event, nc, \
+    setup_nats_subscribers, setup_admin_subscribers
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -33,7 +34,8 @@ app.include_router(users_router, prefix="/api/v1")
 @app.on_event("startup")
 async def startup():
     await connect_nats()
-    await nc.subscribe("workout.completed", cb=handle_workout_event)
+    await setup_nats_subscribers()
+    await setup_admin_subscribers()
 
 
 @app.on_event("shutdown")
