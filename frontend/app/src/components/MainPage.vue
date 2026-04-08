@@ -1289,29 +1289,6 @@ onMounted(async () => {
   font-weight: 500;
 }
 
-.join-btn {
-  background: var(--primary-container);
-  color: white;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  cursor: pointer;
-}
-
-.join-btn .material-symbols-outlined {
-  font-size: 20px;
-}
-
-.join-btn-secondary {
-  background: var(--surface-container-high);
-  color: var(--on-surface-variant);
-}
-
 /* My Meetups — Ваши мероприятия */
 .my-meetups-section {
   display: flex;
