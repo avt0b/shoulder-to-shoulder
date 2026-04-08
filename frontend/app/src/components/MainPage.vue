@@ -57,13 +57,8 @@
       <!-- Meetups Section -->
       <section class="meetups-section">
         <div class="section-header">
-          <h2>Сегодня</h2>
-          <div class="tabs">
-            <button class="tab active">Тренировка</button>
-            <button class="tab">Растяжка</button>
-            <button class="tab">Тишина</button>
-            <button class="tab">Вечер</button>
-          </div>
+          <h2>Ваши встречи</h2>
+          <span class="see-all" @click="$emit('navigate', 'events')">Все встречи →</span>
         </div>
 
         <button class="create-btn" @click="showCreateModal = true">
@@ -71,36 +66,55 @@
           <span>Создать встречу</span>
         </button>
 
-        <!-- Ваши мероприятия (динамические карточки) -->
-        <div class="my-meetups-section">
-          <div class="section-header">
-            <h2>Ваши мероприятия</h2>
-          </div>
-          <div class="meetup-cards">
-            <div class="meetup-card" :class="{ 'border-primary': meetup.isJoined }" v-for="meetup in myMeetups" :key="meetup.id">
-              <div class="meetup-header">
-                <div class="meetup-info">
-                  <div class="meetup-time">
-                    <span class="material-symbols-outlined">schedule</span>
-                    <span>{{ meetup.time }} • {{ meetup.locationShort }}</span>
-                  </div>
-                  <h3>{{ meetup.name }}</h3>
+        <!-- My Meetup Cards -->
+        <div class="meetup-cards">
+          <div
+            class="meetup-card border-primary"
+            v-for="meetup in myMeetups"
+            :key="meetup.id"
+          >
+            <div class="meetup-header">
+              <div class="meetup-info">
+                <div class="meetup-time">
+                  <span class="material-symbols-outlined">schedule</span>
+                  <span>{{ meetup.time }} • {{ meetup.locationShort }}</span>
                 </div>
-                <div class="meetup-level">{{ meetup.level }}</div>
+                <h3>{{ meetup.name }}</h3>
               </div>
-              <div class="meetup-footer">
-                <div class="avatars">
-                  <img v-for="(avatar, i) in meetup.avatars.slice(0, 3)" :key="i" class="avatar-sm" :src="avatar" alt="User" />
-                  <div class="avatar-sm avatar-more" v-if="meetup.moreCount > 0">+{{ meetup.moreCount }}</div>
-                </div>
-                <div class="join-section">
-                  <span class="join-count">{{ meetup.participants }}/{{ meetup.maxParticipants }} участников</span>
-                  <button class="join-btn" :class="{ 'join-btn-joined': meetup.isJoined }" :title="meetup.isJoined ? 'Участвую' : 'Присоединиться'">
-                    <span class="material-symbols-outlined">{{ meetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
-                  </button>
-                </div>
+              <div class="meetup-level">{{ meetup.level }}</div>
+            </div>
+
+            <p class="meetup-desc" v-if="meetup.description">{{ meetup.description }}</p>
+
+            <div class="meetup-tags" v-if="meetup.type || meetup.quietCompanion">
+              <span class="meetup-type-tag" v-if="meetup.type">{{ meetup.type }}</span>
+              <span class="meetup-quiet-tag" v-if="meetup.quietCompanion">🤫 Тихий</span>
+            </div>
+
+            <div class="meetup-footer">
+              <div class="avatars">
+                <img v-for="(avatar, i) in meetup.avatars.slice(0, 3)" :key="i" class="avatar-sm" :src="avatar" alt="User" />
+                <div class="avatar-sm avatar-more" v-if="meetup.moreCount > 0">+{{ meetup.moreCount }}</div>
+              </div>
+              <div class="join-section">
+                <span class="join-count">{{ meetup.participants }}/{{ meetup.maxParticipants }} участников</span>
+                <button
+                  class="join-btn join-btn-joined"
+                  @click="handleLeaveMeetup(meetup.id)"
+                  title="Отписаться"
+                >
+                  <span class="material-symbols-outlined">cancel</span>
+                  <span>Отписаться</span>
+                </button>
               </div>
             </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="myMeetups.length === 0" class="meetup-empty">
+            <span class="material-symbols-outlined empty-icon">event_busy</span>
+            <p>Вы пока не записаны ни на одно мероприятие</p>
+            <button class="empty-cta" @click="$emit('navigate', 'events')">Найти встречу</button>
           </div>
         </div>
       </section>
@@ -496,6 +510,37 @@ function submitEvent() {
 }
 
 // ============================================
+// 🚪 Отписаться от мероприятия (API + localStorage)
+// ============================================
+
+async function handleLeaveMeetup(meetupId, userId = 1) {
+  try {
+    const res = await fetch(api(`/meetups/${meetupId}/leave?user_id=${userId}`), {
+      method: 'DELETE'
+    })
+    const data = await res.json()
+
+    const meetup = myMeetups.value.find(m => m.id === meetupId)
+    if (meetup) {
+      meetup.isJoined = false
+      meetup.participants = data.participants
+    }
+
+    return data
+  } catch (e) {
+    if (config.isDebug) console.warn(`handleLeaveMeetup: API недоступен, localStorage`)
+
+    const meetup = myMeetups.value.find(m => m.id === meetupId)
+    if (meetup && meetup.isJoined) {
+      meetup.isJoined = false
+      meetup.participants--
+      saveToLocalStorage(myMeetups.value)
+    }
+    return null
+  }
+}
+
+// ============================================
 // 🔌 API HANDLES
 // ============================================
 
@@ -570,7 +615,7 @@ async function fetchRoute(startLat, startLng, endLat, endLng) {
 
 // --- Мероприятия (meetups) ---
 
-// Заглушка данных
+// Заглушка данных — мои мероприятия
 const mockMeetups = [
   {
     id: 1,
@@ -579,34 +624,22 @@ const mockMeetups = [
     locationShort: 'Парк',
     location: 'Парк Победы',
     level: 'Новичок',
+    description: 'Лёгкое кардио для разогрева перед основной тренировкой.',
     participants: 3,
     maxParticipants: 5,
     isJoined: true,
+    type: 'Бег',
+    quietCompanion: false,
     avatars: [
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEPBUmcOdAbbYL66LZ6swLoWGWnM2a8lrbZU_2FeRJB6V09iN7R7gCdvzG70oNaGwQHuTDTuWLxFZIcsCuyPKDTxTTlCa-mIDWw_u6ICDWyE7PTSipMhDpdIaIRBWarjXJOQpXw5xQtV9t9i6PKTqJsG-cMsz5IH400UKj9VD_MVWUHv6Rp7fSO9oCivO9qH9carbZ6v8a4p63_S046k5bphL43U',
       'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxuOKErajv7ODK6tavnPTZcFSFrmOmDrbzzIfPj5GSkjn5JIPc3o782XNLA4rrC7Nwxr80tj710WdoTF327craU0496uTzPJI0jeoDAlN3sgoYDDJfoWqkLus8ZYMhGwciYtEaoLiCc99uhOxpdQXA4D1tUt4kuiNqmec6U7SsoXt0',
       'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541T9PEV2VM1_jsojZRXaVXhRhpu2_3tJNiG2y85-X-dc'
     ],
     moreCount: 2
-  },
-  {
-    id: 2,
-    name: 'Основы калистеники',
-    time: '20:30',
-    locationShort: 'Уличная арена',
-    location: 'Стадион «Центральный»',
-    level: 'Открыто',
-    participants: 1,
-    maxParticipants: 8,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC2URqWk5H4FTDLDLL0v1ywXo2oDhzArVrw_IEetPVa6vnn1NyW1eW8iBJz_J5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0-E197igZDCR7JUuvmkCtYRblPeE6Wjg8gxrcUaJAvfV61C25ooLIYUaw0LFJ1wOCnoZKVw-FWUwz8RCILbaS1VHjgzKr9vEynAzX17xSyornMJSlm8PumM0yW4Iw-DPW5UCSbeCVxAHDcjpPUSjEB7rcgNvt4tt5tU3jQ'
-    ],
-    moreCount: 4
   }
 ]
 
-// 5. Получить мероприятия пользователя
+// 5. Получить мои мероприятия
 async function fetchMyMeetups() {
   try {
     const res = await fetch(api('/meetups/my'))
@@ -615,46 +648,6 @@ async function fetchMyMeetups() {
   } catch (e) {
     if (config.isDebug) console.warn('fetchMyMeetups: API недоступен, используем заглушку')
     myMeetups.value = mockMeetups
-  }
-}
-
-// 6. Записаться на мероприятие
-async function joinMeetup(meetupId, userId) {
-  try {
-    const res = await fetch(api(`/meetups/${meetupId}/join`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId })
-    })
-    const data = await res.json()
-    const meetup = myMeetups.value.find(m => m.id === meetupId)
-    if (meetup) {
-      meetup.isJoined = true
-      meetup.participants = data.participants
-    }
-    return data
-  } catch (e) {
-    if (config.isDebug) console.warn(`joinMeetup: ошибка #${meetupId}`)
-    return null
-  }
-}
-
-// 7. Отписаться от мероприятия
-async function leaveMeetup(meetupId, userId) {
-  try {
-    const res = await fetch(api(`/meetups/${meetupId}/leave?user_id=${userId}`), {
-      method: 'DELETE'
-    })
-    const data = await res.json()
-    const meetup = myMeetups.value.find(m => m.id === meetupId)
-    if (meetup) {
-      meetup.isJoined = false
-      meetup.participants = data.participants
-    }
-    return data
-  } catch (e) {
-    if (config.isDebug) console.warn(`leaveMeetup: ошибка #${meetupId}`)
-    return null
   }
 }
 
@@ -949,6 +942,24 @@ onMounted(async () => {
   padding: 0 4px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.see-all {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.see-all:hover {
+  opacity: 0.7;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -1002,6 +1013,138 @@ onMounted(async () => {
 .create-btn span {
   font-weight: bold;
   letter-spacing: 0.025em;
+}
+
+/* Meetup Tabs */
+.meetup-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.meetup-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid #e7e8e9;
+  background: var(--surface-container-low);
+  color: #787170;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.meetup-tab.active {
+  border-color: var(--primary);
+  background: #ffedd5;
+  color: var(--primary);
+}
+
+.meetup-tab:hover:not(.active) {
+  border-color: var(--primary);
+  background: #fff7ed;
+}
+
+/* Meetup Description */
+.meetup-desc {
+  font-size: 12px;
+  color: #787170;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Meetup Tags */
+.meetup-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.meetup-type-tag {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #f5f5f4;
+  color: #787170;
+}
+
+.meetup-quiet-tag {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* Join Button with text */
+.join-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--primary-container);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.join-btn:hover {
+  background: #ea580c;
+  transform: scale(1.05);
+}
+
+.join-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Empty state */
+.meetup-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #a8a29e;
+}
+
+.meetup-empty .empty-icon {
+  font-size: 48px;
+  font-variation-settings: 'FILL' 1;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.meetup-empty p {
+  font-size: 14px;
+  margin: 0;
+}
+
+.empty-cta {
+  margin-top: 16px;
+  background: var(--primary-container);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.empty-cta:hover {
+  background: #ea580c;
+  transform: scale(1.05);
 }
 
 /* Meetup Cards */

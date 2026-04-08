@@ -190,6 +190,9 @@ GET /meetups/my
       "locationShort": "Парк",
       "location": "Парк Победы, ул. Комсомольская",
       "level": "Новичок",
+      "description": "Лёгкое кардио для разогрева.",
+      "type": "Бег",
+      "quietCompanion": false,
       "participants": 3,
       "maxParticipants": 5,
       "isJoined": true,
@@ -197,6 +200,42 @@ GET /meetups/my
         "https://...",
         "https://..."
       ],
+      "moreCount": 2
+    }
+  ]
+}
+```
+
+> Сейчас `user_id` не передаётся — можно захардкодить `user_id = 1` для теста. Позже добавим JWT-токен.
+
+---
+
+## 5b. Все встречи (для вкладки «Все встречи»)
+
+```
+GET /meetups
+```
+
+**Запрос:** без тела
+
+**Ответ `200 OK`:**
+```json
+{
+  "meetups": [
+    {
+      "id": 1,
+      "name": "Вечернее кардио",
+      "time": "19:00",
+      "locationShort": "Парк",
+      "location": "Парк Победы, ул. Комсомольская",
+      "level": "Новичок",
+      "description": "Лёгкое кардио для разогрева.",
+      "type": "Бег",
+      "quietCompanion": false,
+      "participants": 3,
+      "maxParticipants": 5,
+      "isJoined": true,
+      "avatars": ["https://..."],
       "moreCount": 2
     },
     {
@@ -206,19 +245,37 @@ GET /meetups/my
       "locationShort": "Уличная арена",
       "location": "Стадион «Центральный»",
       "level": "Открыто",
+      "description": "Изучаем базовые элементы.",
+      "type": "Гимнастика",
+      "quietCompanion": false,
       "participants": 1,
       "maxParticipants": 8,
       "isJoined": false,
-      "avatars": [
-        "https://..."
-      ],
+      "avatars": ["https://..."],
       "moreCount": 4
     }
   ]
 }
 ```
 
-> Сейчас `user_id` не передаётся — можно захардкодить `user_id = 1` для теста. Позже добавим JWT-токен.
+**Поля объекта Meetup:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | `number` | Уникальный ID |
+| `name` | `string` | Название мероприятия |
+| `time` | `string` | Время (например `19:00`) |
+| `locationShort` | `string` | Краткое место для карточки |
+| `location` | `string` | Полное место |
+| `level` | `string` | Уровень: `Новичок`, `Средний`, `Продвинутый`, `Открыто` |
+| `description` | `string` | Описание мероприятия |
+| `type` | `string` | Тип: `Бег`, `Пауэрлифтинг`, `Растяжка`, `Гимнастика` |
+| `quietCompanion` | `boolean` | Пометка «Тихий компаньон» |
+| `participants` | `number` | Сколько уже записано |
+| `maxParticipants` | `number` | Максимум участников |
+| `isJoined` | `boolean` | Записан ли текущий пользователь |
+| `avatars` | `string[]` | URL аватарок участников (до 3) |
+| `moreCount` | `number` | Сколько ещё участников (показать как `+N`) |
 
 ---
 
