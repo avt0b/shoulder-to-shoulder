@@ -21,7 +21,89 @@
         <span class="material-symbols-outlined">search</span>
         <input type="text" placeholder="Поиск мест..." />
       </div>
+      <button class="filter-toggle-btn" @click="showFilters = !showFilters">
+        <span class="material-symbols-outlined">tune</span>
+      </button>
     </header>
+
+    <!-- Filters Panel -->
+    <div class="filters-panel" :class="{ open: showFilters }">
+      <div class="filters-header">
+        <h3>Фильтры</h3>
+        <button class="reset-filters-btn" @click="resetFilters">Сбросить</button>
+      </div>
+
+      <!-- Тип активности -->
+      <div class="filter-group">
+        <label class="filter-label">Тип активности</label>
+        <div class="filter-chips">
+          <button
+            v-for="chip in activityTypes"
+            :key="chip.key"
+            class="filter-chip"
+            :class="{ active: filters.activityType === chip.key }"
+            @click="filters.activityType = filters.activityType === chip.key ? '' : chip.key"
+          >
+            {{ chip.emoji }} {{ chip.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Уровень шума/людности -->
+      <div class="filter-group">
+        <label class="filter-label">Уровень шума</label>
+        <div class="filter-chips">
+          <button
+            v-for="chip in noiseLevels"
+            :key="chip.key"
+            class="filter-chip"
+            :class="{ active: filters.noiseLevel === chip.key }"
+            @click="filters.noiseLevel = filters.noiseLevel === chip.key ? '' : chip.key"
+          >
+            {{ chip.emoji }} {{ chip.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Освещение -->
+      <div class="filter-group">
+        <label class="filter-label">
+          <input type="checkbox" v-model="filters.lit" />
+          <span class="filter-checkbox-box">
+            <span class="material-symbols-outlined">check</span>
+          </span>
+          💡 Освещённая территория
+        </label>
+      </div>
+
+      <!-- Раздевалки -->
+      <div class="filter-group">
+        <label class="filter-label">
+          <input type="checkbox" v-model="filters.lockers" />
+          <span class="filter-checkbox-box">
+            <span class="material-symbols-outlined">check</span>
+          </span>
+          🚿 Есть раздевалки
+        </label>
+      </div>
+
+      <!-- Скамейки -->
+      <div class="filter-group">
+        <label class="filter-label">
+          <input type="checkbox" v-model="filters.benches" />
+          <span class="filter-checkbox-box">
+            <span class="material-symbols-outlined">check</span>
+          </span>
+          🪑 Есть скамейки
+        </label>
+      </div>
+
+      <!-- Apply Button -->
+      <button class="apply-filters-btn" @click="applyFilters">
+        <span class="material-symbols-outlined">search</span>
+        <span>Применить ({{ filteredPlacesCount }} мест)</span>
+      </button>
+    </div>
 
     <!-- Map Controls -->
     <div class="map-controls">
@@ -67,9 +149,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { config, api } from '../config'
 
 const emit = defineEmits(['close'])
 
@@ -82,8 +165,38 @@ let isDarkMode = ref(false)
 let isTransitioning = ref(false)
 let overlayStyle = ref({})
 
-// Заглушка — позже данные придут с бэкенда
-const places = [
+// ============================================
+// 🔍 Фильтры
+// ============================================
+
+const showFilters = ref(false)
+
+const activityTypes = [
+  { key: 'running', emoji: '🏃', label: 'Бег' },
+  { key: 'strength', emoji: '🏋️', label: 'Силовая' },
+  { key: 'yoga', emoji: '🧘', label: 'Йога' },
+  { key: 'calisthenics', emoji: '💪', label: 'Воркаут' }
+]
+
+const noiseLevels = [
+  { key: 'quiet', emoji: '🤫', label: 'Тихо' },
+  { key: 'moderate', emoji: '😐', label: 'Средне' },
+  { key: 'loud', emoji: '📢', label: 'Шумно' }
+]
+
+const filters = ref({
+  activityType: '',
+  noiseLevel: '',
+  lit: false,
+  lockers: false,
+  benches: false
+})
+
+// Места с бэкенда
+const places = ref([])
+
+// Моковые данные (fallback)
+const mockPlaces = [
   {
     id: 1, name: 'Парк Победы',
     description: 'Отличное место для утренних пробежек и групповых тренировок.',
@@ -94,7 +207,8 @@ const places = [
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop',
       'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop'
     ],
-    category: 'park', address: 'ул. Комсомольская, Орёл'
+    category: 'park', address: 'ул. Комсомольская, Орёл',
+    activityType: 'running', noiseLevel: 'moderate', lit: true, lockers: false, benches: true
   },
   {
     id: 2, name: 'Стадион «Центральный»',
@@ -106,7 +220,8 @@ const places = [
       'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop',
       'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop'
     ],
-    category: 'stadium', address: 'ул. Ленина, Орёл'
+    category: 'stadium', address: 'ул. Ленина, Орёл',
+    activityType: 'strength', noiseLevel: 'loud', lit: true, lockers: true, benches: true
   },
   {
     id: 3, name: 'Набережная Оки',
@@ -118,7 +233,8 @@ const places = [
       'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop',
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop'
     ],
-    category: 'river', address: 'Набережная Оки, Орёл'
+    category: 'river', address: 'Набережная Оки, Орёл',
+    activityType: 'yoga', noiseLevel: 'quiet', lit: false, lockers: false, benches: true
   },
   {
     id: 4, name: 'Спортивная площадка',
@@ -130,9 +246,67 @@ const places = [
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop',
       'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop'
     ],
-    category: 'playground', address: 'ул. Гая, Орёл'
+    category: 'playground', address: 'ул. Гая, Орёл',
+    activityType: 'calisthenics', noiseLevel: 'moderate', lit: true, lockers: false, benches: false
   }
 ]
+
+// Фильтрация локально (для fallback)
+const filteredMockPlaces = computed(() => {
+  return mockPlaces.filter(p => {
+    if (filters.value.activityType && p.activityType !== filters.value.activityType) return false
+    if (filters.value.noiseLevel && p.noiseLevel !== filters.value.noiseLevel) return false
+    if (filters.value.lit && !p.lit) return false
+    if (filters.value.lockers && !p.lockers) return false
+    if (filters.value.benches && !p.benches) return false
+    return true
+  })
+})
+
+// Количество отфильтрованных мест
+const filteredPlacesCount = computed(() => {
+  if (places.value.length > 0) {
+    // Серверная фильтрация — показываем длину ответа
+    return places.value.length
+  }
+  return filteredMockPlaces.value.length
+})
+
+function resetFilters() {
+  filters.value = {
+    activityType: '',
+    noiseLevel: '',
+    lit: false,
+    lockers: false,
+    benches: false
+  }
+}
+
+async function applyFilters() {
+  await fetchPlaces()
+}
+
+// Получить места с бэкенда (с фильтрами)
+async function fetchPlaces() {
+  try {
+    const params = new URLSearchParams()
+    if (filters.value.activityType) params.append('activity_type', filters.value.activityType)
+    if (filters.value.noiseLevel) params.append('noise_level', filters.value.noiseLevel)
+    if (filters.value.lit) params.append('lit', 'true')
+    if (filters.value.lockers) params.append('lockers', 'true')
+    if (filters.value.benches) params.append('benches', 'true')
+
+    const url = params.toString() ? `${api('/places')}?${params.toString()}` : api('/places')
+    const res = await fetch(url)
+    const data = await res.json()
+    places.value = data.places
+    addPlaceMarkers()
+  } catch (e) {
+    if (config.isDebug) console.warn('fetchPlaces: API недоступен, локальная фильтрация')
+    places.value = filteredMockPlaces.value
+    addPlaceMarkers()
+  }
+}
 
 const handleNav = (nav) => {
   activeNav.value = nav
@@ -319,7 +493,7 @@ onMounted(async () => {
       position: 'topleft'
     }).addTo(map)
 
-    addPlaceMarkers()
+    await fetchPlaces()
 
     setTimeout(() => map.invalidateSize(), 100)
   }
@@ -922,5 +1096,197 @@ onMounted(async () => {
 
 .filled {
   font-variation-settings: 'FILL' 1;
+}
+
+/* ============================================
+   Filters Panel
+   ============================================ */
+
+.filter-toggle-btn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.filter-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.filter-toggle-btn:active {
+  transform: scale(0.92);
+}
+
+.filters-panel {
+  position: fixed;
+  top: 72px;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  background: var(--surface-container-lowest);
+  border-radius: 0 0 24px 24px;
+  padding: 0 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.35s ease;
+}
+
+.filters-panel.open {
+  max-height: 80dvh;
+  overflow-y: auto;
+  opacity: 1;
+  padding: 16px 16px 20px;
+}
+
+.filters-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filters-header h3 {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1c1917;
+  margin: 0;
+}
+
+.reset-filters-btn {
+  font-size: 12px;
+  color: var(--primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.reset-filters-btn:hover {
+  background: #fff7ed;
+}
+
+.filter-group {
+  margin-bottom: 16px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #787170;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.filter-label input[type="checkbox"] {
+  display: none;
+}
+
+.filter-checkbox-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.filter-label input:checked + .filter-checkbox-box {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.filter-checkbox-box .material-symbols-outlined {
+  font-size: 16px;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.filter-label input:checked + .filter-checkbox-box .material-symbols-outlined {
+  opacity: 1;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.filter-chip {
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 2px solid #e7e8e9;
+  background: var(--surface-container-low);
+  color: #787170;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.filter-chip:hover {
+  border-color: var(--primary);
+  background: #fff7ed;
+}
+
+.filter-chip.active {
+  border-color: var(--primary);
+  background: #ffedd5;
+  color: var(--primary);
+}
+
+.apply-filters-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: white;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  margin-top: 8px;
+}
+
+.apply-filters-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3);
+}
+
+.apply-filters-btn:active {
+  transform: scale(0.98);
+}
+
+.apply-filters-btn .material-symbols-outlined {
+  font-size: 20px;
 }
 </style>

@@ -27,6 +27,11 @@ GET /places
       "rating": 4.7,
       "emoji": "🏃",
       "category": "park",
+      "activityType": "running",
+      "noiseLevel": "moderate",
+      "lit": true,
+      "lockers": false,
+      "benches": true,
       "address": "ул. Комсомольская, Орёл",
       "image": "https://...",
       "gallery": [
@@ -34,6 +39,74 @@ GET /places
         "https://...",
         "https://..."
       ]
+    }
+  ]
+}
+```
+
+**Поля объекта Place:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `id` | `number` | Уникальный ID |
+| `name` | `string` | Название места |
+| `description` | `string` | Краткое описание |
+| `lat` | `number` | Широта (координаты) |
+| `lng` | `number` | Долгота (координаты) |
+| `rating` | `number` | Рейтинг (0-5) |
+| `emoji` | `string` | Эмодзи-иконка (🏃🏋️🧘💪) |
+| `category` | `string` | Категория: `park`, `stadium`, `river`, `playground` |
+| `activityType` | `string` | Тип активности: `running`, `strength`, `yoga`, `calisthenics` |
+| `noiseLevel` | `string` | Уровень шума: `quiet`, `moderate`, `loud` |
+| `lit` | `boolean` | Освещённая территория |
+| `lockers` | `boolean` | Есть раздевалки |
+| `benches` | `boolean` | Есть скамейки |
+| `address` | `string` | Адрес |
+| `image` | `string` | URL главного изображения |
+| `gallery` | `string[]` | Массив URL фотографий (3 шт) |
+
+---
+
+## 1b. Фильтрация мест
+
+```
+GET /places?activity_type=running&noise_level=quiet&lit=true&lockers=true&benches=true
+```
+
+**Query-параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `activity_type` | `string` | Фильтр по типу: `running`, `strength`, `yoga`, `calisthenics` |
+| `noise_level` | `string` | Фильтр по шуму: `quiet`, `moderate`, `loud` |
+| `lit` | `boolean` | Только освещённые (`true`) |
+| `lockers` | `boolean` | Только с раздевалками (`true`) |
+| `benches` | `boolean` | Только со скамейками (`true`) |
+
+> Все параметры опциональны. Если не переданы — возвращаются все места.
+> Фильтры комбинируются (AND).
+
+**Ответ `200 OK`:**
+```json
+{
+  "places": [
+    {
+      "id": 3,
+      "name": "Набережная Оки",
+      "description": "Живописный маршрут вдоль реки...",
+      "lat": 52.9670,
+      "lng": 36.0680,
+      "rating": 4.8,
+      "emoji": "🧘",
+      "category": "river",
+      "activityType": "yoga",
+      "noiseLevel": "quiet",
+      "lit": false,
+      "lockers": false,
+      "benches": true,
+      "address": "Набережная Оки, Орёл",
+      "image": "https://...",
+      "gallery": ["https://...", "https://...", "https://..."]
     }
   ]
 }
