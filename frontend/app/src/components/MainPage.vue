@@ -1215,10 +1215,13 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .avatars {
   display: flex;
+  flex-shrink: 0;
   margin-left: -8px;
 }
 
@@ -1243,7 +1246,9 @@ onMounted(async () => {
 .join-section {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .join-count {

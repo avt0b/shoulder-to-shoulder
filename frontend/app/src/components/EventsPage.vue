@@ -948,10 +948,13 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .avatars-row {
   display: flex;
+  flex-shrink: 0;
   margin-left: -8px;
 }
 
@@ -986,7 +989,9 @@ onMounted(async () => {
 .event-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .participants-count {
