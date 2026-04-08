@@ -24,7 +24,7 @@ async def get_current_user_token(token: str = Depends(oauth2_scheme)) -> dict:
         )
     return payload
 
-
+#TODO: чуть позже посмотреть по тому, чтобы забаненного пользователя снести
 def require_role(required_role: UserRole = "moderator"):
     async def role_checker(token_data: dict = Depends(get_current_user_token)) -> dict:
         user_role = token_data.get("role", "user")
