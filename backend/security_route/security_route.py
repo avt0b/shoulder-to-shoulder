@@ -1,5 +1,10 @@
 import requests
 
+proxies = {
+    "http": "socks5h://127.0.0.1:12334",
+    "https": "socks5h://127.0.0.1:12334",
+}
+
 def get_route(start_lat, start_lon, end_lat, end_lon):
     url = (
         f"https://router.project-osrm.org/route/v1/foot/"
@@ -7,7 +12,7 @@ def get_route(start_lat, start_lon, end_lat, end_lon):
         f"?overview=full&geometries=polyline"
     )
 
-    response = requests.get(url)
+    response = requests.get(url, proxies=proxies)
     data = response.json()
 
     if data["code"] != "Ok":
@@ -23,17 +28,17 @@ def get_route(start_lat, start_lon, end_lat, end_lon):
     return route, distance
 
 
-def check_safety(lat, lon):
-    query = f"""
-    [out:json];
-    way(around:10,{lat},{lon});
-    out body;
-    """
-
-    response = requests.post(
-        "https://overpass-api.de/api/interpreter",
-        data={"data": query}
+def check_safety(points):
+    url = (
+        f'https://overpass-api.de/api/interpreter?data=[out:json];('
     )
+
+    for point in points: 
+        url += f'way(around:5,{point [0]},{point[1]})["highway"];'
+
+    url += ')["lit"];out%20body;'
+
+    response = requests.get(url, proxies=proxies)
 
     data = response.json()
     score = 0
@@ -61,17 +66,14 @@ def check_safety(lat, lon):
 def evaluate_route(start_lat, start_lon, end_lat, end_lon):
     route, distance = get_route(start_lat, start_lon, end_lat, end_lon)
 
-    total_score = 0
-
-    for lat, lon in route:
-        total_score += check_safety(lat, lon)
+#    total_score = check_safety(route)
 
     return {
         "route": route,
         "distance_meters": distance,
-        "safety_score": total_score
+#        "safety_score": total_score
     }
 
-if __name__ == "__main__":
-    ans = evaluate_route(52.974914, 36.051040, 52.971851, 36.057492)
-    print(ans)
+def get_safety_route(start_lat, start_lon, end_lat, end_lon):
+    ans = evaluate_route(start_lat, start_lon, end_lat, end_lon)
+    return ans
