@@ -253,6 +253,24 @@
             </label>
           </div>
 
+          <!-- Уровень -->
+          <div class="form-group">
+            <label>Уровень подготовки</label>
+            <div class="level-selector">
+              <button
+                v-for="lvl in mainLevels"
+                :key="lvl.key"
+                type="button"
+                class="level-btn"
+                :class="{ 'level-btn-active': form.level === lvl.key }"
+                @click="form.level = lvl.key"
+              >
+                <span class="level-emoji">{{ lvl.emoji }}</span>
+                <span class="level-name">{{ lvl.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Выбор места -->
           <div class="form-group location-group">
             <label>Место проведения</label>
@@ -350,6 +368,12 @@ const typeEmoji = {
   gymnastics: '🤸'
 }
 
+const mainLevels = [
+  { key: 'Новичок', emoji: '🌱', label: 'Новичок' },
+  { key: 'Средний', emoji: '⚡', label: 'Средний' },
+  { key: 'Профи', emoji: '🔥', label: 'Профи' }
+]
+
 const form = ref({
   name: '',
   type: '',
@@ -357,6 +381,7 @@ const form = ref({
   date: '',
   time: '',
   quietCompanion: false,
+  level: 'Новичок',
   locationId: ''
 })
 
@@ -412,6 +437,7 @@ function resetForm() {
     date: '',
     time: '',
     quietCompanion: false,
+    level: 'Новичок',
     locationId: ''
   }
   locationQuery.value = ''
@@ -469,7 +495,7 @@ async function submitEventToBackend(eventData) {
       locationShort: eventData.locationShort,
       location: eventData.location,
       description: '',
-      level: 'Открыто',
+      level: eventData.level,
       type: eventData.type,
       quietCompanion: eventData.quietCompanion,
       participants: 1,
@@ -501,6 +527,7 @@ function submitEvent() {
     location: `${location?.name}, ${location?.address}`,
     description: '',
     quietCompanion: form.value.quietCompanion,
+    level: form.value.level,
     maxParticipants: form.value.maxParticipants,
     user_id: 1
   }

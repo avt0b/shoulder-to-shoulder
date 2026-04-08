@@ -185,6 +185,24 @@
             </label>
           </div>
 
+          <!-- Уровень -->
+          <div class="form-group">
+            <label>Уровень подготовки</label>
+            <div class="level-selector">
+              <button
+                v-for="lvl in levels"
+                :key="lvl.key"
+                type="button"
+                class="level-btn"
+                :class="{ 'level-btn-active': form.level === lvl.key }"
+                @click="form.level = lvl.key"
+              >
+                <span class="level-emoji">{{ lvl.emoji }}</span>
+                <span class="level-name">{{ lvl.label }}</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Выбор места (поиск + dropdown) -->
           <div class="form-group location-group">
             <label>Место проведения</label>
@@ -448,6 +466,13 @@ function hideLocationDropdownDelayed() {
   }, 200)
 }
 
+// Уровни
+const levels = [
+  { key: 'Новичок', emoji: '🌱', label: 'Новичок' },
+  { key: 'Средний', emoji: '⚡', label: 'Средний' },
+  { key: 'Профи', emoji: '🔥', label: 'Профи' }
+]
+
 // Форма нового мероприятия
 const form = ref({
   name: '',
@@ -456,6 +481,7 @@ const form = ref({
   date: '',
   time: '',
   quietCompanion: false,
+  level: 'Новичок',
   locationId: ''
 })
 
@@ -648,6 +674,7 @@ function resetForm() {
     date: '',
     time: '',
     quietCompanion: false,
+    level: 'Новичок',
     locationId: ''
   }
   locationQuery.value = ''
@@ -669,6 +696,7 @@ function submitEvent() {
     location: `${location?.name}, ${location?.address}`,
     description: '',
     quietCompanion: form.value.quietCompanion,
+    level: form.value.level,
     maxParticipants: form.value.maxParticipants,
     user_id: 1
   }
@@ -1223,6 +1251,51 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+}
+
+/* Level Selector */
+.level-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 4px;
+  border-radius: 12px;
+  border: 2px solid #e7e8e9;
+  background: var(--surface-container-low);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.level-btn:hover {
+  border-color: var(--primary);
+  background: #fff7ed;
+}
+
+.level-btn-active {
+  border-color: var(--primary);
+  background: #ffedd5;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.2);
+}
+
+.level-emoji {
+  font-size: 24px;
+}
+
+.level-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #787170;
+}
+
+.level-btn-active .level-name {
+  color: var(--primary);
 }
 
 .type-btn {
