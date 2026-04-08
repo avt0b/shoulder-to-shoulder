@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  # Ваш микросервис
+  app:
+    build: ./app
+    container_name: maps_service
+    ports:
+      - "${APP_PORT:-3000}:${APP_PORT:-3000}"
+    environment:
+      - PORT=${APP_PORT:-3000}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-postgres}:5432/${POSTGRES_DB}?sslmode=disable
+      - REDIS_URL=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - maps_service_net
+    restart: unless-stopped
+
+  # PostgreSQL 17 Alpine
+  postgres:
+    image: postgis/postgis:17-3.4-alpine
+    container_name: shake_db
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - maps_service_net
+    restart: unless-stopped
+
+  # Redis (GEO встроен с 3.2+)
+  redis:
+    image: redis:7-alpine
+    container_name: maps_redis
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory 256mb 
+      --maxmemory-policy allkeys-lru 
+      --save 60 1
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - maps_service_net
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  maps_service_net:
+    driver: bridge
