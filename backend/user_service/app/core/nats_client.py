@@ -3,7 +3,7 @@
 import json
 import logging
 from uuid import UUID
-
+from jose import jwt, JWTError, ExpiredSignatureError
 from nats.aio.client import Client as NATS
 
 from backend.user_service.app.core.config import settings
@@ -265,6 +265,37 @@ async def handle_admin_check_permission(msg):
     except Exception as e:
         logger.exception("Permission check failed")
         await msg.respond(json.dumps({"ok": False, "error": str(e)}).encode())
+
+
+async def handle_auth_validate_token(msg):
+    data = json.loads(msg.data.decode())
+    token = data.get("token")
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id = payload.get("sub")
+        if not user_id:
+            raise ValueError("Missing subject")
+
+        async with AsyncSessionLocal() as db:
+            user_repo = UserRepository(db)
+            user = await user_repo.get_by_id(user_id)
+            if not user or not user.is_active:
+                await msg.respond(json.dumps({"ok": False, "error": "Account banned or not found"}).encode())
+                return
+
+        await msg.respond(json.dumps({
+            "ok": True,
+            "data": {"user_id": user_id, "is_active": True}
+        }).encode())
+
+    except ExpiredSignatureError:
+        await msg.respond(json.dumps({"ok": False, "error": "Token expired"}).encode())
+    except JWTError:
+        await msg.respond(json.dumps({"ok": False, "error": "Invalid token"}).encode())
+    except Exception as e:
+        logger.exception("Auth validation failed")
+        await msg.respond(json.dumps({"ok": False, "error": "Internal auth error"}).encode())
 
 
 
