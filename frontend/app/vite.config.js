@@ -14,28 +14,13 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/maps': {
-        target: 'http://localhost:8001',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/maps/, '/api/v1'),
       }
     }
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'vue': ['vue', 'vue-router', 'pinia'],
-          'maps': ['leaflet', 'leaflet-routing-machine'],
-          'api': ['axios'],
-        }
-      }
-    }
   }
 })

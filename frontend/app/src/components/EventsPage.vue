@@ -536,7 +536,7 @@ async function fetchAllEvents() {
   try {
     const res = await fetch(api('/events'))
     const data = await res.json()
-    allEvents.value = data.events
+    allEvents.value = data.events || []
     return data.events
   } catch (e) {
     if (config.isDebug) console.warn('fetchAllEvents: API недоступен')

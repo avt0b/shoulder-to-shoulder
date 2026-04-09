@@ -39,10 +39,7 @@
         <!-- Map Overlay -->
         <div class="map-overlay">
           <div class="map-controls">
-            <button class="control-btn">
-              <span class="material-symbols-outlined">layers</span>
-            </button>
-            <button class="control-btn">
+            <button class="control-btn" title="Моё местоположение">
               <span class="material-symbols-outlined">my_location</span>
             </button>
           </div>
@@ -54,6 +51,26 @@
         </div>
       </section>
 
+      <!-- Navigation Info Bar (показывается при активной навигации) -->
+      <section v-if="isNavigating" class="nav-info-section">
+        <div class="nav-info-card">
+          <div class="nav-info-icon">
+            <span class="material-symbols-outlined">navigation</span>
+          </div>
+          <div class="nav-info-data">
+            <div class="nav-info-row">
+              <span class="material-symbols-outlined">straighten</span>
+              <span class="nav-info-value">{{ navRemaining.distance }}</span>
+            </div>
+            <div class="nav-info-row">
+              <span class="material-symbols-outlined">schedule</span>
+              <span class="nav-info-value">{{ navRemaining.duration }}</span>
+            </div>
+          </div>
+          <div class="nav-info-label">Осталось</div>
+        </div>
+      </section>
+
       <!-- Meetups Section -->
       <section class="meetups-section">
         <div class="section-header">
@@ -61,7 +78,7 @@
           <span class="see-all" @click="$emit('navigate', 'events')">Все встречи →</span>
         </div>
 
-        <button class="create-btn" @click="showCreateModal = true">
+        <button class="create-btn" type="button" @click.stop="openCreateModal">
           <span class="material-symbols-outlined">add_circle</span>
           <span>Создать встречу</span>
         </button>
@@ -319,16 +336,23 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, api } from '../config'
+import { navigationStore } from '../stores/navigation'
 
 const emit = defineEmits(['expand-map', 'navigate'])
 
 const activeNav = ref('map')
 const mapRef = ref(null)
 let map = null
+let miniRouteLayer = null
+let miniUserLayer = null
+
+// Подписка на навигацию из общего стора
+const isNavigating = computed(() => navigationStore.isNavigating)
+const navRemaining = computed(() => navigationStore.navRemaining)
 
 // Ваши мероприятия — заглушка (заменить на API)
 const myMeetups = ref([])
@@ -549,21 +573,22 @@ async function handleJoinMeetup(meetupId, userId = 1) {
     })
     const data = await res.json()
 
-    const meetup = myMeetups.value.find(m => m.id === meetupId)
-    if (meetup) {
-      meetup.isJoined = true
-      meetup.participants = data.participants
+    const idx = myMeetups.value.findIndex(m => m.id === meetupId)
+    if (idx !== -1) {
+      myMeetups.value[idx] = { ...myMeetups.value[idx], isJoined: true, participants: data.participants }
     }
 
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`handleJoinMeetup: API недоступен, localStorage`)
 
-    const meetup = myMeetups.value.find(m => m.id === meetupId)
-    if (meetup && meetup.participants < meetup.maxParticipants && !meetup.isJoined) {
-      meetup.isJoined = true
-      meetup.participants++
-      saveToLocalStorage(myMeetups.value)
+    const idx = myMeetups.value.findIndex(m => m.id === meetupId)
+    if (idx !== -1) {
+      const m = myMeetups.value[idx]
+      if (m.participants < m.maxParticipants && !m.isJoined) {
+        myMeetups.value[idx] = { ...m, isJoined: true, participants: m.participants + 1 }
+        saveToLocalStorage(myMeetups.value)
+      }
     }
     return null
   }
@@ -576,21 +601,22 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
     })
     const data = await res.json()
 
-    const meetup = myMeetups.value.find(m => m.id === meetupId)
-    if (meetup) {
-      meetup.isJoined = false
-      meetup.participants = data.participants
+    const idx = myMeetups.value.findIndex(m => m.id === meetupId)
+    if (idx !== -1) {
+      myMeetups.value[idx] = { ...myMeetups.value[idx], isJoined: false, participants: data.participants }
     }
 
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`handleLeaveMeetup: API недоступен, localStorage`)
 
-    const meetup = myMeetups.value.find(m => m.id === meetupId)
-    if (meetup && meetup.isJoined) {
-      meetup.isJoined = false
-      meetup.participants--
-      saveToLocalStorage(myMeetups.value)
+    const idx = myMeetups.value.findIndex(m => m.id === meetupId)
+    if (idx !== -1) {
+      const m = myMeetups.value[idx]
+      if (m.isJoined) {
+        myMeetups.value[idx] = { ...m, isJoined: false, participants: m.participants - 1 }
+        saveToLocalStorage(myMeetups.value)
+      }
     }
     return null
   }
@@ -700,7 +726,7 @@ async function fetchMyMeetups() {
   try {
     const res = await fetch(api('/meetups/my'))
     const data = await res.json()
-    myMeetups.value = data.meetups
+    myMeetups.value = data.meetups || []
   } catch (e) {
     if (config.isDebug) console.warn('fetchMyMeetups: API недоступен, используем заглушку')
     myMeetups.value = mockMeetups
@@ -743,6 +769,99 @@ onMounted(async () => {
   // Загружаем мероприятия (заглушка или API)
   await fetchMyMeetups()
 })
+
+// Отслеживаем изменения навигации — рисуем маршрут на мини-карте
+watch(
+  () => navigationStore.isNavigating,
+  async (val) => {
+    await nextTick()
+    if (config.isDebug) console.log('MainPage nav watch:', val, 'map:', !!map)
+    if (val && map) {
+      drawMiniRoute()
+    } else if (!val) {
+      clearMiniRoute()
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => navigationStore.routeCoords.length,
+  async (len) => {
+    await nextTick()
+    if (config.isDebug) console.log('MainPage routeCoords watch:', len, 'map:', !!map)
+    if (map && navigationStore.isNavigating && len > 0) {
+      drawMiniRoute()
+    }
+  }
+)
+
+watch(
+  () => navigationStore.userPosition,
+  async (pos) => {
+    await nextTick()
+    if (config.isDebug) console.log('MainPage userPos watch:', pos, 'map:', !!map)
+    if (map && navigationStore.isNavigating) {
+      drawMiniRoute()
+    }
+  }
+)
+
+function drawMiniRoute() {
+  if (!map) {
+    if (config.isDebug) console.warn('drawMiniRoute: map not ready')
+    return
+  }
+  clearMiniRoute()
+
+  const coords = navigationStore.routeCoords
+  if (!coords || coords.length === 0) {
+    if (config.isDebug) console.warn('drawMiniRoute: no coords')
+    return
+  }
+
+  if (config.isDebug) console.log('drawMiniRoute: drawing', coords.length, 'points')
+
+  const routeColor = navigationStore.routeColor
+
+  // Рисуем маршрут
+  miniRouteLayer = L.polyline(coords, {
+    color: routeColor,
+    weight: 4,
+    opacity: 0.9,
+    smoothFactor: 1
+  }).addTo(map)
+
+  // Точка пользователя
+  if (navigationStore.userPosition) {
+    miniUserLayer = L.circleMarker(
+      [navigationStore.userPosition.lat, navigationStore.userPosition.lng],
+      {
+        radius: 6,
+        fillColor: '#3b82f6',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.9
+      }
+    ).addTo(map)
+  }
+
+  // Фитим карту под маршрут
+  try {
+    map.fitBounds(miniRouteLayer.getBounds(), { padding: [20, 20] })
+  } catch (e) {}
+}
+
+function clearMiniRoute() {
+  if (miniRouteLayer) {
+    map.removeLayer(miniRouteLayer)
+    miniRouteLayer = null
+  }
+  if (miniUserLayer) {
+    map.removeLayer(miniUserLayer)
+    miniUserLayer = null
+  }
+}
 </script>
 
 <style scoped>
@@ -1016,6 +1135,80 @@ onMounted(async () => {
   opacity: 0.7;
 }
 
+/* Navigation Info Section */
+.nav-info-section {
+  margin-top: -8px;
+}
+
+.nav-info-card {
+  background: var(--surface-container-lowest);
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 2px solid var(--primary);
+  animation: navPulse 2s ease-in-out infinite;
+}
+
+@keyframes navPulse {
+  0%, 100% { border-color: var(--primary); }
+  50% { border-color: #f97316; }
+}
+
+.nav-info-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.nav-info-icon .material-symbols-outlined {
+  font-size: 24px;
+  color: white;
+}
+
+.nav-info-data {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nav-info-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-info-row .material-symbols-outlined {
+  font-size: 18px;
+  color: var(--primary);
+}
+
+.nav-info-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1c1917;
+}
+
+.nav-info-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #a8a29e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+/* Tabs */
 .tabs {
   display: flex;
   gap: 8px;
@@ -1614,6 +1807,51 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
+}
+
+/* Level Selector */
+.level-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.level-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 4px;
+  border-radius: 12px;
+  border: 2px solid #e7e8e9;
+  background: var(--surface-container-low);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.level-btn:hover {
+  border-color: var(--primary);
+  background: #fff7ed;
+}
+
+.level-btn-active {
+  border-color: var(--primary);
+  background: #ffedd5;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.2);
+}
+
+.level-emoji {
+  font-size: 24px;
+}
+
+.level-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #787170;
+}
+
+.level-btn-active .level-name {
+  color: var(--primary);
 }
 
 .type-btn {

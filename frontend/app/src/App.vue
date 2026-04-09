@@ -2,7 +2,7 @@
   <div class="app-container">
     <!-- Map Fullscreen -->
     <transition name="map-expand" mode="out-in">
-      <MapLight v-if="isMapExpanded" @close="closeMap" />
+      <MapLight v-if="isMapExpanded" @close="closeMap" @navigate="handleNavigateFromMap" />
 
       <!-- Events Page -->
       <EventsPage
@@ -37,6 +37,11 @@ const closeMap = () => {
 const handleNavigate = (page) => {
   currentPage.value = page
 }
+
+const handleNavigateFromMap = (page) => {
+  isMapExpanded.value = false
+  currentPage.value = page
+}
 </script>
 
 <style scoped>
@@ -44,7 +49,6 @@ const handleNavigate = (page) => {
   position: relative;
   width: 100%;
   min-height: 100dvh;
-  overflow: hidden;
 }
 
 .map-expand-enter-active,

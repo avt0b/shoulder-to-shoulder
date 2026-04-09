@@ -64,7 +64,50 @@ GET /places/{id}
 
 ---
 
-### 3. Маршрут (прокси OSRM)
+### 3. Безопасный маршрут (Быстрый старт)
+
+```
+GET /route/safe?start_lat=52.9651&start_lng=36.0785&end_lat=52.9690&end_lng=36.0820
+```
+
+**Query-параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| `start_lat` | `number` | Широта начальной точки |
+| `start_lng` | `number` | Долгота начальной точки |
+| `end_lat` | `number` | Широта конечной точки |
+| `end_lng` | `number` | Долгота конечной точки |
+
+**Ответ `200 OK`:**
+```json
+{
+  "shortest_route": {
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[36.0785, 52.9651], ...]
+    },
+    "distance": 1250,
+    "duration": 900
+  },
+  "safest_route": {
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[36.0785, 52.9651], ...]
+    },
+    "distance": 1400,
+    "duration": 1050
+  }
+}
+```
+
+> На бэке вызывается `get_safety_route(start_lat, start_lng, end_lat, end_lng)`.
+> Фронтенд использует `shortest_route` как «Быстрый» и `safest_route` как «Безопасный».
+> Если бэк недоступен — fallback на прямой OSRM API.
+
+---
+
+### 3b. Маршрут (прокси OSRM — fallback)
 
 ```
 GET /route?start_lat=52.9651&start_lng=36.0785&end_lat=52.9690&end_lng=36.0820
@@ -244,7 +287,8 @@ DELETE /events/{id}/leave?user_id=1
 | 1 | `GET` | `/places` | ✅ Нужно |
 | 1b | `GET` | `/places?filters` | ✅ Нужно |
 | 2 | `GET` | `/places/{id}` | ⏳ Опционально |
-| 3 | `GET` | `/route` | ⏳ Опционально |
+| 3 | `GET` | `/route/safe` | ✅ Безопасный маршрут (бэк) |
+| 3b | `GET` | `/route` | ⏳ Fallback (OSRM) |
 | 4 | `GET` | `/places/nearby` | ⏳ Опционально |
 | 5 | `GET` | `/meetups/my` | ✅ Нужно |
 | 6 | `POST` | `/meetups/{id}/join` | ✅ Нужно |

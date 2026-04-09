@@ -1,22 +1,19 @@
 <template>
   <div class="map-light" :class="{ dark: isDarkMode }">
-    <!-- Route Navigator -->
-    <RouteNavigator v-if="showRouteNavigator" @close="showRouteNavigator = false" />
-
     <!-- Map Canvas -->
-    <main v-else class="map-canvas">
+    <main class="map-canvas">
       <div ref="mapRef" class="leaflet-map"></div>
     </main>
 
     <!-- Spread Transition Overlay -->
-    <div v-if="!showRouteNavigator"
-      class="spread-overlay" 
+    <div
+      class="spread-overlay"
       :class="{ active: isTransitioning }"
       :style="overlayStyle"
     ></div>
 
     <!-- Top AppBar -->
-    <header v-if="!showRouteNavigator" class="top-bar">
+    <header class="top-bar">
       <button class="close-btn" @click="$emit('close')">
         <span class="material-symbols-outlined">close</span>
       </button>
@@ -108,11 +105,8 @@
       </button>
     </div>
 
-    <!-- Map Controls -->
-    <div v-if="!showRouteNavigator" class="map-controls">
-      <button class="control-btn control-btn-glass" title="Слои">
-        <span class="material-symbols-outlined">layers</span>
-      </button>
+    <!-- Map Controls — скрываются при выборе точки -->
+    <div class="map-controls" v-if="!pickMode">
       <button class="control-btn control-btn-ninja" ref="ninjaBtnRef" @click="toggleDarkMode" title="Режим ниндзя">
         <span class="material-symbols-outlined">sports_martial_arts</span>
       </button>
@@ -121,33 +115,245 @@
       </button>
     </div>
 
-    <!-- FAB Quick Start -->
-    <div v-if="!showRouteNavigator" class="fab-quick-start">
-      <button class="fab-btn" @click="showRouteNavigator = true">
-        <span class="material-symbols-outlined">directions_run</span>
-        <span>Быстрый старт</span>
+    <!-- FAB Quick Start — скрывается при открытой форме маршрута -->
+    <transition name="fab-fade">
+      <div class="fab-quick-start" v-if="!showRouteForm">
+        <button class="fab-btn" @click="showRouteForm = true">
+          <span class="material-symbols-outlined">directions_run</span>
+          <span>Быстрый старт</span>
+        </button>
+      </div>
+    </transition>
+
+    <!-- Route Form Panel -->
+    <div class="route-panel" :class="{ open: showRouteForm }">
+      <div class="route-panel-header">
+        <h3>Маршрут</h3>
+        <button class="route-close" @click="showRouteForm = false">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Откуда -->
+      <div class="route-field">
+        <label>Откуда</label>
+        <div class="route-input-row">
+          <span class="material-symbols-outlined route-dot start-dot">circle</span>
+          <input
+            v-model="routeStartQuery"
+            type="text"
+            placeholder="Введите адрес или..."
+            @input="onStartSearch"
+            @focus="showStartSuggestions = true"
+            @blur="hideStartSuggestionsDelayed"
+          />
+          <button class="route-geo-btn" @click="useMyLocation" title="Моё местоположение">
+            <span class="material-symbols-outlined">my_location</span>
+          </button>
+        </div>
+        <!-- Подсказки адресов (Nominatim) -->
+        <div class="route-dropdown" v-if="showStartSuggestions && startSuggestions.length > 0">
+          <div
+            v-for="(s, i) in startSuggestions"
+            :key="i"
+            class="route-dropdown-item"
+            @mousedown="selectStartAddress(s)"
+          >
+            <span class="material-symbols-outlined" style="font-size:18px;color:#787170">place</span>
+            <div class="route-place-info">
+              <span class="route-place-name">{{ s.name }}</span>
+              <span class="route-place-address">{{ s.address }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Куда -->
+      <div class="route-field">
+        <label>Куда</label>
+        <div class="route-input-row">
+          <span class="material-symbols-outlined route-dot end-dot">location_on</span>
+          <input
+            v-model="routeEndQuery"
+            type="text"
+            placeholder="Введите адрес или выберите место..."
+            @input="onEndSearch"
+            @focus="showEndSuggestions = true"
+            @blur="hideEndSuggestionsDelayed"
+          />
+        </div>
+        <!-- Подсказки адресов (Nominatim) -->
+        <div class="route-dropdown" v-if="showEndSuggestions && endSuggestions.length > 0">
+          <div
+            v-for="(s, i) in endSuggestions"
+            :key="i"
+            class="route-dropdown-item"
+            @mousedown="selectEndAddress(s)"
+          >
+            <span class="material-symbols-outlined" style="font-size:18px;color:#787170">place</span>
+            <div class="route-place-info">
+              <span class="route-place-name">{{ s.name }}</span>
+              <span class="route-place-address">{{ s.address }}</span>
+            </div>
+          </div>
+        </div>
+        <!-- Или места из базы -->
+        <div class="route-dropdown" v-if="showEndSuggestions && filteredEndPlaces.length > 0 && endSuggestions.length === 0">
+          <div
+            v-for="place in filteredEndPlaces"
+            :key="place.id"
+            class="route-dropdown-item"
+            :class="{ selected: routeEndId === place.id }"
+            @mousedown="selectEndPlace(place)"
+          >
+            <span class="route-place-emoji">{{ place.emoji }}</span>
+            <div class="route-place-info">
+              <span class="route-place-name">{{ place.name }}</span>
+              <span class="route-place-address">{{ place.address }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Указать на карте -->
+      <div class="route-pick-mode">
+        <button class="route-pick-btn" @click="startPickMode('start')">
+          <span class="material-symbols-outlined route-dot start-dot">circle</span>
+          <span>Откуда — на карте</span>
+        </button>
+        <button class="route-pick-btn" @click="startPickMode('end')">
+          <span class="material-symbols-outlined route-dot end-dot">location_on</span>
+          <span>Куда — на карте</span>
+        </button>
+      </div>
+
+      <!-- Кнопка построить -->
+      <button class="route-build-btn" @click="buildRoute" :disabled="!canBuildRoute">
+        <span class="material-symbols-outlined">route</span>
+        <span>Построить маршрут</span>
       </button>
     </div>
 
     <!-- Bottom Navigation -->
-    <nav v-if="!showRouteNavigator" class="bottom-nav">
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'map' }" @click.prevent="handleNav('map')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'map' }">map</span>
+    <nav class="bottom-nav" v-if="!pickMode">
+      <a href="#" class="nav-item active" @click.prevent>
+        <span class="material-symbols-outlined filled">map</span>
         <span>Карта</span>
       </a>
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'sessions' }" @click.prevent="handleNav('sessions')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'sessions' }">fitness_center</span>
-        <span>Сессии</span>
+      <a href="#" class="nav-item" @click.prevent="$emit('navigate', 'events')">
+        <span class="material-symbols-outlined">event</span>
+        <span>Ивенты</span>
       </a>
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'pulse' }" @click.prevent="handleNav('pulse')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'pulse' }">sensors</span>
-        <span>Пульс</span>
+      <a href="#" class="nav-item" :class="{ active: activeNav === 'routes' }" @click.prevent="handleNav('routes')">
+        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'routes' }">directions_run</span>
+        <span>Маршруты</span>
       </a>
       <a href="#" class="nav-item" :class="{ active: activeNav === 'profile' }" @click.prevent="handleNav('profile')">
         <span class="material-symbols-outlined" :class="{ filled: activeNav === 'profile' }">person</span>
         <span>Профиль</span>
       </a>
     </nav>
+
+    <!-- Pick Point Overlay — режим выбора точки на карте -->
+    <transition name="pick-overlay-fade">
+      <div v-if="pickMode" class="pick-overlay">
+        <!-- Маркер-иголка по центру -->
+        <div class="pick-pin">
+          <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 34 18 34s18-20.5 18-34C36 8.06 27.94 0 18 0z"
+                  :fill="pickMode === 'start' ? '#22c55e' : '#ea580c'"/>
+            <circle cx="18" cy="18" r="8" fill="white"/>
+            <circle :cx="18" cy="18" r="4"
+                    :fill="pickMode === 'start' ? '#22c55e' : '#ea580c'"/>
+          </svg>
+        </div>
+
+        <!-- Подсказка -->
+        <div class="pick-hint">
+          <span class="pick-hint-text">
+            {{ pickMode === 'start' ? '🟢 Откуда' : '🟠 Куда' }} — переместите карту
+          </span>
+        </div>
+
+        <!-- Кнопки -->
+        <div class="pick-actions">
+          <button class="pick-cancel-btn" @click="cancelPickMode">
+            <span class="material-symbols-outlined">close</span>
+            <span>Отмена</span>
+          </button>
+          <button class="pick-confirm-btn" @click="confirmPickMode">
+            <span class="material-symbols-outlined">check</span>
+            <span>Готово</span>
+          </button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Route Toggle Bar — поверх карты над bottom-nav -->
+    <transition name="route-toggle-fade">
+      <div v-if="routeFast && routeSafety && !isNavigating" class="route-bar-group">
+        <!-- Быстрый / Безопасный -->
+        <div class="route-toggle-bar-overlay">
+          <button
+            class="route-toggle-btn"
+            :class="{ active: activeRoute === 'fast' }"
+            @click="switchRoute('fast')"
+          >
+            <span class="route-toggle-icon" style="color: #ea580c">⚡</span>
+            <span>Быстрый</span>
+            <span class="route-toggle-meta">{{ routeFast.distance }} • {{ routeFast.duration }}</span>
+          </button>
+          <button
+            class="route-toggle-btn"
+            :class="{ active: activeRoute === 'safety' }"
+            @click="switchRoute('safety')"
+          >
+            <span class="route-toggle-icon" style="color: #16a34a">🛡</span>
+            <span>Безопасный</span>
+            <span class="route-toggle-meta">{{ routeSafety.distance }} • {{ routeSafety.duration }}</span>
+          </button>
+          <button class="route-close-overlay" @click="clearRoute">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Кнопка "Начать навигацию" — ОТДЕЛЬНО -->
+    <transition name="nav-start-fade">
+      <div v-if="routeFast && routeSafety && !isNavigating" class="nav-start-float-btn">
+        <button @click="startNavigation">
+          <span class="material-symbols-outlined">navigation</span>
+          <span>Начать навигацию</span>
+        </button>
+      </div>
+    </transition>
+
+    <!-- Navigation Bar — показывается при навигации -->
+    <transition name="nav-bar-fade">
+      <div v-if="isNavigating" class="nav-bar-overlay">
+        <div class="nav-bar-info">
+          <div class="nav-bar-item">
+            <span class="material-symbols-outlined">straighten</span>
+            <div>
+              <span class="nav-bar-value">{{ navRemaining.distance }}</span>
+              <span class="nav-bar-label">Осталось</span>
+            </div>
+          </div>
+          <div class="nav-bar-item">
+            <span class="material-symbols-outlined">schedule</span>
+            <div>
+              <span class="nav-bar-value">{{ navRemaining.duration }}</span>
+              <span class="nav-bar-label">Время</span>
+            </div>
+          </div>
+        </div>
+        <button class="nav-stop-btn" @click="stopNavigation">
+          <span class="material-symbols-outlined">stop</span>
+          <span>Завершить</span>
+        </button>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -155,14 +361,14 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import RouteNavigator from './RouteNavigator.vue'
+import { config, api } from '../config'
+import { setNavigation, updateNavPosition, updateNavRemaining } from '../stores/navigation'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'navigate'])
 
 const activeNav = ref('map')
 const mapRef = ref(null)
 const ninjaBtnRef = ref(null)
-const showRouteNavigator = ref(false)
 let map = null
 let markers = []
 let isDarkMode = ref(false)
@@ -174,6 +380,682 @@ let overlayStyle = ref({})
 // ============================================
 
 const showFilters = ref(false)
+
+// ============================================
+// 🗺 Маршрутизация
+// ============================================
+
+const showRouteForm = ref(false)
+
+// Точки маршрута
+const routeStartQuery = ref('')
+const routeEndQuery = ref('')
+const routeStartCoords = ref(null) // { lat, lng }
+const routeEndId = ref(null)
+const routeEndCoords = ref(null) // { lat, lng }
+
+// Geocoding (Nominatim)
+const startSuggestions = ref([])
+const endSuggestions = ref([])
+const showStartSuggestions = ref(false)
+const showEndSuggestions = ref(false)
+let geoSearchTimer = null
+
+// Режим выбора точки на карте
+const pickMode = ref(null) // 'start' | 'end' | null
+let prevCenter = null
+
+// Линия маршрута на карте
+let routeLineLayer = null
+let userDotLayer = null // точка пользователя
+const routeFast = ref(null)       // { geometry, distance, duration }
+const routeSafety = ref(null)     // { geometry, distance, duration }
+const activeRoute = ref('fast')   // 'fast' | 'safety'
+
+// Навигация
+const isNavigating = ref(false)
+let watchId = null
+const userPosition = ref(null) // { lat, lng }
+const navRemaining = ref({ distance: '0 м', duration: '0 мин' })
+
+// Можно построить маршрут
+const canBuildRoute = computed(() => {
+  return routeStartCoords.value && routeEndCoords.value
+})
+
+// Отфильтрованные места для "Куда"
+const filteredEndPlaces = computed(() => {
+  if (!routeEndQuery.value.trim()) return places.value
+  const q = routeEndQuery.value.toLowerCase()
+  return places.value.filter(p =>
+    p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)
+  )
+})
+
+// ============================================
+// 🔍 Geocoding (Nominatim)
+// ============================================
+
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
+
+// Границы Орла для приоритизации поиска
+const ORL_VIEWBOX = '35.95,53.05,36.25,52.88' // left,top,right,bottom
+
+function geocode(query) {
+  return fetch(
+    `${NOMINATIM_URL}?q=${encodeURIComponent(query)}&format=json&limit=10&countrycodes=ru&accept-language=ru&viewbox=${ORL_VIEWBOX}&bounded=1&addressdetails=1`,
+    { headers: { 'User-Agent': 'ShoulderToShoulder/1.0' } }
+  ).then(r => r.json())
+}
+
+function parseNominatimResult(item) {
+  // Nominatim возвращает { lat, lon, display_name, address, ... }
+  const parts = item.display_name.split(',')
+
+  // Если есть номер дома в address — включаем в название
+  const addr = item.address || {}
+  let name = parts[0].trim()
+  if (addr.house_number && addr.road) {
+    name = `${addr.road}, ${addr.house_number}`
+  }
+
+  // Адрес: город + остальное
+  let address = parts.slice(1, 4).join(',').trim()
+  if (addr.city || addr.town) address = `${addr.city || addr.town}, ${address}`
+
+  return {
+    name,
+    address,
+    lat: parseFloat(item.lat),
+    lng: parseFloat(item.lon),
+    type: item.type // house, road, residential, etc.
+  }
+}
+
+// Поиск для "Откуда"
+function onStartSearch() {
+  const q = routeStartQuery.value.trim()
+  if (q.length < 3) {
+    startSuggestions.value = []
+    return
+  }
+  clearTimeout(geoSearchTimer)
+  geoSearchTimer = setTimeout(async () => {
+    try {
+      const results = await geocode(q)
+      startSuggestions.value = results.map(parseNominatimResult)
+    } catch (e) {
+      if (config.isDebug) console.warn('Geocoding error:', e)
+      startSuggestions.value = []
+    }
+  }, 400)
+}
+
+function selectStartAddress(s) {
+  routeStartCoords.value = { lat: s.lat, lng: s.lng }
+  routeStartQuery.value = s.name
+  showStartSuggestions.value = false
+  pickMode.value = null
+}
+
+function hideStartSuggestionsDelayed() {
+  setTimeout(() => { showStartSuggestions.value = false }, 200)
+}
+
+// Поиск для "Куда"
+function onEndSearch() {
+  const q = routeEndQuery.value.trim()
+  routeEndId.value = null
+  routeEndCoords.value = null
+  if (q.length < 3) {
+    endSuggestions.value = []
+    return
+  }
+  clearTimeout(geoSearchTimer)
+  geoSearchTimer = setTimeout(async () => {
+    try {
+      const results = await geocode(q)
+      endSuggestions.value = results.map(parseNominatimResult)
+    } catch (e) {
+      if (config.isDebug) console.warn('Geocoding error:', e)
+      endSuggestions.value = []
+    }
+  }, 400)
+}
+
+function selectEndAddress(s) {
+  routeEndCoords.value = { lat: s.lat, lng: s.lng }
+  routeEndQuery.value = s.name
+  showEndSuggestions.value = false
+  pickMode.value = null
+}
+
+function hideEndSuggestionsDelayed() {
+  setTimeout(() => { showEndSuggestions.value = false }, 200)
+}
+
+// Выбор места из базы
+function selectEndPlace(place) {
+  routeEndId.value = place.id
+  routeEndQuery.value = place.name
+  routeEndCoords.value = { lat: place.lat, lng: place.lng }
+  showEndSuggestions.value = false
+  pickMode.value = null
+}
+
+// ============================================
+// 📍 Выбор точки на карте (иголка по центру)
+// ============================================
+
+function startPickMode(type) {
+  // type: 'start' или 'end'
+  pickMode.value = type
+  prevCenter = map.getCenter()
+  showRouteForm.value = false
+  // Курсор crosshair
+  map.getContainer().style.cursor = 'crosshair'
+}
+
+function cancelPickMode() {
+  pickMode.value = null
+  if (prevCenter) {
+    map.setView(prevCenter, map.getZoom(), { animate: false })
+    prevCenter = null
+  }
+  map.getContainer().style.cursor = ''
+  // Возвращаем форму
+  showRouteForm.value = true
+}
+
+async function confirmPickMode() {
+  const center = map.getCenter()
+  const lat = center.lat
+  const lng = center.lng
+
+  if (pickMode.value === 'start') {
+    routeStartCoords.value = { lat, lng }
+    // Обратное геокодирование
+    routeStartQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ru`,
+        { headers: { 'User-Agent': 'ShoulderToShoulder/1.0' } }
+      )
+      const data = await res.json()
+      if (data.display_name) {
+        const parts = data.display_name.split(',').slice(0, 3).join(',').trim()
+        routeStartQuery.value = parts
+      }
+    } catch (e) {
+      if (config.isDebug) console.warn('Reverse geocoding error:', e)
+    }
+  } else if (pickMode.value === 'end') {
+    routeEndCoords.value = { lat, lng }
+    routeEndQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ru`,
+        { headers: { 'User-Agent': 'ShoulderToShoulder/1.0' } }
+      )
+      const data = await res.json()
+      if (data.display_name) {
+        const parts = data.display_name.split(',').slice(0, 3).join(',').trim()
+        routeEndQuery.value = parts
+      }
+    } catch (e) {
+      if (config.isDebug) console.warn('Reverse geocoding error:', e)
+    }
+  }
+
+  pickMode.value = null
+  map.getContainer().style.cursor = ''
+  // Возвращаем форму
+  showRouteForm.value = true
+}
+
+// Геолокация
+async function useMyLocation() {
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000
+      })
+    })
+    const { latitude, longitude } = pos.coords
+    routeStartCoords.value = { lat: latitude, lng: longitude }
+    routeStartQuery.value = 'Моё местоположение'
+  } catch (e) {
+    if (config.isDebug) console.warn('Геолокация недоступна')
+    // Fallback: центр Орла
+    routeStartCoords.value = { lat: 52.9651, lng: 36.0785 }
+    routeStartQuery.value = 'Центр города'
+  }
+}
+
+// Построить маршрут: GET /route/safe?start_lat=&start_lng=&end_lat=&end_lng=
+async function buildRoute() {
+  if (!canBuildRoute.value) return
+
+  const start = routeStartCoords.value
+  const end = routeEndCoords.value
+  let routeBuilt = false
+
+  // 1. Пробуем свой бэкэнд — GET с query-параметрами
+  try {
+    const url = `${api('/route/safe')}?start_lat=${start.lat}&start_lng=${start.lng}&end_lat=${end.lat}&end_lng=${end.lng}`
+    if (config.isDebug) console.log('🗺 Запрос маршрута:', url)
+
+    const res = await fetch(url)
+    const data = await res.json()
+
+    if (config.isDebug) console.log('📦 Ответ бэка:', data)
+
+    // Бэк возвращает { shortest_route: {...}, safest_route: {...}, ... }
+    const fast = formatRoute(data.shortest_route)
+    const safety = formatRoute(data.safest_route)
+
+    if (fast && safety) {
+      routeFast.value = fast
+      routeSafety.value = safety
+      activeRoute.value = 'fast'
+      showRouteForm.value = false
+      drawRoute('fast')
+      routeBuilt = true
+    } else {
+      if (config.isDebug) console.warn('⚠️ Бэк вернул пустые маршруты:', data)
+    }
+  } catch (e) {
+    if (config.isDebug) console.warn('buildRoute: бэк недоступен, fallback на OSRM', e)
+  }
+
+  // 2. Fallback: прямой запрос к OSRM
+  if (!routeBuilt) {
+    try {
+      const url = `${config.osrmBaseURL}/route/v1/foot/${start.lng},${start.lat};${end.lng},${end.lat}?steps=true&geometries=geojson&overview=full`
+      if (config.isDebug) console.log('🗺 OSRM запрос:', url)
+
+      const res = await fetch(url)
+      const data = await res.json()
+
+      if (data.code === 'Ok' && data.routes?.length > 0) {
+        const r = data.routes[0]
+        const osrmCoords = r.geometry.coordinates
+        const coords = osrmCoords.map(c => [c[1], c[0]])
+        const distM = Math.round(r.distance)
+        const durMin = Math.round(r.duration / 60)
+
+        routeFast.value = {
+          geometry: r.geometry,
+          coords,
+          distance: distM >= 1000 ? `${(distM / 1000).toFixed(1)} км` : `${distM} м`,
+          duration: durMin >= 60 ? `${Math.floor(durMin / 60)}ч ${durMin % 60}м` : `${durMin} мин`,
+          _rawDistance: distM,
+          _rawDuration: durMin
+        }
+        routeSafety.value = { ...routeFast.value }
+        activeRoute.value = 'fast'
+        showRouteForm.value = false
+        drawRoute('fast')
+        routeBuilt = true
+      } else {
+        if (config.isDebug) console.warn('⚠️ OSRM не вернул маршрут:', data)
+      }
+    } catch (e) {
+      if (config.isDebug) console.warn('buildRoute: OSRM недоступен', e)
+    }
+  }
+
+  // Если ничего не получилось — не скрываем форму
+  if (!routeBuilt && config.isDebug) {
+    console.warn('❌ Не удалось построить ни один маршрут')
+  }
+}
+
+// Форматируем ответ бэка
+// Наш формат: { coordinates: [{lat, lng}, ...], distance_m, risk_score, ... }
+// OSRM формат: { geometry: {type: 'LineString', coordinates: [[lng, lat], ...]}, distance, duration }
+function formatRoute(raw) {
+  if (!raw) return null
+
+  let coords
+  let distM = 0
+  let durMin = 0
+
+  if (raw.coordinates && raw.coordinates.length > 0 && raw.coordinates[0].lat !== undefined) {
+    // Наш формат: [{lat, lng}, ...]
+    coords = raw.coordinates.map(c => [c.lat, c.lng])
+    distM = Math.round(raw.distance_m || 0)
+    durMin = Math.round(distM * 60 / 5000) // ~5 км/ч
+  } else if (raw.geometry && raw.geometry.coordinates) {
+    // OSRM формат: GeoJSON LineString
+    coords = raw.geometry.coordinates.map(c => [c[1], c[0]])
+    distM = Math.round(raw.distance || 0)
+    durMin = Math.round((raw.duration || 0) / 60)
+  } else {
+    return null
+  }
+
+  return {
+    geometry: { type: 'LineString', coordinates: coords.map(c => [c[1], c[0]]) },
+    coords,
+    distance: distM >= 1000 ? `${(distM / 1000).toFixed(1)} км` : `${distM} м`,
+    duration: durMin >= 60 ? `${Math.floor(durMin / 60)}ч ${durMin % 60}м` : `${durMin} мин`,
+    _rawDistance: distM,
+    _rawDuration: durMin
+  }
+}
+
+// Переключение маршрута
+function switchRoute(type) {
+  activeRoute.value = type
+  drawRoute(type)
+}
+
+// Отрисовка выбранного маршрута
+function drawRoute(type) {
+  const route = type === 'fast' ? routeFast.value : routeSafety.value
+  if (!route) return
+
+  // Если есть готовые coords (наш формат) — используем
+  let coords = route.coords
+  if (!coords) {
+    // Fallback: парсим GeoJSON
+    const geometry = route.geometry
+    if (!geometry || !geometry.coordinates) return
+    coords = geometry.coordinates.map(c => [c[1], c[0]])
+  }
+
+  const color = type === 'fast' ? '#ea580c' : '#16a34a'
+
+  // Полная очистка всех возможных слоёв
+  if (routeLineLayer) {
+    if (routeLineLayer.completed && routeLineLayer.remaining) {
+      map.removeLayer(routeLineLayer.completed)
+      map.removeLayer(routeLineLayer.remaining)
+    } else {
+      map.removeLayer(routeLineLayer)
+    }
+    routeLineLayer = null
+  }
+
+  routeLineLayer = L.polyline(
+    coords,
+    { color, weight: 5, opacity: 0.9, smoothFactor: 1 }
+  ).addTo(map)
+
+  map.fitBounds(routeLineLayer.getBounds(), { padding: [60, 60] })
+}
+
+function clearRoute() {
+  // Останавливаем навигацию если активна
+  if (isNavigating.value) {
+    stopNavigation()
+    return
+  }
+
+  // Очищаем слои маршрута (может быть объект или простой polyline)
+  if (routeLineLayer) {
+    if (routeLineLayer.completed && routeLineLayer.remaining) {
+      // Навигационный режим: { completed, remaining }
+      map.removeLayer(routeLineLayer.completed)
+      map.removeLayer(routeLineLayer.remaining)
+    } else {
+      // Простой полигон
+      map.removeLayer(routeLineLayer)
+    }
+    routeLineLayer = null
+  }
+  routeFast.value = null
+  routeSafety.value = null
+  activeRoute.value = 'fast'
+  routeStartQuery.value = ''
+  routeEndQuery.value = ''
+  routeStartCoords.value = null
+  routeEndId.value = null
+  routeEndCoords.value = null
+  pickMode.value = null
+  // Возвращаем кнопку "Быстрый старт"
+  showRouteForm.value = false
+}
+
+// ============================================
+// 🧭 Навигация (GPS + перерисовка маршрута)
+// ============================================
+
+function startNavigation() {
+  isNavigating.value = true
+
+  // Сразу показываем полное расстояние маршрута
+  const route = activeRoute.value === 'fast' ? routeFast.value : routeSafety.value
+  if (route) {
+    navRemaining.value = { distance: route.distance, duration: route.duration }
+  }
+
+  // Синхронизируем с общим стором
+  setNavigation(true, {
+    activeRoute: activeRoute.value,
+    routeCoords: route?.coords || [],
+    userPosition: null,
+    navRemaining: navRemaining.value
+  })
+
+  // Запускаем GPS-отслеживание
+  if ('geolocation' in navigator) {
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => onUserPositionUpdate(pos),
+      (err) => { if (config.isDebug) console.warn('GPS error:', err) },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    )
+  }
+
+  // Получаем начальную позицию
+  navigator.geolocation.getCurrentPosition(
+    (pos) => onUserPositionUpdate(pos),
+    () => {},
+    { enableHighAccuracy: true }
+  )
+}
+
+function onUserPositionUpdate(pos) {
+  const lat = pos.coords.latitude
+  const lng = pos.coords.longitude
+  userPosition.value = { lat, lng }
+
+  // Синхронизируем с общим стором
+  updateNavPosition({ lat, lng })
+
+  // Обновляем маркер пользователя
+  updateUserMarker()
+
+  // Перерисовываем маршрут (пройденный/оставшийся)
+  redrawRouteWithProgress()
+
+  // Считаем оставшееся расстояние
+  updateRemainingDistance()
+}
+
+function updateUserMarker() {
+  if (!userPosition.value || !map) return
+
+  if (userDotLayer) map.removeLayer(userDotLayer)
+
+  userDotLayer = L.circleMarker(
+    [userPosition.value.lat, userPosition.value.lng],
+    {
+      radius: 8,
+      fillColor: '#3b82f6',
+      color: '#fff',
+      weight: 3,
+      opacity: 1,
+      fillOpacity: 0.9
+    }
+  ).addTo(map)
+}
+
+function redrawRouteWithProgress() {
+  const route = activeRoute.value === 'fast' ? routeFast.value : routeSafety.value
+  if (!route || !route.coords || !userPosition.value) return
+
+  const routeCoords = route.coords
+  const userLat = userPosition.value.lat
+  const userLng = userPosition.value.lng
+
+  // Находим ближайшую точку на маршруте к пользователю
+  let closestIdx = 0
+  let minDist = Infinity
+  for (let i = 0; i < routeCoords.length; i++) {
+    const d = haversineDistance(userLat, userLng, routeCoords[i][0], routeCoords[i][1])
+    if (d < minDist) {
+      minDist = d
+      closestIdx = i
+    }
+  }
+
+  // Пройденный путь (серый) — если пользователь уже сдвинулся
+  const completedCoords = routeCoords.slice(0, closestIdx + 1)
+  // Оставшийся путь (цвет маршрута)
+  const remainingCoords = routeCoords.slice(closestIdx)
+
+  // Удаляем старые слои
+  if (routeLineLayer) {
+    if (routeLineLayer.completed && routeLineLayer.remaining) {
+      map.removeLayer(routeLineLayer.completed)
+      map.removeLayer(routeLineLayer.remaining)
+    }
+    routeLineLayer = null
+  }
+
+  const routeColor = activeRoute.value === 'fast' ? '#ea580c' : '#16a34a'
+
+  // Рисуем пройденный путь (серый) — только если есть что рисовать
+  if (completedCoords.length > 1) {
+    const completedLine = L.polyline(completedCoords, {
+      color: '#9ca3af',
+      weight: 5,
+      opacity: 0.6,
+      smoothFactor: 1
+    }).addTo(map)
+
+    const remainingLine = L.polyline(remainingCoords, {
+      color: routeColor,
+      weight: 5,
+      opacity: 0.9,
+      smoothFactor: 1
+    }).addTo(map)
+
+    routeLineLayer = { completed: completedLine, remaining: remainingLine }
+  } else {
+    // Ещё не сдвинулся — рисуем полный маршрут цветным
+    routeLineLayer = L.polyline(routeCoords, {
+      color: routeColor,
+      weight: 5,
+      opacity: 0.9,
+      smoothFactor: 1
+    }).addTo(map)
+  }
+}
+
+function updateRemainingDistance() {
+  const route = activeRoute.value === 'fast' ? routeFast.value : routeSafety.value
+  if (!route || !route.coords || !userPosition.value) return
+
+  const routeCoords = route.coords
+  const userLat = userPosition.value.lat
+  const userLng = userPosition.value.lng
+
+  // Находим ближайшую точку
+  let closestIdx = 0
+  let minDist = Infinity
+  for (let i = 0; i < routeCoords.length; i++) {
+    const d = haversineDistance(userLat, userLng, routeCoords[i][0], routeCoords[i][1])
+    if (d < minDist) {
+      minDist = d
+      closestIdx = i
+    }
+  }
+
+  // Считаем оставшееся расстояние по оставшимся точкам
+  let remainingM = 0
+  for (let i = closestIdx; i < routeCoords.length - 1; i++) {
+    remainingM += haversineDistance(
+      routeCoords[i][0], routeCoords[i][1],
+      routeCoords[i + 1][0], routeCoords[i + 1][1]
+    )
+  }
+
+  const distM = Math.round(remainingM)
+  const durMin = Math.round(distM * 60 / 5000)
+
+  const remaining = {
+    distance: distM >= 1000 ? `${(distM / 1000).toFixed(1)} км` : `${distM} м`,
+    duration: durMin >= 60 ? `${Math.floor(durMin / 60)}ч ${durMin % 60}м` : `${durMin} мин`
+  }
+
+  navRemaining.value = remaining
+
+  // Синхронизируем с общим стором
+  updateNavRemaining(remaining)
+}
+
+// Формула Haversine для расстояния между двумя точками (метры)
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
+function stopNavigation() {
+  isNavigating.value = false
+
+  // Останавливаем GPS
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId)
+    watchId = null
+  }
+
+  // Удаляем маркер пользователя
+  if (userDotLayer) {
+    map.removeLayer(userDotLayer)
+    userDotLayer = null
+  }
+
+  userPosition.value = null
+  navRemaining.value = { distance: '0 м', duration: '0 мин' }
+
+  // Очищаем слои маршрута (completed + remaining или простой polyline)
+  if (routeLineLayer) {
+    if (routeLineLayer.completed && routeLineLayer.remaining) {
+      map.removeLayer(routeLineLayer.completed)
+      map.removeLayer(routeLineLayer.remaining)
+    } else {
+      map.removeLayer(routeLineLayer)
+    }
+    routeLineLayer = null
+  }
+
+  // Полностью очищаем маршрут — возвращаемся к начальному состоянию
+  routeFast.value = null
+  routeSafety.value = null
+  activeRoute.value = 'fast'
+  routeStartQuery.value = ''
+  routeEndQuery.value = ''
+  routeStartCoords.value = null
+  routeEndId.value = null
+  routeEndCoords.value = null
+  pickMode.value = null
+  showRouteForm.value = false
+
+  // Очищаем общий стор навигации
+  setNavigation(false)
+}
+
+// ============================================
 
 const activityTypes = [
   { key: 'running', emoji: '🏃', label: 'Бег' },
@@ -315,6 +1197,10 @@ async function fetchPlaces() {
 
 const handleNav = (nav) => {
   activeNav.value = nav
+  // Если уходим с карты — очищаем маршрут
+  if (nav !== 'map') {
+    clearRoute()
+  }
 }
 
 // Анимация растекания от кнопки ниндзя
@@ -355,6 +1241,7 @@ const toggleDarkMode = () => {
       if (map) {
         map.getContainer().style.filter = 'invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2)'
       }
+      addPlaceMarkers()
       setTimeout(() => {
         isTransitioning.value = false
         overlayStyle.value = {}
@@ -384,6 +1271,7 @@ const toggleDarkMode = () => {
     if (map) {
       map.getContainer().style.filter = 'none'
     }
+    addPlaceMarkers()
 
     setTimeout(() => {
       isTransitioning.value = false
@@ -392,28 +1280,39 @@ const toggleDarkMode = () => {
   }
 }
 
-// Создание кастомного маркера с эмодзи
+// Размер маркера в зависимости от зума
+const getMarkerSize = (zoom) => {
+  if (zoom <= 12) return { size: 28, font: 14, border: 2 }
+  if (zoom <= 14) return { size: 36, font: 18, border: 2 }
+  if (zoom <= 16) return { size: 44, font: 22, border: 2 }
+  return { size: 52, font: 26, border: 3 }
+}
+
+// Создание маркера: белый фон + оранжевая рамка (светлая), тёмный фон + оранжевая рамка (тёмная)
 const createPlaceMarker = (place) => {
+  const zoom = map.getZoom()
+  const { size, font, border } = getMarkerSize(zoom)
+  const bg = isDarkMode.value ? '#262626' : '#fff'
+  const textColor = isDarkMode.value ? '#f0f1f2' : '#1c1917'
+
   const icon = L.divIcon({
     className: 'custom-marker',
-    html: `
-      <div class="marker-emoji" style="
-        width: 44px;
-        height: 44px;
-        border-radius: 50%;
-        background: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 22px;
-        border: 3px solid #f97316;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-      ">${place.emoji}</div>
-    `,
-    iconSize: [44, 44],
-    iconAnchor: [22, 22]
+    html: `<div class="marker-emoji" style="
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 50%;
+      background: ${bg};
+      color: ${textColor};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: ${font}px;
+      border: ${border}px solid #ea580c;
+      cursor: pointer;
+      user-select: none;
+    ">${place.emoji}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2]
   })
 
   const marker = L.marker([place.lat, place.lng], { icon })
@@ -476,6 +1375,11 @@ const addPlaceMarkers = () => {
   markers = places.value.map(place => createPlaceMarker(place))
 }
 
+// Перерисовка маркеров при зуме
+const onMapZoom = () => {
+  addPlaceMarkers()
+}
+
 // Удаление маркеров (для очистки)
 const removePlaceMarkers = () => {
   markers.forEach(m => map.removeLayer(m))
@@ -498,6 +1402,9 @@ onMounted(async () => {
     L.control.zoom({
       position: 'topleft'
     }).addTo(map)
+
+    // Перерисовка маркеров при зуме
+    map.on('zoomend', onMapZoom)
 
     await fetchPlaces()
 
@@ -534,21 +1441,37 @@ onMounted(async () => {
   top: 76px !important;
   left: 16px !important;
   border: none !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(12px) !important;
+  background: rgba(255, 255, 255, 0.25) !important;
 }
 
 .leaflet-map :global(.leaflet-control-zoom a) {
   width: 44px !important;
   height: 44px !important;
   line-height: 44px !important;
-  background: white !important;
-  color: #ea580c !important;
+  background: transparent !important;
+  color: #1c1917 !important;
   border: none !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
   font-size: 20px !important;
+  font-weight: 700 !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.leaflet-map :global(.leaflet-control-zoom a:first-child) {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.leaflet-map :global(.leaflet-control-zoom a:last-child) {
+  border-radius: 0 0 12px 12px !important;
+  border-bottom: none !important;
 }
 
 .leaflet-map :global(.leaflet-control-zoom a:hover) {
-  background: #fef3f2 !important;
+  background: rgba(255, 255, 255, 0.4) !important;
 }
 
 .leaflet-map :global(.leaflet-control-attribution) {
@@ -638,14 +1561,19 @@ onMounted(async () => {
 }
 
 /* Leaflet dark mode */
+.map-light.dark .leaflet-map :global(.leaflet-control-zoom) {
+  background: rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+}
+
 .map-light.dark .leaflet-map :global(.leaflet-control-zoom a) {
-  background: #262626 !important;
-  color: #c2410c !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: transparent !important;
+  color: #f0f1f2 !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .map-light.dark .leaflet-map :global(.leaflet-control-zoom a:hover) {
-  background: #333333 !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Popup dark mode */
@@ -690,16 +1618,8 @@ onMounted(async () => {
   transition: filter 0.6s ease;
 }
 
-/* Кастомные маркеры-эмодзи */
-:global(.custom-marker .marker-emoji:hover) {
-  transform: scale(1.15);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
-
-.map-light.dark :global(.custom-marker .marker-emoji) {
-  border-color: #c2410c !important;
-  box-shadow: 0 2px 12px rgba(194, 65, 12, 0.4) !important;
-}
+/* Маркеры: белый фон + оранжевая рамка */
+/* Стили заданы inline в createPlaceMarker */
 
 /* Стилизация Leaflet Popup */
 .leaflet-map :global(.leaflet-popup-content-wrapper) {
@@ -1294,5 +2214,877 @@ onMounted(async () => {
 
 .apply-filters-btn .material-symbols-outlined {
   font-size: 20px;
+}
+
+/* ============================================
+   Route Panel
+   ============================================ */
+
+.route-panel {
+  position: fixed;
+  top: 72px;
+  left: 0;
+  right: 0;
+  z-index: 46;
+  background: var(--surface-container-lowest);
+  border-radius: 0 0 24px 24px;
+  padding: 0 16px 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.35s ease;
+}
+
+.route-panel.open {
+  max-height: 90dvh;
+  overflow-y: auto;
+  opacity: 1;
+  padding: 16px 16px 20px;
+}
+
+.route-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.route-panel-header h3 {
+  font-size: 16px;
+  font-weight: bold;
+  color: #1c1917;
+  margin: 0;
+}
+
+.route-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface-container-high);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #787170;
+  transition: background 0.2s;
+}
+
+.route-close:hover {
+  background: #d1d5db;
+}
+
+.route-field {
+  margin-bottom: 14px;
+}
+
+.route-field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #787170;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.route-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-container-low);
+  border-radius: 12px;
+  padding: 0 12px;
+  border: 1px solid #e7e8e9;
+  transition: border-color 0.2s;
+}
+
+.route-input-row:focus-within {
+  border-color: var(--primary);
+}
+
+.route-input-row input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
+  font-size: 14px;
+  color: #1c1917;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+}
+
+.route-dot {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.start-dot {
+  color: #22c55e;
+}
+
+.end-dot {
+  color: #ea580c;
+}
+
+.route-geo-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.route-geo-btn:hover {
+  background: rgba(234, 88, 12, 0.1);
+}
+
+.route-geo-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* Dropdown */
+.route-dropdown {
+  position: relative;
+  margin-top: 4px;
+  background: var(--surface-container-lowest);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #e7e8e9;
+  z-index: 10;
+}
+
+.route-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.route-dropdown-item:hover {
+  background: #fff7ed;
+}
+
+.route-dropdown-item.selected {
+  background: #ffedd5;
+}
+
+.route-place-emoji {
+  font-size: 18px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff7ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.route-place-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.route-place-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.route-place-address {
+  font-size: 11px;
+  color: #a8a29e;
+}
+
+/* Build Button */
+.route-build-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: white;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  margin-top: 4px;
+}
+
+.route-build-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3);
+}
+
+.route-build-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.route-build-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.route-build-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* Pick on Map buttons */
+.route-pick-mode {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.route-pick-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid #e7e8e9;
+  background: var(--surface-container-low);
+  color: #787170;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.route-pick-btn:hover {
+  border-color: var(--primary);
+}
+
+.route-pick-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* "Начать навигацию" кнопка */
+.nav-start-bar {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+/* Floating "Начать навигацию" button */
+.nav-start-float-btn {
+  position: fixed;
+  bottom: 210px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+}
+
+.nav-start-float-btn button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  border-radius: 9999px;
+  border: none;
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 8px 32px rgba(234, 88, 12, 0.5);
+  font-family: 'Inter', sans-serif;
+}
+
+.nav-start-float-btn button:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 40px rgba(234, 88, 12, 0.6);
+}
+
+.nav-start-float-btn button:active {
+  transform: scale(0.95);
+}
+
+.nav-start-float-btn .material-symbols-outlined {
+  font-size: 22px;
+}
+
+/* Nav start button transition */
+.nav-start-fade-enter-active,
+.nav-start-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.nav-start-fade-enter-from {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+}
+
+.nav-start-fade-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+}
+
+/* Контейнер для кнопок маршрутов */
+
+.nav-start-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(22, 163, 74, 0.4);
+  font-family: 'Inter', sans-serif;
+}
+
+.nav-start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(22, 163, 74, 0.5);
+}
+
+.nav-start-btn:active {
+  transform: scale(0.98);
+}
+
+.nav-start-btn .material-symbols-outlined {
+  font-size: 22px;
+}
+
+/* Контейнер для навигации + кнопки маршрутов */
+.route-bar-group {
+  position: fixed;
+  bottom: 96px;
+  left: 16px;
+  right: 16px;
+  z-index: 55;
+}
+
+/* Navigation Bar (при навигации) */
+.nav-bar-overlay {
+  position: fixed;
+  bottom: 96px;
+  left: 16px;
+  right: 16px;
+  z-index: 55;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* route-toggle-bar внутри route-bar-group — без собственного позиционирования */
+.route-toggle-bar-overlay {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.map-light.dark .route-toggle-bar-overlay {
+  background: rgba(26, 26, 26, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Кнопки переключения маршрутов */
+.route-bar-group .route-toggle-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.5);
+  color: #787170;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.map-light.dark .route-bar-group .route-toggle-btn {
+  background: rgba(38, 38, 38, 0.6);
+}
+
+.route-bar-group .route-toggle-btn:hover {
+  background: rgba(234, 88, 12, 0.1);
+}
+
+.route-bar-group .route-toggle-btn.active {
+  border-color: var(--primary);
+  background: #ffedd5;
+  color: #1c1917;
+}
+
+.map-light.dark .route-bar-group .route-toggle-btn.active {
+  background: rgba(194, 65, 12, 0.2);
+  color: #f0f1f2;
+}
+
+.route-bar-group .route-toggle-icon {
+  font-size: 16px;
+}
+
+.route-bar-group .route-toggle-btn span:nth-child(2) {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-bar-group .route-toggle-meta {
+  font-size: 10px;
+  color: #a8a29e;
+}
+
+.route-bar-group .route-toggle-btn.active .route-toggle-meta {
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.route-bar-group .route-close-overlay {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(234, 88, 12, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ea580c;
+  transition: background 0.2s;
+  align-self: center;
+}
+
+.route-bar-group .route-close-overlay:hover {
+  background: rgba(234, 88, 12, 0.2);
+}
+
+.route-bar-group .route-close-overlay .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* Toggle bar transition */
+.route-toggle-fade-enter-active,
+.route-toggle-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.route-toggle-fade-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.route-toggle-fade-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.map-light.dark .nav-bar-overlay {
+  background: rgba(26, 26, 26, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.nav-bar-info {
+  flex: 1;
+  display: flex;
+  gap: 20px;
+}
+
+.nav-bar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-bar-item .material-symbols-outlined {
+  font-size: 20px;
+  color: #ea580c;
+}
+
+.nav-bar-item > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-bar-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1c1917;
+}
+
+.map-light.dark .nav-bar-value {
+  color: #f0f1f2;
+}
+
+.nav-bar-label {
+  font-size: 10px;
+  color: #a8a29e;
+  font-weight: 500;
+}
+
+/* Stop Navigation Button */
+.nav-stop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 2px solid #dc2626;
+  background: transparent;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+}
+
+.nav-stop-btn:hover {
+  background: #dc2626;
+  color: white;
+}
+
+.nav-stop-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Navigation bar transition */
+.nav-bar-fade-enter-active,
+.nav-bar-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.nav-bar-fade-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.nav-bar-fade-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* ============================================
+   Pick Point Overlay (иголка по центру)
+   ============================================ */
+
+.pick-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* Иголка — фиксирована по центру экрана */
+.pick-pin {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 61;
+  width: 36px;
+  height: 52px;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+  animation: pin-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes pin-bounce {
+  0%, 100% { transform: translate(-50%, -100%); }
+  50% { transform: translate(-50%, -105%); }
+}
+
+.pick-pin svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Подсказка */
+.pick-hint {
+  position: fixed;
+  top: calc(50% + 40px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 61;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: 6px 16px;
+  border-radius: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+}
+
+.map-light.dark .pick-hint {
+  background: rgba(26, 26, 26, 0.9);
+}
+
+.pick-hint-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c1917;
+  white-space: nowrap;
+}
+
+.map-light.dark .pick-hint-text {
+  color: #f0f1f2;
+}
+
+/* Кнопки */
+.pick-actions {
+  position: fixed;
+  bottom: 112px;
+  left: 16px;
+  right: 16px;
+  z-index: 61;
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.pick-cancel-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid #e7e8e9;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  color: #787170;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.map-light.dark .pick-cancel-btn {
+  background: rgba(38, 38, 38, 0.9);
+  color: #a1a1aa;
+}
+
+.pick-cancel-btn:hover {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.pick-cancel-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+.pick-confirm-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary-container);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+}
+
+.pick-confirm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3);
+}
+
+.pick-confirm-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* Transition */
+.pick-overlay-fade-enter-active,
+.pick-overlay-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.pick-overlay-fade-enter-from,
+.pick-overlay-fade-leave-to {
+  opacity: 0;
+}
+
+/* Route Toggle Bar — переключение маршрутов (внутри формы, удалён) */
+
+/* Route Toggle Bar Overlay — поверх карты над bottom-nav */
+.route-toggle-bar-overlay {
+  position: fixed;
+  bottom: 96px;
+  left: 16px;
+  right: 16px;
+  z-index: 45;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.map-light.dark .route-toggle-bar-overlay {
+  background: rgba(26, 26, 26, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.route-toggle-bar-overlay .route-toggle-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.5);
+  color: #787170;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.map-light.dark .route-toggle-bar-overlay .route-toggle-btn {
+  background: rgba(38, 38, 38, 0.6);
+}
+
+.route-toggle-bar-overlay .route-toggle-btn:hover {
+  background: rgba(234, 88, 12, 0.1);
+}
+
+.route-toggle-bar-overlay .route-toggle-btn.active {
+  border-color: var(--primary);
+  background: #ffedd5;
+  color: #1c1917;
+}
+
+.map-light.dark .route-toggle-bar-overlay .route-toggle-btn.active {
+  background: rgba(194, 65, 12, 0.2);
+  color: #f0f1f2;
+}
+
+.route-toggle-bar-overlay .route-toggle-icon {
+  font-size: 16px;
+}
+
+.route-toggle-bar-overlay .route-toggle-btn span:nth-child(2) {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.route-toggle-bar-overlay .route-toggle-meta {
+  font-size: 10px;
+  color: #a8a29e;
+}
+
+.route-toggle-bar-overlay .route-toggle-btn.active .route-toggle-meta {
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.route-close-overlay {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(234, 88, 12, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ea580c;
+  transition: background 0.2s;
+  align-self: center;
+}
+
+.route-close-overlay:hover {
+  background: rgba(234, 88, 12, 0.2);
+}
+
+.route-close-overlay .material-symbols-outlined {
+  font-size: 20px;
+}
+
+/* Toggle transition */
+.route-toggle-fade-enter-active,
+.route-toggle-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.route-toggle-fade-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.route-toggle-fade-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+/* FAB transition */
+.fab-fade-enter-active,
+.fab-fade-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fab-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+.fab-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
 }
 </style>
