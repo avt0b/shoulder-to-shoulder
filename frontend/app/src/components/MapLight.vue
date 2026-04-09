@@ -1,19 +1,22 @@
 <template>
   <div class="map-light" :class="{ dark: isDarkMode }">
+    <!-- Route Navigator -->
+    <RouteNavigator v-if="showRouteNavigator" @close="showRouteNavigator = false" />
+
     <!-- Map Canvas -->
-    <main class="map-canvas">
+    <main v-else class="map-canvas">
       <div ref="mapRef" class="leaflet-map"></div>
     </main>
 
     <!-- Spread Transition Overlay -->
-    <div 
+    <div v-if="!showRouteNavigator"
       class="spread-overlay" 
       :class="{ active: isTransitioning }"
       :style="overlayStyle"
     ></div>
 
     <!-- Top AppBar -->
-    <header class="top-bar">
+    <header v-if="!showRouteNavigator" class="top-bar">
       <button class="close-btn" @click="$emit('close')">
         <span class="material-symbols-outlined">close</span>
       </button>
@@ -24,7 +27,7 @@
     </header>
 
     <!-- Map Controls -->
-    <div class="map-controls">
+    <div v-if="!showRouteNavigator" class="map-controls">
       <button class="control-btn control-btn-glass" title="Слои">
         <span class="material-symbols-outlined">layers</span>
       </button>
@@ -37,15 +40,15 @@
     </div>
 
     <!-- FAB Quick Start -->
-    <div class="fab-quick-start">
-      <button class="fab-btn">
+    <div v-if="!showRouteNavigator" class="fab-quick-start">
+      <button class="fab-btn" @click="showRouteNavigator = true">
         <span class="material-symbols-outlined">directions_run</span>
         <span>Быстрый старт</span>
       </button>
     </div>
 
     <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
+    <nav v-if="!showRouteNavigator" class="bottom-nav">
       <a href="#" class="nav-item" :class="{ active: activeNav === 'map' }" @click.prevent="handleNav('map')">
         <span class="material-symbols-outlined" :class="{ filled: activeNav === 'map' }">map</span>
         <span>Карта</span>
@@ -70,12 +73,14 @@
 import { ref, onMounted, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import RouteNavigator from './RouteNavigator.vue'
 
 const emit = defineEmits(['close'])
 
 const activeNav = ref('map')
 const mapRef = ref(null)
 const ninjaBtnRef = ref(null)
+const showRouteNavigator = ref(false)
 let map = null
 let markers = []
 let isDarkMode = ref(false)
