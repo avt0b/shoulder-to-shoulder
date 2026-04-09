@@ -6,14 +6,14 @@ from uuid import UUID
 from jose import jwt, JWTError, ExpiredSignatureError
 from nats.aio.client import Client as NATS
 
-from app.core.config import settings
-from app.core.database import AsyncSessionLocal
-from app.core.permissions import UserRole
-from app.repositories.badge_repository import UserBadgeRepository
-from app.repositories.user_repository import UserRepository
-from app.repositories.rating_repository import UserRatingRepository
-from app.services.user_service import UserService
-from app.core.permissions import has_permission
+from backend.user_service.app.core.config import settings
+from backend.user_service.app.core.database import AsyncSessionLocal
+from backend.user_service.app.core.permissions import UserRole
+from backend.user_service.app.repositories.badge_repository import UserBadgeRepository
+from backend.user_service.app.repositories.user_repository import UserRepository
+from backend.user_service.app.repositories.rating_repository import UserRatingRepository
+from backend.user_service.app.services.user_service import UserService
+from backend.user_service.app.core.permissions import has_permission
 
 logger = logging.getLogger(__name__)
 nc = NATS()

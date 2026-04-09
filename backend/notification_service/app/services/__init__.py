@@ -1,5 +1,5 @@
 """Services module."""
 
-from app.services.notification_service import NotificationService
+from backend.notification_service.app.services.notification_service import NotificationService
 
 __all__ = ["NotificationService"]

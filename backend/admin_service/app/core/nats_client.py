@@ -1,7 +1,7 @@
 import json
 import logging
 from nats.aio.client import Client as NATS
-from app.core.config import settings
+from backend.admin_service.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 nc = NATS()

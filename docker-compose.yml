@@ -47,7 +47,7 @@ services:
     networks:
       - s2s_network
 
-  # User Service
+
   user_service:
     build:
       context: .
@@ -66,15 +66,16 @@ services:
       FIRST_SUPERUSER_EMAIL: admin@example.com
       FIRST_SUPERUSER_PASSWORD: admin123
       PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/user_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      PYTHONPATH: /app
+    working_dir: /app
+    command: python -m uvicorn backend.user_service.app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/user_service:/app/backend/user_service
+      - .:/app
     networks:
       - s2s_network
     healthcheck:
@@ -101,15 +102,16 @@ services:
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
       PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/notification_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+      PYTHONPATH: /app
+    working_dir: /app
+    command: python -m uvicorn backend.notification_service.app.main:app --host 0.0.0.0 --port 8001 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/notification_service:/app/backend/notification_service
+      - .:/app
     networks:
       - s2s_network
     healthcheck:
@@ -136,15 +138,16 @@ services:
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
       PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/event_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+      PYTHONPATH: /app
+    working_dir: /app
+    command: python -m uvicorn backend.event_service.app.main:app --host 0.0.0.0 --port 8002 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/event_service:/app/backend/event_service
+      - .:/app
     networks:
       - s2s_network
     healthcheck:
@@ -171,15 +174,16 @@ services:
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
       PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/admin_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+      PYTHONPATH: /app
+    working_dir: /app
+    command: python -m uvicorn backend.admin_service.app.main:app --host 0.0.0.0 --port 8003 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./backend/admin_service:/app/backend/admin_service
+      - .:/app
     networks:
       - s2s_network
     healthcheck:

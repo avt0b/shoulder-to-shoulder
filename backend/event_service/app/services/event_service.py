@@ -1,9 +1,9 @@
 import logging
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
-from app.repositories.event_repository import EventRepository
-from app.core.nats_client import publish_event
-from app.models.event import Event, EventStatus
+from backend.event_service.app.repositories.event_repository import EventRepository
+from backend.event_service.app.core.nats_client import publish_event
+from backend.event_service.app.models.event import Event, EventStatus
 
 logger = logging.getLogger(__name__)
 
