@@ -53,8 +53,8 @@ services:
   # User Service
   user_service:
     build:
-      context: ./backend/user_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/user_service/Dockerfile
     container_name: s2s_user_service
     ports:
       - "8000:8000"
@@ -83,8 +83,8 @@ services:
   # Notification Service
   notification_service:
     build:
-      context: ./backend/notification_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/notification_service/Dockerfile
     container_name: s2s_notification_service
     ports:
       - "8001:8001"
@@ -111,8 +111,8 @@ services:
   # Event Service
   event_service:
     build:
-      context: ./backend/event_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/event_service/Dockerfile
     container_name: s2s_event_service
     ports:
       - "8002:8002"
@@ -139,8 +139,8 @@ services:
   # Admin Service
   admin_service:
     build:
-      context: ./backend/admin_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/admin_service/Dockerfile
     container_name: s2s_admin_service
     ports:
       - "8003:8003"
@@ -167,8 +167,8 @@ services:
   # Maps Service
   maps_service:
     build:
-      context: ./backend/maps_service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/maps_service/Dockerfile
     container_name: s2s_maps_service
     ports:
       - "8004:8004"
