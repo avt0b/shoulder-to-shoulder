@@ -1,12 +1,11 @@
 # Build stage
-FROM node:20-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
+COPY vite.config.js ./
 COPY index.html ./
 COPY public ./public
 COPY src ./src

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -46,11 +44,6 @@ services:
       - "4222:4222"      # Client port
       - "8222:8222"      # HTTP monitoring port
     command: -js         # Enable JetStream
-    healthcheck:
-      test: ["CMD", "nats", "server", "info"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - s2s_network
 
@@ -79,8 +72,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      nats:
         condition: service_healthy
     volumes:
       - ./backend/user_service:/app/backend/user_service
@@ -117,8 +108,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      nats:
-        condition: service_healthy
     volumes:
       - ./backend/notification_service:/app/backend/notification_service
     networks:
@@ -154,8 +143,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      nats:
-        condition: service_healthy
     volumes:
       - ./backend/event_service:/app/backend/event_service
     networks:
@@ -190,8 +177,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      nats:
         condition: service_healthy
     volumes:
       - ./backend/admin_service:/app/backend/admin_service

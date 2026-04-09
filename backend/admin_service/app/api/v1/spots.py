@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from backend.admin_service.app.api.dependencies import require_superuser
-from backend.admin_service.app.services.admin_service import AdminService
-from backend.admin_service.app.schemas.spot import (
+from app.api.dependencies import require_superuser
+from app.services.admin_service import AdminService
+from app.schemas.spot import (
     ModerateSpotRequest,
     ModerationResultResponse,
     AdminSpotResponse,

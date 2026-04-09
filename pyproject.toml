@@ -20,16 +20,14 @@ dependencies = [
     "python-dotenv>=1.2.2",
     # Auth & security
     "python-jose[cryptography]>=3.3.0",
-    "passlib>=1.7.4",
-    "nats-py>=2.5.0",
+    "passlib[bcrypt]>=1.7.4",
     "bcrypt==3.2.2",
-    "passlib==1.7.4",
+    "nats-py>=2.14.0",
     # File uploads & HTTP client
     "python-multipart>=0.0.9",
     "httpx>=0.27.0",
     # Caching
     "redis>=5.0.0",
-    "nats-py>=2.14.0",
 ]
 
 [project.optional-dependencies]
