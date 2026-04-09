@@ -144,4 +144,19 @@ export const authApi = USE_MOCK
       resetPassword(data) {
         return request('/api/v1/auth/forgot-password/reset', { method: 'POST', body: data });
       },
+      getProfile() {
+        return request('/api/v1/users/me');
+      },
+      updateProfile(data) {
+        return request('/api/v1/users/me', { method: 'PUT', body: data });
+      },
+      updateContact(data) {
+        return request('/api/v1/users/me/contact', { method: 'PUT', body: data });
+      },
+      getRating() {
+        return request('/api/v1/users/me/rating');
+      },
+      getPublicProfile(userId) {
+        return request(`/api/v1/users/${userId}/public`);
+      },
     };

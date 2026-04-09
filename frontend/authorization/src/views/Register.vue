@@ -41,7 +41,7 @@
             />
           </div>
           <div class="field">
-            <label class="field-label">Email</label>
+            <label class="field-label">Email <span class="optional">(необязательно)</span></label>
             <input
               v-model="email"
               type="email"
@@ -131,7 +131,7 @@ const handleRegister = async () => {
     router.push('/profile');
   } catch (e) {
     const msg = e.message || '';
-    if (msg.includes('номер телефона') || msg.toLowerCase().includes('phone')) {
+    if (msg.includes('номер') || msg.toLowerCase().includes('phone')) {
       error.value = 'Аккаунт с таким номером телефона уже существует';
     } else if (msg.toLowerCase().includes('email')) {
       error.value = 'Аккаунт с таким email уже существует';
@@ -262,6 +262,11 @@ const handleRegister = async () => {
   font-weight: 500;
   color: #59413a;
   margin-left: 4px;
+}
+
+.optional {
+  font-weight: 400;
+  color: #9ca3af;
 }
 
 .form-input {
