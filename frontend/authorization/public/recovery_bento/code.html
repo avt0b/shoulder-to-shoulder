@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-low": "#f3f4f5",
+                    "secondary": "#924a31",
+                    "tertiary": "#0051af",
+                    "inverse-primary": "#ffb59d",
+                    "primary-fixed": "#ffdbd0",
+                    "secondary-container": "#fea182",
+                    "primary-container": "#c2410c",
+                    "on-primary-fixed-variant": "#832600",
+                    "on-secondary": "#ffffff",
+                    "on-background": "#191c1d",
+                    "surface-dim": "#d9dadb",
+                    "on-error": "#ffffff",
+                    "on-secondary-container": "#78351e",
+                    "error-container": "#ffdad6",
+                    "surface-variant": "#e1e3e4",
+                    "on-primary-container": "#ffece7",
+                    "on-secondary-fixed": "#390c00",
+                    "on-primary-fixed": "#390c00",
+                    "on-error-container": "#93000a",
+                    "on-tertiary-fixed": "#001a41",
+                    "primary": "#9b2f00",
+                    "on-tertiary-container": "#ecf0ff",
+                    "tertiary-container": "#0069de",
+                    "surface-container-high": "#e7e8e9",
+                    "surface-bright": "#f8f9fa",
+                    "primary-fixed-dim": "#ffb59d",
+                    "secondary-fixed": "#ffdbd0",
+                    "surface-tint": "#ac3400",
+                    "on-surface-variant": "#59413a",
+                    "surface-container-highest": "#e1e3e4",
+                    "secondary-fixed-dim": "#ffb59d",
+                    "on-secondary-fixed-variant": "#75331c",
+                    "outline": "#8d7168",
+                    "error": "#ba1a1a",
+                    "outline-variant": "#e1bfb5",
+                    "inverse-on-surface": "#f0f1f2",
+                    "inverse-surface": "#2e3132",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "on-surface": "#191c1d",
+                    "on-tertiary-fixed-variant": "#004494",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "surface-container": "#edeeef",
+                    "on-tertiary": "#ffffff",
+                    "surface": "#f8f9fa",
+                    "tertiary-fixed": "#d8e2ff",
+                    "background": "#f8f9fa"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        }
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .bento-card {
+            border-radius: 1.5rem; /* 24px per instructions */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-low font-body text-on-surface antialiased">
+<!-- TopAppBar Shell (Transactional State: No Global Nav) -->
+<header class="fixed top-0 w-full z-50 bg-stone-50 dark:bg-stone-950 flex items-center px-4 py-3 h-16 w-full">
+<button class="hover:bg-stone-100 dark:hover:bg-stone-900 rounded-full transition-colors p-2 active:scale-95 transition-transform duration-150 flex items-center justify-center">
+<span class="material-symbols-outlined text-orange-700 dark:text-orange-500">arrow_back</span>
+</button>
+<h1 class="ml-4 font-['Inter'] font-semibold text-lg tracking-tight text-orange-700 dark:text-orange-500">Восстановление</h1>
+</header>
+<main class="pt-24 pb-12 px-4 max-w-2xl mx-auto">
+<div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+<!-- Hero Instruction Bento Cell -->
+<div class="md:col-span-6 bento-card bg-surface-container-lowest p-6 min-h-[180px] flex flex-col justify-end relative overflow-hidden">
+<!-- Background Image Integration -->
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-10 saturate-50" data-alt="Modern fitness studio interior with soft natural lighting and warm wood accents, creating a calm and professional atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAWin96o6RB2Fm5YHW1xtgieaso2fvYmEWxRs8HodEhEbGJgefjWuM_7D-EFMoO26s1uUpV5aiOPRXDPl1ZxiUurIRl8X7RhxFI05nReLA18TzuIOIVt9mNrzU5gixcd4AABKEv0SiYgtHoPi7n-VDlJIC3B_nJe7meYEeOTrhVO8IBUIE4TGRG48DKbJmO-d4v48P5mFnhvUUgjMF8p3jB0y3ZhzeYHpaqJTCJLZQjeZIN62S5-H9K2wmmL6S7US_BpBnajeqNpV4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/80 to-transparent"></div>
+</div>
+<div class="relative z-10">
+<h2 class="text-headline-sm font-semibold text-primary mb-2">Введите ваш email или номер телефона для восстановления доступа</h2>
+<p class="text-body-md text-on-surface-variant max-w-sm">Мы отправим вам временный код для подтверждения личности и сброса пароля.</p>
+</div>
+</div>
+<!-- Main Input Bento Cell -->
+<div class="md:col-span-4 bento-card bg-surface-container-lowest p-6 flex flex-col justify-center">
+<label class="text-label-sm font-medium text-on-surface-variant mb-2 block px-1" for="recovery-identity">Email или телефон</label>
+<div class="relative">
+<input class="w-full bg-surface-container-high border-none bento-card h-14 px-4 text-on-surface placeholder:text-outline-variant focus:ring-2 focus:ring-primary-container transition-all" id="recovery-identity" placeholder="example@mail.com" type="text"/>
+</div>
+</div>
+<!-- Action Bento Cell -->
+<div class="md:col-span-2 bento-card bg-primary-container p-6 flex items-center justify-center group active:scale-95 transition-transform duration-150">
+<button class="w-full h-full flex flex-col items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined mb-2 text-3xl">send</span>
+<span class="text-title-md font-semibold">Отправить код</span>
+</button>
+</div>
+<!-- Secondary Info / Support Cell -->
+<div class="md:col-span-3 bento-card bg-surface-container-high p-6">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary">info</span>
+<div>
+<h3 class="text-label-sm font-semibold uppercase tracking-wider text-secondary">Безопасность</h3>
+<p class="text-body-md text-on-surface-variant mt-1">Ваши данные защищены сквозным шифрованием.</p>
+</div>
+</div>
+</div>
+<!-- Login Link Cell -->
+<div class="md:col-span-3 bento-card bg-surface-container-lowest p-6 flex items-center justify-center border-2 border-transparent hover:border-primary-fixed transition-all cursor-pointer">
+<a class="flex items-center gap-2 text-primary font-medium group" href="#">
+<span>Вспомнили пароль? Войти</span>
+<span class="material-symbols-outlined text-sm group-hover:translate-x-1 transition-transform">login</span>
+</a>
+</div>
+</div>
+<!-- Editorial Breathing Room -->
+<footer class="mt-12 text-center">
+<p class="text-label-sm text-outline font-medium tracking-[0.1em] uppercase">Shoulder to Shoulder • Collective Pulse</p>
+</footer>
+</main>
+<!-- FAB Suppression: On transactional/recovery screen, no primary action FAB should be rendered per "Contextual FAB Suppression" rule. -->
+</body></html>
