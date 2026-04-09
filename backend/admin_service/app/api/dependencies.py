@@ -2,11 +2,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from typing import Literal
 
-from app.core.security import decode_admin_token
-from app.core.nats_client import request
+from backend.admin_service.app.core.security import decode_admin_token
+from backend.admin_service.app.core.nats_client import request
 import logging
 
-from app.core.permissions import has_permission
+from backend.admin_service.app.core.permissions import has_permission
 
 logger = logging.getLogger(__name__)
 

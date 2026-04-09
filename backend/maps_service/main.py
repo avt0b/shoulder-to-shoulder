@@ -6,11 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# from src.core.config import cors_settings
-# from src.core.infrastructure.database.database import engine, get_session
-# from src.core.infrastructure.exception_handler import register_handlers
+from src.core.config import cors_settings
+from src.core.infrastructure.database.database import engine, get_session
+from src.core.infrastructure.exception_handler import register_handlers
 from logger import get_logger
-# from src.modules.identity.presentation.api.router import router as account_router
+from src.modules.identity.presentation.api.router import router as account_router
 
 logger = get_logger(__name__)
 

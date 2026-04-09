@@ -1,10 +1,10 @@
 import logging
 from uuid import UUID
-from app.repositories.user_repository import UserRepository
-from app.repositories.profile_repository import UserProfileRepository
-from app.repositories.rating_repository import UserRatingRepository
-from app.repositories.badge_repository import UserBadgeRepository
-from app.schemas.user import (
+from backend.user_service.app.repositories.user_repository import UserRepository
+from backend.user_service.app.repositories.profile_repository import UserProfileRepository
+from backend.user_service.app.repositories.rating_repository import UserRatingRepository
+from backend.user_service.app.repositories.badge_repository import UserBadgeRepository
+from backend.user_service.app.schemas.user import (
     UserProfileResponse,
     PublicUserInfoResponse,
     RatingResponse,

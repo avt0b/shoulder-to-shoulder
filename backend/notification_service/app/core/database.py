@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 
-from app.core.config import settings
+from backend.notification_service.app.core.config import settings
 
 # Create async engine
 engine = create_async_engine(
@@ -24,7 +24,7 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 # Import models here to register them with Base
-from app.models.notification import Notification  # noqa: E402, F401
+from backend.notification_service.app.models.notification import Notification  # noqa: E402, F401
 
 
 async def init_db():
