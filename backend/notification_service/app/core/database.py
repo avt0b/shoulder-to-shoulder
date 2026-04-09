@@ -29,8 +29,13 @@ from app.models.notification import Notification  # noqa: E402, F401
 
 async def init_db():
     """Initialize database tables."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"Warning: Could not initialize database: {e}")
+        # Don't fail startup if database initialization fails
+        pass
 
 
 async def get_db() -> AsyncSession:
