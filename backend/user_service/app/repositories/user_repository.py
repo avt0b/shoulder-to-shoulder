@@ -1,6 +1,6 @@
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.user_service.app.models.user import User
+from app.models.user import User
 from sqlalchemy import select, update, func, or_
 
 class UserRepository:

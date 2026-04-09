@@ -19,6 +19,7 @@ services:
       retries: 5
     networks:
       - s2s_network
+    restart: unless-stopped
 
   # Redis Cache
   redis:
@@ -35,6 +36,7 @@ services:
       retries: 5
     networks:
       - s2s_network
+    restart: unless-stopped
 
   # NATS Message Broker
   nats:
@@ -43,14 +45,15 @@ services:
     ports:
       - "4222:4222"      # Client port
       - "8222:8222"      # HTTP monitoring port
-    command: -js         # Enable JetStream
+    command: -m 8222 -js # Enable JetStream with monitoring
     networks:
       - s2s_network
+    restart: unless-stopped
 
   # User Service
   user_service:
     build:
-      context: .
+      context: ./backend/user_service
       dockerfile: Dockerfile
     container_name: s2s_user_service
     ports:
@@ -66,29 +69,21 @@ services:
       FIRST_SUPERUSER_EMAIL: admin@example.com
       FIRST_SUPERUSER_PASSWORD: admin123
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app
-    working_dir: /app
-    command: python -m uvicorn backend.user_service.app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
+      nats:
+        condition: service_started
     networks:
       - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
   # Notification Service
   notification_service:
     build:
-      context: .
+      context: ./backend/notification_service
       dockerfile: Dockerfile
     container_name: s2s_notification_service
     ports:
@@ -102,29 +97,21 @@ services:
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app
-    working_dir: /app
-    command: python -m uvicorn backend.notification_service.app.main:app --host 0.0.0.0 --port 8001 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
+      nats:
+        condition: service_started
     networks:
       - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
   # Event Service
   event_service:
     build:
-      context: .
+      context: ./backend/event_service
       dockerfile: Dockerfile
     container_name: s2s_event_service
     ports:
@@ -138,29 +125,21 @@ services:
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app
-    working_dir: /app
-    command: python -m uvicorn backend.event_service.app.main:app --host 0.0.0.0 --port 8002 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
+      nats:
+        condition: service_started
     networks:
       - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
 
   # Admin Service
   admin_service:
     build:
-      context: .
+      context: ./backend/admin_service
       dockerfile: Dockerfile
     container_name: s2s_admin_service
     ports:
@@ -174,43 +153,53 @@ services:
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
       PYTHONUNBUFFERED: "1"
-      PYTHONPATH: /app
-    working_dir: /app
-    command: python -m uvicorn backend.admin_service.app.main:app --host 0.0.0.0 --port 8003 --reload
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - .:/app
+      nats:
+        condition: service_started
     networks:
       - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    restart: unless-stopped
+
+  # Maps Service
+  maps_service:
+    build:
+      context: ./backend/maps_service
+      dockerfile: Dockerfile
+    container_name: s2s_maps_service
+    ports:
+      - "8004:8004"
+    environment:
+      ENVIRONMENT: development
+      PROJECT_NAME: Maps Service Плечом к плечу
+      API_V1_STR: /api/v1
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db
+      PYTHONUNBUFFERED: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - s2s_network
+    restart: unless-stopped
 
   # Frontend (Vue.js)
   frontend:
     build:
       context: ./frontend/authorization
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+        VITE_APP_ENV: development
+        VITE_DEBUG: "true"
     container_name: s2s_frontend
     ports:
       - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:8000
-      VITE_NATS_URL: ws://localhost:9222
-    depends_on:
-      - user_service
-    volumes:
-      - ./frontend/authorization:/app
-      - /app/node_modules
     networks:
       - s2s_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:

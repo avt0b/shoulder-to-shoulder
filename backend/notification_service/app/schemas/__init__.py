@@ -1,6 +1,6 @@
 """Schemas module."""
 
-from backend.notification_service.app.schemas.notification import (
+from app.schemas.notification import (
     NotificationCreate,
     NotificationUpdate,
     NotificationResponse,

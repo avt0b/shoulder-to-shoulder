@@ -1,35 +1,70 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-.qwen
-
-.venv/
-venv/
-env/
-
-.env
-*.env.local
-*.env.backup
-!.env.example
-
-build/
-dist/
 *.egg-info/
 *.egg
 *.whl
 *.tar.gz
+build/
+dist/
 
-script.py.mako
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+.env.backup
+!.env.example
+
+# IDE & Editors
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
-
 .DS_Store
 Thumbs.db
 
+# Project specific
 .qwen/
+.claude/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Build & Docker
+.ruff_cache/
+uv.lock
+.coverage.*
+
+# Node (for frontend)
+node_modules/
+dist/
+.nuxt/
+npm-debug.log
+
+# OS files
+.DS_Store
+.vscode/extensions/
+

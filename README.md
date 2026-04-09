@@ -3,67 +3,326 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status: MVP](https://img.shields.io/badge/Status-MVP-orange)](README.md)
-[![Product Hack](https://img.shields.io/badge/Event-Product%20Programming%20Competition-purple)](README.md)
+[![Microservices](https://img.shields.io/badge/Architecture-Microservices-brightgreen)](README.md)
 
 ## 🎯 О проекте
 «Плечом к плечу» решает не проблему лени, а проблему **страха осуждения и одиночества** при выходе на бесплатные спортплощадки. Приложение позволяет за 2 клика найти компанию для тренировки, получить безопасный маршрут и попасть в среду, где ценят поддержку, а не результат.
 
-📍 **Пилот:** г. Орёл (масштабируемая архитектура под любой город РФ)
-👥 **ЦА:** 18–35 лет, новички, интроверты, жители спальных районов, приезжие.
+📍 **Пилот:** г. Орёл
+👥 **ЦА:** 18–35 лет, новички, интроверты, жители спальных районов
 
 ---
 
-## 📉 Проблема
-| Инсайт | Цифра / Факт |
-|:---|:---|
-| 43% россиян хотят тренироваться чаще, но не делают этого | ВЦИОМ, 2023 |
-| 61% из них называют причиной «не с кем», «стесняюсь», «боюсь осуждения» | |
-| Бесплатные площадки загружены на 15–20% | Мониторинг Минспорта |
-| Существующие сервисы фокусируются на результатах или одиночных треках | Нет социальной механики с низким порогом входа |
+## 🏗 Микросервисная архитектура
 
-**Ключевой барьер:** *«Я не знаю, кто там будет, вдруг я сделаю плохо, и все будут смотреть».*
+### Сервисы
+| Сервис | Порт | Описание |
+|:---|:---:|:---|
+| **user_service** | 8000 | Управление пользователями, профилями, рейтингами |
+| **notification_service** | 8001 | Отправка уведомлений, расписание |
+| **event_service** | 8002 | Управление сборами и участниками |
+| **admin_service** | 8003 | Административная панель |
+| **maps_service** | 8004 | Работа с географическими данными |
+| **frontend** | 3000 | Vue.js приложение |
 
----
-
-## 💡 Решение
-Приложение превращает страх в поддержку через 3 принципа:
-1. **Низкий порог входа** → поиск компании за 2 клика, фильтры по уровню и формату.
-2. **Психологическая безопасность** → рейтинг эмпатии, «тихие сборы», анонимная карта зон дискомфорта.
-3. **Безопасность физическая** → освещённые маршруты, синхронизация выхода из дома, верифицированные площадки.
-
----
-
-## 🚀 MVP Функционал
-| Модуль | Описание | Статус |
+### Инфраструктура
+| Компонент | Технология | Порт |
 |:---|:---|:---:|
-| 🗺️ Карта «Доступный спорт» | Бесплатные площадки, фильтры (освещение, тип, шум), UGC-добавление с модерацией | ✅ |
-| 👥 Сбор «Не один» | Создание/вступление в группу 2–10 чел., таймер, чек-ин/фото после тренировки | ✅ |
-| 📊 Рейтинг «Вместе сильнее» | Метрики: Эмпатия + Надёжность. Влияет на доступ к закрытым сборам и бейджи | ✅ |
-| 🚶 Совместный маршрут | Безопасный пеший путь до спота, функция «Пройтись вместе» (синхронизация выхода) | ✅ |
-| 🎭 Бонус: «Стыдно? Не проблема» | Виртуальный маскот/аватар для первых тренировок | 🟡 В планах |
-| 🤫 Тихие сборы | Формат для интровертов: без обязательного общения, только присутствие рядом | 🟡 В планах |
-
----
-НИЖЕ НЕ ГОТОВО
-## 🛠 Технологический стек
-*(Замените на свои реализации, если отличаются)*
-| Слой | Технология | Обоснование |
-|:---|:---|:---|
-| 📱 Клиент (Mobile) | `[Flutter / React Native / Kotlin + Swift]` | Кроссплатформенность, быстрая итерация UI |
-| 🗺️ Карты & Гео | Яндекс.Карты API / Mapbox + Turf.js | Точная маршрутизация, слои освещения, кастомные маркеры |
-| ⚙️ Бэкенд | `[Node.js + Express / Python + FastAPI / Go]` | Быстрые REST/WebSocket для real-time сборов |
-| 🗃️ БД | PostgreSQL + PostGIS | Геопространственные запросы, ACID, масштабируемость |
-| 🔐 Auth & Realtime | `[Firebase / Supabase / JWT + WebSocket]` | Быстрый онбординг, live-обновление статуса сборов |
-| 🚀 Деплой | `[Vercel / Render / AWS / Yandex Cloud]` | CI/CD, мониторинг, autoscale |
+| База данных | PostgreSQL 16 | 5432 |
+| Кэш | Redis 7 | 6379 |
+| Message Broker | NATS 2 (JetStream) | 4222 |
 
 ---
 
-## 🏗 Архитектура
-```mermaid
-graph LR
-  A[Mobile Client] -->|REST/WS| B[API Gateway / Backend]
-  B --> C[(PostgreSQL + PostGIS)]
-  B --> D[Map Service API]
-  B --> E[Push & Realtime Engine]
-  A -->|Geolocation| B
-  B -->|Aggregated Data| A
+## 🚀 Быстрый старт
+
+### Требования
+- **Docker & Docker Compose**: [Установка](https://docs.docker.com/get-docker/)
+- **Make** (опционально): Для удобных команд
+- **Python 3.12+** (для локальной разработки)
+
+### Запуск всех сервисов
+
+```bash
+# Запустить все контейнеры в фоне
+make up
+
+# Или без Make
+docker-compose up -d
+```
+
+Сервисы будут доступны:
+- **Swagger UI**: http://localhost:8000/docs (User Service)
+- **Frontend**: http://localhost:3000
+- **NATS Monitor**: http://localhost:8222
+
+### Разработка с hot-reload
+
+```bash
+# Запустить с автоперезагрузкой при изменении кода
+make dev
+
+# Или
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+### Остановка сервисов
+
+```bash
+make down
+```
+
+---
+
+## 📋 Доступные команды Make
+
+```bash
+make help              # Показать все команды
+make build             # Собрать образы
+make up                # Запустить сервисы (фон)
+make down              # Остановить сервисы
+make dev               # Разработка с hot-reload
+make logs              # Показать логи
+make logs-follow       # Следить за логами
+make status            # Статус сервисов и health-checks
+make restart           # Перезапустить все
+make clean             # Удалить контейнеры и volumes
+make bash-USER         # Shell в user_service (и другие сервисы)
+make migrate-user      # Миграции БД
+```
+
+---
+
+## 🏢 Структура проекта
+
+```
+shoulder-to-shoulder/
+├── backend/
+│   ├── user_service/
+│   │   ├── app/              # FastAPI приложение
+│   │   ├── Dockerfile        # Образ сервиса
+│   │   ├── pyproject.toml     # Зависимости
+│   │   └── .dockerignore
+│   ├── notification_service/  # Уведомления
+│   ├── event_service/         # Сборы и события
+│   ├── admin_service/         # Админ-панель
+│   └── maps_service/          # Геоданные
+├── frontend/
+│   └── authorization/         # Vue.js интерфейс
+├── docker-compose.yml         # Production конфиг
+├── docker-compose.dev.yml     # Development перегрузки
+├── Makefile                   # Управление сервисами
+├── .env.example              # Переменные окружения
+└── README.md                 # Этот файл
+```
+
+---
+
+## 🔧 Конфигурация
+
+### Переменные окружения
+
+Скопируйте `.env.example` → `.env`:
+
+```bash
+cp .env.example .env
+```
+
+**Основные переменные:**
+
+```env
+# Сервис
+ENVIRONMENT=development
+SECRET_KEY=your-secret-key-change-in-production
+
+# База данных
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# NATS Message Broker
+NATS_URL=nats://nats:4222
+```
+
+### Для production
+
+Обновите переменные в `.env`:
+- `ENVIRONMENT=production`
+- `SECRET_KEY=` - сгенерируйте надежный ключ
+- `DATABASE_URL=` - используйте управляемую БД
+- Используйте HTTPS для всех сервисов
+
+---
+
+## 🗄️ База данных
+
+### Первый запуск
+
+Миграции применяются автоматически при запуске. Для явного запуска:
+
+```bash
+make migrate-user
+make migrate-event
+make migrate-notif
+```
+
+### Сброс БД (WARNING: удалит все данные)
+
+```bash
+make db-reset
+```
+
+### Доступ к PostgreSQL
+
+```bash
+make bash-postgres
+# Или
+docker-compose exec postgres psql -U postgres -d shoulder_to_shoulder_db
+```
+
+---
+
+## 📡 NATS Message Broker
+
+### Мониторинг
+
+Откройте: http://localhost:8222
+
+### События в системе
+
+```
+workout.completed      → User Service обновляет надёжность
+empathy.awarded        → User Service добавляет points эмпатии
+notification.created   → Notification Service создал уведомление
+notification.sent      → Уведомление отправлено
+```
+
+---
+
+## 🧪 Тестирование и линтинг
+
+```bash
+# Форматирование кода
+make format
+
+# Линтинг
+make lint
+```
+
+---
+
+## 🐛 Отладка
+
+### Логи конкретного сервиса
+
+```bash
+docker-compose logs user_service -f
+```
+
+### Вход в shell контейнера
+
+```bash
+make bash-USER    # user_service
+make bash-EVENT   # event_service
+```
+
+### Health checks
+
+```bash
+make status
+```
+
+---
+
+## 📚 API Documentation
+
+После запуска сервисов:
+
+| Сервис | Swagger |
+|:---|:---|
+| User Service | http://localhost:8000/docs |
+| Notification Service | http://localhost:8001/docs |
+| Event Service | http://localhost:8002/docs |
+| Admin Service | http://localhost:8003/docs |
+| Maps Service | http://localhost:8004/docs |
+
+---
+
+## 🚀 Развёртывание
+
+### Docker Hub / private registry
+
+```bash
+# Собрать образы с тегом
+docker build -t your-registry/user-service:latest backend/user_service
+
+# Запушить
+docker push your-registry/user-service:latest
+
+# В docker-compose использовать
+image: your-registry/user-service:latest
+```
+
+### Kubernetes (примерная структура)
+
+```bash
+kubectl apply -f k8s/postgres-pvc.yaml
+kubectl apply -f k8s/postgres-deployment.yaml
+kubectl apply -f k8s/redis-deployment.yaml
+kubectl apply -f k8s/nats-deployment.yaml
+kubectl apply -f k8s/user-service-deployment.yaml
+# ...
+```
+
+### Yandex Cloud, AWS, или другие
+
+Используйте CI/CD pipeline:
+1. GitHub Actions / GitLab CI для сборки образов
+2. Push в реестр
+3. Обновление в целевом окружении (Helm, docker-compose, Kubernetes)
+
+---
+
+## 📖 Технологический стек
+
+| Слой | Технология |
+|:---|:---|
+| **API Framework** | FastAPI 0.135+ |
+| **ASGI Server** | Uvicorn 0.44+ |
+| **ORM** | SQLAlchemy 2.0+ |
+| **Database** | PostgreSQL 16 + asyncpg |
+| **Cache** | Redis 7 |
+| **Message Broker** | NATS 2 JetStream |
+| **Auth** | JWT + bcrypt |
+| **Validation** | Pydantic 2.12+ |
+| **Frontend** | Vue.js 3, Vite |
+| **Container** | Docker & Docker Compose |
+
+---
+
+## 🤝 Вклад в проект
+
+1. Создайте ветку: `git checkout -b feature/new-feature`
+2. Коммитьте изменения: `git commit -m "Add new feature"`
+3. Пушьте в репо: `git push origin feature/new-feature`
+4. Откройте Pull Request
+
+---
+
+## 📝 Лицензия
+
+MIT License - см. [LICENSE](LICENSE)
+
+---
+
+## 👥 Контакты
+
+📧 **Email**: team@example.com
+🔗 **Website**: https://plecho-k-plecho.ru (пример)
+💬 **Telegram**: @example_bot (пример)
+
+---
+
+**Last updated**: 2026-04-09
+**Maintainer**: DevOps & Backend Team

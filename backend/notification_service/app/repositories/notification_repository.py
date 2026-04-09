@@ -4,8 +4,8 @@ from datetime import datetime
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.notification_service.app.models.notification import Notification
-from backend.notification_service.app.schemas.notification import NotificationCreate, NotificationUpdate
+from app.models.notification import Notification
+from app.schemas.notification import NotificationCreate, NotificationUpdate
 
 
 class NotificationRepository:
