@@ -300,7 +300,15 @@ const startNavigation = () => {
 const loadPlaces = async () => {
   try {
     const data = await getPlaces()
-    places.value = data.places || []
+    const rawPlaces = data.places || []
+    
+    // Нормализуем структуру мест (преобразуем latitude/longitude в lat/lng)
+    places.value = rawPlaces.map(place => ({
+      ...place,
+      lat: place.lat ?? place.latitude,
+      lng: place.lng ?? place.longitude,
+      name: place.name ?? place.title ?? 'Место'
+    }))
   } catch (err) {
     console.warn('Не удалось загрузить места:', err)
   }
