@@ -20,7 +20,6 @@ async def test_admin_list():
     nc = NATS()
     await nc.connect("nats://localhost:4222")
 
-    # Request/Reply
     msg = await nc.request(
         "admin.user.list",
         json.dumps({"limit": 10, "offset": 0}).encode(),
