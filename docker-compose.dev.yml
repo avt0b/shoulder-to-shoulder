@@ -4,36 +4,36 @@
 services:
   user_service:
     volumes:
-      - ./backend/user_service:/app
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./backend/user_service:/shoulder-to-shoulder/backend/user_service
+    command: python -m uvicorn backend.user_service.app.main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       ENVIRONMENT: development
 
   notification_service:
     volumes:
-      - ./backend/notification_service:/app
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+      - ./backend/notification_service:/shoulder-to-shoulder/backend/notification_service
+    command: python -m uvicorn backend.notification_service.app.main:app --host 0.0.0.0 --port 8001 --reload
     environment:
       ENVIRONMENT: development
 
   event_service:
     volumes:
-      - ./backend/event_service:/app
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+      - ./backend/event_service:/shoulder-to-shoulder/backend/event_service
+    command: python -m uvicorn backend.event_service.app.main:app --host 0.0.0.0 --port 8002 --reload
     environment:
       ENVIRONMENT: development
 
   admin_service:
     volumes:
-      - ./backend/admin_service:/app
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+      - ./backend/admin_service:/shoulder-to-shoulder/backend/admin_service
+    command: python -m uvicorn backend.admin_service.app.main:app --host 0.0.0.0 --port 8003 --reload
     environment:
       ENVIRONMENT: development
 
   maps_service:
     volumes:
-      - ./backend/maps_service:/app
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8004 --reload
+      - ./backend/maps_service:/shoulder-to-shoulder/backend/maps_service
+    command: python -m uvicorn backend.maps_service.app.main:app --host 0.0.0.0 --port 8004 --reload
     environment:
       ENVIRONMENT: development
 
@@ -41,10 +41,3 @@ services:
     build:
       context: ./frontend/authorization
       dockerfile: Dockerfile
-      target: dev
-    command: npm run dev -- --host 0.0.0.0 --port 3000
-    environment:
-      CHOKIDAR_USEPOLLING: "true"
-    volumes:
-      - ./frontend/authorization:/app
-      - /app/node_modules

@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, DateTime, Enum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from app.core.database import Base
+from backend.event_service.app.core.database import Base
 
 class ParticipantStatus(str, enum.Enum):
     JOINED = "joined"

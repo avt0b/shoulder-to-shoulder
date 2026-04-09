@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UUID
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from backend.user_service.app.core.database import Base
 
 
 class Badge(Base):

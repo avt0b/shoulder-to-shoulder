@@ -1,7 +1,7 @@
 import json
 import logging
 from nats.aio.client import Client as NATS
-from app.core.config import settings
+from backend.event_service.app.core.config import settings
 from nats.errors import NoServersError, TimeoutError, ConnectionClosedError
 
 logger = logging.getLogger(__name__)

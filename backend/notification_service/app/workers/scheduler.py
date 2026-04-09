@@ -2,9 +2,9 @@
 
 import asyncio
 import httpx
-from app.core.config import settings
-from app.core.database import AsyncSessionLocal
-from app.services.notification_service import NotificationService
+from backend.notification_service.app.core.config import settings
+from backend.notification_service.app.core.database import AsyncSessionLocal
+from backend.notification_service.app.services.notification_service import NotificationService
 
 scheduler_task = None
 

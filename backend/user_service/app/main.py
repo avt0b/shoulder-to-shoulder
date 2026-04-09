@@ -3,10 +3,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
-from app.api.v1.auth import router as auth_router
-from app.api.v1.users import router as users_router
-from app.core.nats_client import connect_nats, close_nats, handle_workout_event, nc, \
+from backend.user_service.app.core.config import settings
+from backend.user_service.app.api.v1.auth import router as auth_router
+from backend.user_service.app.api.v1.users import router as users_router
+from backend.user_service.app.core.nats_client import connect_nats, close_nats, handle_workout_event, nc, \
     setup_nats_subscribers, setup_admin_subscribers
 
 app = FastAPI(

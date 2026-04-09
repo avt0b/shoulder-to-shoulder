@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, Float, ForeignKey, DateTime, UUID
 from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from backend.user_service.app.core.database import Base
 
 
 class UserRating(Base):
