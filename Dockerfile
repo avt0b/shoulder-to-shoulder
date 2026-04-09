@@ -11,9 +11,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy project files
 COPY pyproject.toml uv.lock* ./
 
-# Install uv and dependencies
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system -r <(uv pip compile pyproject.toml)
+# Install dependencies using pip with all needed packages
+RUN pip install --no-cache-dir \
+    fastapi[standard] \
+    uvicorn[standard] \
+    sqlalchemy[asyncio] \
+    alembic \
+    asyncpg \
+    psycopg2-binary \
+    pydantic[email] \
+    pydantic-settings \
+    python-dotenv \
+    python-jose[cryptography] \
+    passlib[bcrypt] \
+    bcrypt \
+    nats-py \
+    python-multipart \
+    httpx \
+    redis
 
 # Runtime stage
 FROM python:3.12-slim
