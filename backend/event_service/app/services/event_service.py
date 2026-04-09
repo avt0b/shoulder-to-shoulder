@@ -53,7 +53,6 @@ class EventService:
     async def complete_expired_events(self):
         """Авто-завершение прошедших сборов + штрафы за неявку"""
         now = datetime.now(timezone.utc)
-        # Получаем все незавершённые события, время которых вышло
         from sqlalchemy import select
         stmt = select(Event).where(
             Event.status.in_([EventStatus.PENDING, EventStatus.ACTIVE]),
