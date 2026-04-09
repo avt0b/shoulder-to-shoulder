@@ -4,19 +4,22 @@
 
 Мобильное приложение на **Vue 3 + Leaflet** для поиска спортивных мест и групповых тренировок в городе Орёл.
 
-На данном этапе фронтенд работает с **заглушками** (mock-данные в коде). Бэкендеру нужно реализовать API для замены этих данных.
+Фронтенд уже имеет **mock-данные** и fallback на `localStorage`. Бэкенд нужен для замены заглушек реальными данными.
 
 ---
 
-## 📍 Текущая архитектура
+## 📁 Структура фронтенда
 
 ```
 app/
 ├── src/
 │   ├── components/
-│   │   ├── MainPage.vue   # Главная страница с мини-картой
-│   │   └── MapLight.vue   # Полноэкранная карта с маркерами
-│   ├── App.vue            # Роутинг между MainPage ↔ MapLight
+│   │   ├── MainPage.vue    # Главная: мини-карта + мои встречи + создание
+│   │   ├── MapLight.vue    # Полноэкранная карта + фильтры мест
+│   │   └── EventsPage.vue  # Вкладка «Ивенты»: все встречи + создание
+│   ├── App.vue             # Роутинг: MainPage ↔ EventsPage ↔ MapLight
+│   ├── config.js           # API URL, OSRM URL, debug-флаги
+│   ├── style.css           # Глобальные CSS-переменные (Material Design)
 │   └── main.js
 └── package.json
 ```
@@ -25,217 +28,192 @@ app/
 
 ## 🔌 API Endpoints
 
-Бэкенд должен предоставить следующие REST-эндпоинты:
+Полная документация — **[API.md](API.md)**. Ниже — обзор для бэкендера.
 
-### 1. Получение всех мест (places)
+### Места (Places)
 
-```
-GET /api/v1/places
-```
+| Метод | Эндпоинт | Описание |
+|-------|----------|----------|
+| `GET` | `/places` | Все места (с опциональными фильтрами) |
+| `GET` | `/places/{id}` | Одно место |
+| `GET` | `/places/nearby` | Ближайшие места по координатам |
 
-**Ответ:**
-```json
+**Фильтры для `/places`:**
+- `activity_type` — `running`, `strength`, `yoga`, `calisthenics`
+- `noise_level` — `quiet`, `moderate`, `loud`
+- `lit`, `lockers`, `benches` — boolean-флаги
+
+**Поля Place:**
+```typescript
 {
-  "places": [
-    {
-      "id": 1,
-      "name": "Парк Победы",
-      "description": "Отличное место для утренних пробежек...",
-      "lat": 52.9690,
-      "lng": 36.0820,
-      "rating": 4.7,
-      "category": "park",
-      "address": "ул. Комсомольская, Орёл",
-      "image": "https://...",
-      "gallery": [
-        "https://...",
-        "https://...",
-        "https://..."
-      ]
-    }
-  ]
-}
-```
-
-**Поля объекта Place:**
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | `number` | Уникальный ID |
-| `name` | `string` | Название места |
-| `description` | `string` | Краткое описание |
-| `lat` | `number` | Широта (координаты) |
-| `lng` | `number` | Долгота (координаты) |
-| `rating` | `number` | Рейтинг (0-5) |
-| `emoji` | `string` | Эмодзи-иконка (🏃🏋️🧘💪) |
-| `category` | `string` | Категория: `park`, `stadium`, `river`, `playground` |
-| `address` | `string` | Адрес |
-| `image` | `string` | URL главного изображения |
-| `gallery` | `string[]` | Массив URL фотографий (3 шт) |
-
----
-
-### 2. Получение одного места
-
-```
-GET /api/v1/places/:id
-```
-
-**Ответ:** Тот же объект Place что и выше.
-
----
-
-### 3. Построение маршрута (OSRM)
-
-```
-GET /api/v1/route?start_lat=52.9651&start_lng=36.0785&end_lat=52.9690&end_lng=36.0820
-```
-
-**Ответ:**
-```json
-{
-  "distance": 1250,
-  "duration": 900,
-  "geometry": {
-    "type": "LineString",
-    "coordinates": [[36.0785, 52.9651], [36.0820, 52.9690], ...]
-  },
-  "steps": [
-    {
-      "instruction": "Идите на север",
-      "distance": 200,
-      "duration": 150
-    }
-  ]
-}
-```
-
-> **Примечание:** Можно использовать публичный сервер OSRM: `https://router.project-osrm.org/route/v1/foot/{lng1},{lat1};{lng2},{lat2}`
-
----
-
-### 4. Ближайшее место (геолокация)
-
-```
-GET /api/v1/places/nearby?lat=52.9651&lng=36.0785&radius=2000
-```
-
-**Ответ:** Массив Place, отсортированный по расстоянию.
-
----
-
-### 5. Мои мероприятия (пользователь записан)
-
-```
-GET /api/v1/meetups/my
-```
-
-**Ответ:**
-```json
-{
-  "meetups": [
-    {
-      "id": 1,
-      "name": "Вечернее кардио",
-      "time": "19:00",
-      "locationShort": "Парк",
-      "location": "Парк Победы",
-      "level": "Новичок",
-      "participants": 3,
-      "maxParticipants": 5,
-      "isJoined": true,
-      "avatars": ["https://...", "https://..."],
-      "moreCount": 2
-    }
-  ]
-}
-```
-
-**Поля объекта Meetup:**
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `id` | `number` | Уникальный ID |
-| `name` | `string` | Название мероприятия |
-| `time` | `string` | Время (например `19:00`) |
-| `locationShort` | `string` | Краткое место для карточки |
-| `location` | `string` | Полное место |
-| `level` | `string` | Уровень: `Новичок`, `Открыто`, `Продвинутый` |
-| `participants` | `number` | Сколько уже записано |
-| `maxParticipants` | `number` | Максимум участников |
-| `isJoined` | `boolean` | Записан ли текущий пользователь |
-| `avatars` | `string[]` | URL аватарок участников (до 3) |
-| `moreCount` | `number` | Сколько ещё участников (показать как `+N`) |
-
----
-
-### 6. Записаться / отписаться
-
-```
-POST /api/v1/meetups/:id/join
-DELETE /api/v1/meetups/:id/leave
-```
-
-**Ответ:**
-```json
-{
-  "success": true,
-  "participants": 4,
-  "maxParticipants": 8
+  id: number
+  name: string
+  description: string
+  lat: number        // широта
+  lng: number        // долгота
+  rating: number     // 0-5
+  emoji: string      // 🏃🏋️🧘💪
+  category: string   // park, stadium, river, playground
+  activityType: string   // running, strength, yoga, calisthenics
+  noiseLevel: string     // quiet, moderate, loud
+  lit: boolean       // освещённая территория
+  lockers: boolean   // есть раздевалки
+  benches: boolean   // есть скамейки
+  address: string
+  image: string      // URL главного фото
+  gallery: string[]  // 3 фото
 }
 ```
 
 ---
 
-## 📱 Как фронтенд будет использовать API
+### Мероприятия (Meetups) — MainPage
 
-### Текущие заглушки (для замены):
+| Метод | Эндпоинт | Описание |
+|-------|----------|----------|
+| `GET` | `/meetups/my` | Мои встречи (пользователь записан) |
+| `POST` | `/meetups/{id}/join` | Записаться |
+| `DELETE` | `/meetups/{id}/leave` | Отписаться |
 
-В `MapLight.vue` сейчас есть массив `places` с захардкоженными данными. Нужно заменить на:
+**Поля Meetup:**
+```typescript
+{
+  id: number
+  name: string
+  time: string           // "19:00"
+  locationShort: string
+  location: string
+  level: string          // Новичок, Средний, Продвинутый, Открыто
+  description: string
+  type: string           // Бег, Пауэрлифтинг, Растяжка, Гимнастика
+  quietCompanion: boolean
+  participants: number
+  maxParticipants: number
+  isJoined: boolean
+  avatars: string[]      // до 3 URL
+  moreCount: number
+}
+```
+
+---
+
+### Ивенты (Events) — EventsPage
+
+| Метод | Эндпоинт | Описание |
+|-------|----------|----------|
+| `GET` | `/events` | Все встречи |
+| `POST` | `/events` | Создать встречу |
+| `POST` | `/events/{id}/join` | Записаться |
+| `DELETE` | `/events/{id}/leave` | Отписаться |
+
+**Поля Event:**
+```typescript
+{
+  id: number
+  name: string
+  emoji: string           // 🏃🏋️🧘🔥🤸
+  date: string            // "Сегодня", "Завтра", "2026-04-10"
+  time: string            // "07:00"
+  locationShort: string
+  location: string
+  description: string
+  level: string           // Новичок, Средний, Профи, Открыто для всех
+  type: string            // running, powerlifting, stretching, gymnastics
+  quietCompanion: boolean
+  participants: number
+  maxParticipants: number
+  isJoined: boolean
+  avatars: string[]
+  moreCount: number
+}
+```
+
+**Тело POST /events:**
+```json
+{
+  "name": "Вечерняя пробежка",
+  "date": "2026-04-10",
+  "time": "19:00",
+  "locationId": 1,
+  "locationShort": "Парк Победы",
+  "location": "Парк Победы, ул. Комсомольская",
+  "level": "Новичок",
+  "type": "running",
+  "quietCompanion": false,
+  "description": "",
+  "maxParticipants": 10,
+  "user_id": 1
+}
+```
+
+---
+
+### Маршруты (OSRM)
+
+| Метод | Эндпоинт | Описание |
+|-------|----------|----------|
+| `GET` | `/route` | Построить маршрут (прокси OSRM) |
+
+Можно проксировать: `https://router.project-osrm.org/route/v1/foot/{lng1},{lat1};{lng2},{lat2}`
+
+---
+
+## 🔐 Авторизация
+
+Сейчас `user_id` передаётся в теле (`user_id: 1`) или query-параметре.
+Позже добавим JWT-токен. Пока можно захардкодить `user_id = 1`.
+
+---
+
+## 📱 Как фронтенд использует API
+
+### Загрузка данных
 
 ```js
-// Сейчас (заглушка):
-const places = [
-  { id: 1, name: 'Парк Победы', lat: 52.9690, lng: 36.0820, ... }
-]
+// MapLight.vue — места на карту
+const res = await fetch('http://localhost:3000/api/v1/places')
+const data = await res.json()
+places.value = data.places
+addPlaceMarkers()
 
-// Будет (запрос к API):
-const places = ref([])
+// MainPage.vue — мои встречи
+const res = await fetch('http://localhost:3000/api/v1/meetups/my')
+myMeetups.value = (await res.json()).meetups
 
-onMounted(async () => {
-  const res = await fetch('http://localhost:3000/api/v1/places')
-  const data = await res.json()
-  places.value = data.places
-  addPlaceMarkers()
-})
+// EventsPage.vue — все встречи
+const res = await fetch('http://localhost:3000/api/v1/events')
+allEvents.value = (await res.json()).events
 ```
+
+### Fallback
+
+Если API недоступен — фронтенд использует:
+1. `localStorage` (сохранённые данные)
+2. Mock-данные (захардкоженные заглушки)
+
+Это позволяет тестировать UI без бэкенда.
 
 ---
 
 ## 🗺 Координаты
 
-**Формат:** `lat` (широта), `lng` (долгота) — центр города Орёл: `[52.9651, 36.0785]`
+**Центр Орла:** `[52.9651, 36.0785]`
 
-**Важно для OSRM:** OSRM использует формат `[долгота, широта]` → `[lng, lat]`!
-
----
-
-## 🎨 Что сейчас работает на фронтенде
-
-| Функция | Статус |
-|---------|--------|
-| Карта OpenStreetMap (Leaflet) | ✅ Работает |
-| Маркеры с эмодзи | ✅ Работает |
-| Popup с фото и инфо | ✅ Работает |
-| Тёмный/Светлый режим (кнопка ниндзя) | ✅ Работает |
-| Анимация растекания | ✅ Работает |
-| Зум кнопки | ✅ Работает |
-| Поиск мест | ❌ Заглушка |
-| Маршруты | ❌ Заглушка |
-| Геолокация | ❌ Заглушка |
-| Данные с бэкенда | ❌ Заглушка |
+**OSRM формат:** `[долгота, широта]` → `[lng, lat]`
 
 ---
 
-## 🚀 Как запустить фронтенд
+## 💡 Рекомендации
+
+1. **База данных** — PostgreSQL / SQLite / MongoDB — на ваш выбор
+2. **Хранение фото** — URL-ссылки или загрузка на сервер
+3. **Эмодзи** — хранить как строки
+4. **Категории** — `park`, `stadium`, `river`, `playground` — можно расширять
+5. **Типы активности** — `running`, `strength`, `yoga`, `calisthenics`
+
+---
+
+## 🚀 Запуск фронтенда
 
 ```bash
 cd app
@@ -243,26 +221,4 @@ npm install
 npm run dev
 ```
 
-Сервер запустится на `http://localhost:5173`
-
----
-
-## 💡 Рекомендации для бэкендера
-
-1. **База данных** — PostgreSQL / SQLite / MongoDB — на ваш выбор
-2. **Хранение фото** — можно использовать URL-ссылки или загружать на сервер
-3. **Эмодзи** — фронтенд ожидает строку с эмодзи (🏃🏋️🧘💪), можно хранить как есть или мапить по категории
-4. **Категории** — `park`, `stadium`, `river`, `playground` — можно расширять
-5. **Рейтинг** — число от 0 до 5, можно считать на основе отзывов пользователей
-
----
-
-## 📋 Минимальный MVP для начала
-
-Достаточно реализовать **только один эндпоинт**:
-
-```
-GET /api/v1/places
-```
-
-Вернуть массив хотя бы с 2-3 местами. Остальное добавим позже.
+Сервер на `http://localhost:5173`

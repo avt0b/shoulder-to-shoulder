@@ -1,8 +1,18 @@
 <template>
   <div class="app-container">
+    <!-- Map Fullscreen -->
     <transition name="map-expand" mode="out-in">
       <MapLight v-if="isMapExpanded" @close="closeMap" />
-      <MainPage v-else @expand-map="expandMap" />
+
+      <!-- Events Page -->
+      <EventsPage
+        v-else-if="currentPage === 'events'"
+        @close="currentPage = 'main'"
+        @navigate="handleNavigate"
+      />
+
+      <!-- Main Page -->
+      <MainPage v-else @expand-map="expandMap" @navigate="handleNavigate" />
     </transition>
   </div>
 </template>
@@ -11,8 +21,10 @@
 import { ref } from 'vue'
 import MainPage from './components/MainPage.vue'
 import MapLight from './components/MapLight.vue'
+import EventsPage from './components/EventsPage.vue'
 
 const isMapExpanded = ref(false)
+const currentPage = ref('main')
 
 const expandMap = () => {
   isMapExpanded.value = true
@@ -20,6 +32,10 @@ const expandMap = () => {
 
 const closeMap = () => {
   isMapExpanded.value = false
+}
+
+const handleNavigate = (page) => {
+  currentPage.value = page
 }
 </script>
 
