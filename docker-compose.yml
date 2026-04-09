@@ -74,7 +74,6 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_healthy
     volumes:
       - ./backend/user_service:/app/backend/user_service
     networks:
@@ -111,7 +110,6 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_healthy
     volumes:
       - ./backend/notification_service:/app/backend/notification_service
     networks:
@@ -148,7 +146,6 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_healthy
     volumes:
       - ./backend/event_service:/app/backend/event_service
     networks:
@@ -185,7 +182,6 @@ services:
       redis:
         condition: service_healthy
       nats:
-        condition: service_healthy
     volumes:
       - ./backend/admin_service:/app/backend/admin_service
     networks:
