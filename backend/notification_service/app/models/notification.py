@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
 from sqlalchemy.sql import func
 
-from backend.notification_service.app.core.database import Base
+from app.core.database import Base
 
 
 class Notification(Base):

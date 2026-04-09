@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from backend.admin_service.app.core.nats_client import request
+from app.core.nats_client import request
 
 
 class AdminService:

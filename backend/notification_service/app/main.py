@@ -3,10 +3,10 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from backend.notification_service.app.api.v1 import notifications
-from backend.notification_service.app.core.database import init_db
-from backend.notification_service.app.core.nats_client import nats_client
-from backend.notification_service.app.workers.scheduler import start_scheduler, stop_scheduler
+from app.api.v1 import notifications
+from app.core.database import init_db
+from app.core.nats_client import nats_client
+from app.workers.scheduler import start_scheduler, stop_scheduler
 
 # API tags metadata
 tags_metadata = [

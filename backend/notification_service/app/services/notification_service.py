@@ -3,10 +3,10 @@
 import json
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.notification_service.app.repositories.notification_repository import NotificationRepository
-from backend.notification_service.app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
-from backend.notification_service.app.core.nats_client import nats_client
-from backend.notification_service.app.core.config import settings
+from app.repositories.notification_repository import NotificationRepository
+from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
+from app.core.nats_client import nats_client
+from app.core.config import settings
 
 
 class NotificationService:

@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.admin_service.app.core.config import settings
-from backend.admin_service.app.api.v1 import users, spots
-from backend.admin_service.app.core.nats_client import connect_nats, close_nats
+from app.core.config import settings
+from app.api.v1 import users, spots
+from app.core.nats_client import connect_nats, close_nats
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
