@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.admin_service.app.core.config import settings
 from backend.admin_service.app.api.v1 import users, spots
 from backend.admin_service.app.core.nats_client import connect_nats, close_nats
+from backend.admin_service.app.api.v1 import events as events_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -21,7 +22,7 @@ app.add_middleware(
 
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(spots.router, prefix="/api/v1")
-
+app.include_router(events_router.router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup():
