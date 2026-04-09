@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.user_service.app.models.profile import UserProfile
+from app.models.profile import UserProfile
 
 
 class UserProfileRepository:

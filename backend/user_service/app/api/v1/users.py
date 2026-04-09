@@ -1,14 +1,14 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from backend.user_service.app.api.dependencies import get_current_user_id, get_user_service
-from backend.user_service.app.schemas.user import (
+from app.api.dependencies import get_current_user_id, get_user_service
+from app.schemas.user import (
     UserProfileResponse,
     UserProfileUpdateRequest,
     PublicUserInfoResponse,
     RatingResponse, UserContactUpdateRequest,
 )
-from backend.user_service.app.services.user_service import UserService
+from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 

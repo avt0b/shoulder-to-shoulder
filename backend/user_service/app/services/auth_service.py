@@ -1,17 +1,17 @@
 import logging
-from backend.user_service.app.core.security import (
+from app.core.security import (
     get_password_hash,
     verify_password,
     create_access_token,
     create_refresh_token,
 )
-from backend.user_service.app.schemas.auth import TokenResponse
-from backend.user_service.app.repositories.user_repository import UserRepository
-from backend.user_service.app.repositories.profile_repository import UserProfileRepository
-from backend.user_service.app.repositories.rating_repository import UserRatingRepository
-from backend.user_service.app.models.user import User
-from backend.user_service.app.models.profile import UserProfile
-from backend.user_service.app.models.rating import UserRating
+from app.schemas.auth import TokenResponse
+from app.repositories.user_repository import UserRepository
+from app.repositories.profile_repository import UserProfileRepository
+from app.repositories.rating_repository import UserRatingRepository
+from app.models.user import User
+from app.models.profile import UserProfile
+from app.models.rating import UserRating
 
 logger = logging.getLogger(__name__)
 

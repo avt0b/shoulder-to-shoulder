@@ -23,6 +23,9 @@ AsyncSessionLocal = async_sessionmaker(
 # Declarative base for models
 Base = declarative_base()
 
+# Import models here to register them with Base
+from app.models.notification import Notification  # noqa: E402, F401
+
 
 async def init_db():
     """Initialize database tables."""
