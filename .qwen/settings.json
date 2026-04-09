@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(py *)",
+      "Bash(npm install)",
+      "Bash(npm run *)",
+      "Bash(timeout *)",
+      "Bash(netstat *)",
+      "Bash(findstr *)",
+      "Bash(taskkill *)",
+      "Bash(dir *)",
+      "Bash(copy *)",
+      "Bash(rmdir *)",
+      "Bash(rd *)",
+      "Bash(md *)",
+      "Bash(del *)",
+      "Bash(do *)",
+      "Bash(type *)"
+    ]
+  },
+  "$version": 3
+}
