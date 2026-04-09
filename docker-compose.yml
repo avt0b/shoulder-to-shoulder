@@ -44,11 +44,6 @@ services:
       - "4222:4222"      # Client port
       - "8222:8222"      # HTTP monitoring port
     command: -js         # Enable JetStream
-    healthcheck:
-      test: ["CMD", "nats", "server", "info"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     networks:
       - s2s_network
 
