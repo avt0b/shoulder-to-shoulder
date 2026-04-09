@@ -12,7 +12,7 @@
       <!-- Welcome Text -->
       <div class="welcome-text">
         <h2 class="welcome-title">Добро пожаловать!</h2>
-        <p class="welcome-subtitle">Стань частью команды</p>
+        <p class="welcome-subtitle">Станьте частью команды</p>
       </div>
 
       <!-- Registration Form -->
@@ -108,6 +108,7 @@ const handleRegister = async () => {
       phone: phone.value,
       login: login.value,
       password: password.value,
+      confirmPassword: confirmPassword.value,
     });
     router.push('/login');
   } catch (e) {

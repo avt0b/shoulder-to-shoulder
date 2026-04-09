@@ -3,17 +3,14 @@ import WelcomeScreen from '../views/WelcomeScreen.vue';
 import Login from '../views/Login.vue';
 import Register from '../views/Register.vue';
 import ForgotPassword from '../views/ForgotPassword.vue';
+import Profile from '../views/Profile.vue';
 
 const routes = [
   { path: '/', name: 'Welcome', component: WelcomeScreen },
   { path: '/login', name: 'Login', component: Login },
   { path: '/register', name: 'Register', component: Register },
   { path: '/forgot-password', name: 'ForgotPassword', component: ForgotPassword },
-  {
-    path: '/profile',
-    name: 'Profile',
-    component: { template: '<div style="padding:24px;font-family:Inter,sans-serif;"><h1>Профиль</h1><p>Страница профиля</p></div>' },
-  },
+  { path: '/profile', name: 'Profile', component: Profile },
 ];
 
 const router = createRouter({

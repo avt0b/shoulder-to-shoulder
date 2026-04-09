@@ -134,6 +134,7 @@ const handleResetPassword = async () => {
       contact: contact.value,
       code: code.value,
       new_password: newPassword.value,
+      confirmPassword: confirmPassword.value,
     });
     router.push('/login');
   } catch (e) {

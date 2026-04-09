@@ -12,7 +12,7 @@
       <!-- Welcome Text -->
       <div class="welcome-text">
         <h2 class="welcome-title">Давно не виделись!</h2>
-        <p class="welcome-subtitle">Готов к тренировке?</p>
+        <p class="welcome-subtitle">Готовы к тренировке?</p>
       </div>
 
       <!-- Login Form -->
