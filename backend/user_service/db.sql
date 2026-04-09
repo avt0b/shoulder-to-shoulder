@@ -58,3 +58,6 @@ CREATE INDEX idx_users_role ON users(role);
 
 CREATE INDEX idx_ratings_empathy ON user_ratings(empathy_score DESC);
 CREATE INDEX idx_ratings_reliability ON user_ratings(reliability_score DESC);
+
+ALTER TABLE user_profiles ADD COLUMN city VARCHAR(100);
+CREATE INDEX idx_user_profiles_city ON user_profiles(city);

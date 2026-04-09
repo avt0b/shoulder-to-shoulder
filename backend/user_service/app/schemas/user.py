@@ -9,6 +9,7 @@ class UserProfileCreateRequest(BaseModel):
     bio: str | None = None
     email: EmailStr | None = None
     preferences: dict | None = None
+    city: str | None = Field(None, max_length=100)
 
 
 class UserProfileUpdateRequest(BaseModel):
@@ -17,6 +18,7 @@ class UserProfileUpdateRequest(BaseModel):
     fitness_level: Literal["beginner", "intermediate", "advanced"] | None = None
     bio: str | None = None
     preferences: dict | None = None
+    city: str | None = Field(None, max_length=100)
 
 
 class UserContactUpdateRequest(BaseModel):
@@ -33,6 +35,7 @@ class UserProfileResponse(BaseModel):
     bio: str | None
     avatar_url: str | None = None
     preferences: dict
+    city: str | None = Field(None, max_length=100)
 
 
 class PublicUserInfoResponse(BaseModel):
@@ -42,7 +45,9 @@ class PublicUserInfoResponse(BaseModel):
     empathy_score: int
     reliability_score: float
     badges: list[str] = Field(default_factory=list)
+    city: str | None = Field(None, max_length=100)
     # phone_number и email НЕ показываем публично
+
 
 class RatingResponse(BaseModel):
     empathy_score: int

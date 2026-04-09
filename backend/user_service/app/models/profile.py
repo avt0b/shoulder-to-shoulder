@@ -21,6 +21,7 @@ class UserProfile(Base):
     fitness_level = Column(String(20), default="beginner", nullable=False)
     bio = Column(String(500), nullable=True)
     avatar_url = Column(String(500), nullable=True)
+    city = Column(String(100), nullable=True, index=True)
 
     preferences = Column(JSON, default=dict, nullable=False)
 
