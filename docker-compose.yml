@@ -47,7 +47,7 @@ services:
     networks:
       - s2s_network
 
-
+  # User Service
   user_service:
     build:
       context: .
