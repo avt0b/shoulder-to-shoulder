@@ -1,10 +1,10 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from backend.event_service.app.api.dependencies import get_current_user_id
-from backend.event_service.app.services.event_service import EventService
-from backend.event_service.app.repositories.event_repository import EventRepository
-from backend.event_service.app.core.database import get_db
-from backend.event_service.app.schemas.event import EventCreateRequest, EventResponse, CheckInResponse
+from app.api.dependencies import get_current_user_id
+from app.services.event_service import EventService
+from app.repositories.event_repository import EventRepository
+from app.core.database import get_db
+from app.schemas.event import EventCreateRequest, EventResponse, CheckInResponse
 
 router = APIRouter(prefix="/events", tags=["events"])
 

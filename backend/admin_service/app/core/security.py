@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-from backend.admin_service.app.core.config import settings
+from app.core.config import settings
 
 
 def decode_admin_token(token: str) -> dict | None:

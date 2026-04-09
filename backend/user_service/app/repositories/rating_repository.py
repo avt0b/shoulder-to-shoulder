@@ -1,7 +1,7 @@
 from uuid import UUID
 from sqlalchemy import select, update, func, Numeric
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.user_service.app.models.rating import UserRating
+from app.models.rating import UserRating
 
 
 class UserRatingRepository:
