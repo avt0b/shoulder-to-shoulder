@@ -5,8 +5,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY tsconfig.json ./
-COPY vite.config.ts ./
+COPY vite.config.js ./
 COPY index.html ./
 COPY public ./public
 COPY src ./src
