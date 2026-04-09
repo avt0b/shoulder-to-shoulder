@@ -14,6 +14,7 @@ from backend.user_service.app.repositories.user_repository import UserRepository
 from backend.user_service.app.repositories.rating_repository import UserRatingRepository
 from backend.user_service.app.services.user_service import UserService
 from backend.user_service.app.core.permissions import has_permission
+from backend.user_service.app.services.badge_service import evaluate_and_award_badges
 
 logger = logging.getLogger(__name__)
 nc = NATS()
@@ -95,11 +96,22 @@ async def handle_workout_event(msg):
         async with AsyncSessionLocal() as db:
             user_repo = UserRepository(db)
             rating_repo = UserRatingRepository(db)
-            user_service = UserService(user_repo, None, rating_repo, None)
+            badge_repo = UserBadgeRepository(db)
+            user_service = UserService(user_repo, None, rating_repo, badge_repo)
+            rating = await user_service.update_reliability(user_id, success)
+            if not rating:
+                logger.warning(f"User {user_id} not found for reliability update")
+                return
+            awarded = await evaluate_and_award_badges(user_id, {
+                "completed_events": rating.completed_events,
+                "total_events": rating.total_events,
+                "reliability_score": rating.reliability_score,
+                "empathy_score": rating.empathy_score,
+            }, db)
 
-            await user_service.update_reliability(user_id, success)
             await db.commit()
-
+            if awarded:
+                logger.info(f"User {user_id} earned badges: {awarded}")
         logger.info(f"Updated reliability for user {user_id}: success={success}")
 
     except Exception as e:
