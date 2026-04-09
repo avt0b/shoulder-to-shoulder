@@ -1,14 +1,26 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Development stage
+FROM node:20-alpine AS dev
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+RUN npm ci
+
+# Copy application sources
 COPY vite.config.js ./
 COPY index.html ./
 COPY public ./public
 COPY src ./src
+
+# Expose Vite dev server port
+EXPOSE 3000
+
+# Run Vite in container-friendly mode for docker-compose.dev
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+
+# Build stage
+FROM dev AS builder
 
 # Accept build arguments
 ARG VITE_API_BASE_URL=http://localhost:8000
@@ -19,9 +31,6 @@ ARG VITE_DEBUG=true
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_APP_ENV=$VITE_APP_ENV
 ENV VITE_DEBUG=$VITE_DEBUG
-
-# Install dependencies
-RUN npm ci
 
 # Build the application
 RUN npm run build
