@@ -1,6 +1,5 @@
 <template>
-  <div class="register-page">
-    <!-- Full-screen Hero -->
+  <div class="forgot-password-page">
     <section class="hero">
       <img
         class="hero-image"
@@ -11,39 +10,48 @@
 
       <!-- Welcome Text -->
       <div class="welcome-text">
-        <h2 class="welcome-title">Добро пожаловать!</h2>
-        <p class="welcome-subtitle">Станьте частью команды</p>
+        <h2 class="welcome-title">Забыли пароль?</h2>
+        <p class="welcome-subtitle">Ничего страшного, восстановим!</p>
       </div>
 
-      <!-- Registration Form -->
+      <!-- Forgot Password Form -->
       <div class="form-wrapper">
         <div class="form-header">
-          <h3 class="form-title">Создать аккаунт</h3>
+          <h3 class="form-title">Восстановление пароля</h3>
         </div>
 
-        <form class="register-form" @submit.prevent="handleRegister">
+        <!-- Step 1: Enter phone/email -->
+        <form v-if="step === 1" class="forgot-form" @submit.prevent="handleSendCode">
           <div class="field">
-            <label class="field-label">Номер телефона</label>
+            <label class="field-label">Номер телефона или Email</label>
             <input
-              v-model="phone"
-              type="tel"
-              placeholder="+7 (900) 000-00-00"
-              class="form-input"
-            />
-          </div>
-          <div class="field">
-            <label class="field-label">Логин</label>
-            <input
-              v-model="login"
+              v-model="contact"
               type="text"
-              placeholder="Введите логин"
+              placeholder="+7 (900) 000-00-00 или email"
+              class="form-input"
+            />
+          </div>
+          <p v-if="error" class="error">{{ error }}</p>
+          <button type="submit" class="submit-btn" :disabled="loading">
+            {{ loading ? 'Отправка...' : 'Получить код' }}
+          </button>
+        </form>
+
+        <!-- Step 2: Enter code + new password -->
+        <form v-if="step === 2" class="forgot-form" @submit.prevent="handleResetPassword">
+          <div class="field">
+            <label class="field-label">Код из SMS / Email</label>
+            <input
+              v-model="code"
+              type="text"
+              placeholder="123456"
               class="form-input"
             />
           </div>
           <div class="field">
-            <label class="field-label">Пароль</label>
+            <label class="field-label">Новый пароль</label>
             <input
-              v-model="password"
+              v-model="newPassword"
               type="password"
               placeholder="••••••••"
               class="form-input"
@@ -59,16 +67,15 @@
             />
           </div>
           <p v-if="error" class="error">{{ error }}</p>
-          <button type="submit" class="register-btn" :disabled="loading">
-            {{ loading ? 'Загрузка...' : 'Зарегистрироваться' }}
+          <button type="submit" class="submit-btn" :disabled="loading">
+            {{ loading ? 'Сохранение...' : 'Сбросить пароль' }}
           </button>
         </form>
 
         <div class="form-footer">
-          <p class="login-text">
-            Уже есть аккаунт?
-            <router-link to="/login" class="login-link">
-              Войти
+          <p class="back-text">
+            <router-link to="/login" class="back-link">
+              ← Назад ко входу
             </router-link>
           </p>
         </div>
@@ -81,38 +88,57 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { authApi } from '../api/index';
-import heroImage from '../assets/RegistrationPicture.jpg';
+import heroImage from '../assets/ForgotPasswordPicture.jpg';
 
 const router = useRouter();
-const phone = ref('');
-const login = ref('');
-const password = ref('');
+const contact = ref('');
+const code = ref('');
+const newPassword = ref('');
 const confirmPassword = ref('');
 const error = ref('');
 const loading = ref(false);
+const step = ref(1);
 
-const handleRegister = async () => {
+const handleSendCode = async () => {
   error.value = '';
-  if (!phone.value || !login.value || !password.value || !confirmPassword.value) {
+  if (!contact.value) {
+    error.value = 'Введите номер телефона или Email';
+    return;
+  }
+
+  loading.value = true;
+  try {
+    await authApi.sendResetCode({ contact: contact.value });
+    step.value = 2;
+  } catch (e) {
+    error.value = e.message || 'Ошибка отправки кода. Попробуйте снова.';
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleResetPassword = async () => {
+  error.value = '';
+  if (!code.value || !newPassword.value || !confirmPassword.value) {
     error.value = 'Заполните все поля';
     return;
   }
-  if (password.value !== confirmPassword.value) {
+  if (newPassword.value !== confirmPassword.value) {
     error.value = 'Пароли не совпадают';
     return;
   }
 
   loading.value = true;
   try {
-    await authApi.register({
-      phone: phone.value,
-      login: login.value,
-      password: password.value,
+    await authApi.resetPassword({
+      contact: contact.value,
+      code: code.value,
+      new_password: newPassword.value,
       confirmPassword: confirmPassword.value,
     });
     router.push('/login');
   } catch (e) {
-    error.value = e.message || 'Ошибка регистрации. Попробуйте снова.';
+    error.value = e.message || 'Ошибка сброса пароля. Попробуйте снова.';
   } finally {
     loading.value = false;
   }
@@ -122,7 +148,7 @@ const handleRegister = async () => {
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-.register-page {
+.forgot-password-page {
   position: fixed;
   inset: 0;
   font-family: 'Inter', sans-serif;
@@ -219,7 +245,7 @@ const handleRegister = async () => {
 }
 
 /* ===== Form ===== */
-.register-form {
+.forgot-form {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -272,7 +298,7 @@ const handleRegister = async () => {
   word-break: break-word;
 }
 
-.register-btn {
+.submit-btn {
   width: 100%;
   padding: 14px 20px;
   border: none;
@@ -289,16 +315,16 @@ const handleRegister = async () => {
   -webkit-tap-highlight-color: transparent;
 }
 
-.register-btn:disabled {
+.submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.register-btn:active:not(:disabled) {
+.submit-btn:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-.register-btn:hover:not(:disabled) {
+.submit-btn:hover:not(:disabled) {
   opacity: 0.92;
   box-shadow: 0 4px 16px rgba(194, 65, 12, 0.3);
 }
@@ -310,19 +336,19 @@ const handleRegister = async () => {
   text-align: center;
 }
 
-.login-text {
+.back-text {
   font-size: 13px;
   color: #59413a;
   margin: 0;
 }
 
-.login-link {
+.back-link {
   color: #9b2f00;
   font-weight: 700;
   text-decoration: none;
 }
 
-.login-link:hover {
+.back-link:hover {
   text-decoration: underline;
 }
 
@@ -347,7 +373,7 @@ const handleRegister = async () => {
     font-size: 13px;
   }
 
-  .register-btn {
+  .submit-btn {
     padding: 12px 16px;
     font-size: 14px;
     min-height: 42px;
@@ -369,7 +395,7 @@ const handleRegister = async () => {
     font-size: 13px;
   }
 
-  .register-btn {
+  .submit-btn {
     padding: 13px 18px;
     font-size: 14px;
   }
@@ -441,7 +467,7 @@ const handleRegister = async () => {
     font-size: 13px;
   }
 
-  .register-btn {
+  .submit-btn {
     padding: 10px 16px;
     font-size: 13px;
     min-height: 38px;

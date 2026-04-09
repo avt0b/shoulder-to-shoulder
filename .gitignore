@@ -9,7 +9,6 @@ __pycache__/
 venv/
 env/
 
-
 .env
 *.env.local
 *.env.backup
@@ -32,3 +31,5 @@ script.py.mako
 
 .DS_Store
 Thumbs.db
+
+.qwen/
