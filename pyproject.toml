@@ -28,6 +28,7 @@ dependencies = [
     "httpx>=0.27.0",
     # Caching
     "redis>=5.0.0",
+    "boto3>=1.42.86",
 ]
 
 [project.optional-dependencies]
