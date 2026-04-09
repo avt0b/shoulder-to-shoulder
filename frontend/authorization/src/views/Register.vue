@@ -25,18 +25,27 @@
           <div class="field">
             <label class="field-label">Номер телефона</label>
             <input
-              v-model="phone"
+              v-model="phone_number"
               type="tel"
               placeholder="+7 (900) 000-00-00"
               class="form-input"
             />
           </div>
           <div class="field">
-            <label class="field-label">Логин</label>
+            <label class="field-label">Имя</label>
             <input
-              v-model="login"
+              v-model="display_name"
               type="text"
-              placeholder="Введите логин"
+              placeholder="Введите имя"
+              class="form-input"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label">Email</label>
+            <input
+              v-model="email"
+              type="email"
+              placeholder="user@example.com"
               class="form-input"
             />
           </div>
@@ -84,8 +93,9 @@ import { authApi } from '../api/index';
 import heroImage from '../assets/RegistrationPicture.jpg';
 
 const router = useRouter();
-const phone = ref('');
-const login = ref('');
+const phone_number = ref('');
+const display_name = ref('');
+const email = ref('');
 const password = ref('');
 const confirmPassword = ref('');
 const error = ref('');
@@ -93,7 +103,14 @@ const loading = ref(false);
 
 const handleRegister = async () => {
   error.value = '';
-  if (!phone.value || !login.value || !password.value || !confirmPassword.value) {
+
+  const phoneRegex = /^(\+7|7|8)?\d{10}$/;
+  if (!phoneRegex.test(phone_number.value.replace(/[\s\-\(\)]/g, ''))) {
+    error.value = 'Неверный формат номера телефона. Используйте формат +7XXXXXXXXXX';
+    return;
+  }
+
+  if (!display_name.value || !password.value || !confirmPassword.value) {
     error.value = 'Заполните все поля';
     return;
   }
@@ -104,15 +121,25 @@ const handleRegister = async () => {
 
   loading.value = true;
   try {
-    await authApi.register({
-      phone: phone.value,
-      login: login.value,
+    const data = await authApi.register({
+      phone_number: phone_number.value,
       password: password.value,
-      confirmPassword: confirmPassword.value,
+      display_name: display_name.value,
+      email: email.value || undefined,
     });
-    router.push('/login');
+    localStorage.setItem('token', data.access_token);
+    router.push('/profile');
   } catch (e) {
-    error.value = e.message || 'Ошибка регистрации. Попробуйте снова.';
+    const msg = e.message || '';
+    if (msg.includes('номер телефона') || msg.toLowerCase().includes('phone')) {
+      error.value = 'Аккаунт с таким номером телефона уже существует';
+    } else if (msg.toLowerCase().includes('email')) {
+      error.value = 'Аккаунт с таким email уже существует';
+    } else if (msg.toLowerCase().includes('пароль') || msg.toLowerCase().includes('password')) {
+      error.value = 'Пароль должен содержать минимум 8 символов';
+    } else {
+      error.value = 'Ошибка регистрации. Попробуйте снова.';
+    }
   } finally {
     loading.value = false;
   }
