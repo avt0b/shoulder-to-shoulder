@@ -89,13 +89,6 @@ async def handle_empathy_event(msg):
         logger.error(f"Error handling empathy event: {e}")
 
 
-async def setup_nats_subscribers():
-    """Subscribe to relevant NATS topics."""
-    await nc.subscribe("workout.completed", cb=handle_workout_event)
-    await nc.subscribe("empathy.awarded", cb=handle_empathy_event)
-    logger.info("NATS subscribers registered")
-
-
 async def handle_admin_user_list(msg):
     data = json.loads(msg.data.decode())
     try:
@@ -207,7 +200,7 @@ async def handle_admin_award_badge(msg):
     try:
         async with AsyncSessionLocal() as db:
             user_repo = UserRepository(db)
-            badge_repo = UserBadgeRepository(db) #TODO: добавить, когда сделаем
+            badge_repo = UserBadgeRepository(db)  # TODO: добавить, когда сделаем
 
             user = await user_repo.get_by_id(str(user_id))
             if not user:
@@ -298,10 +291,18 @@ async def handle_auth_validate_token(msg):
         await msg.respond(json.dumps({"ok": False, "error": "Internal auth error"}).encode())
 
 
+async def setup_nats_subscribers():
+    """Subscribe to relevant NATS topics."""
+    await nc.subscribe("workout.completed", cb=handle_workout_event)
+    await nc.subscribe("empathy.awarded", cb=handle_empathy_event)
+    await nc.subscribe("auth.validate_token", cb=handle_auth_validate_token)
+    logger.info("NATS subscribers registered")
+
 
 async def setup_admin_subscribers():
     await nc.subscribe("admin.user.list", cb=handle_admin_user_list)
     await nc.subscribe("admin.user.ban", cb=handle_admin_user_ban)
     await nc.subscribe("admin.user.unban", cb=handle_admin_user_unban)
     await nc.subscribe("admin.user.award_badge", cb=handle_admin_award_badge)
+    await nc.subscribe("admin.user.check_permission", cb=handle_admin_check_permission)
     logger.info("Admin command subscribers registered")

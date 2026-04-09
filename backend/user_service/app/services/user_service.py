@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 class UserService:
     def __init__(
-        self,
-        user_repo: UserRepository,
-        profile_repo: UserProfileRepository,
-        rating_repo: UserRatingRepository,
-        badge_repo: UserBadgeRepository,
+            self,
+            user_repo: UserRepository,
+            profile_repo: UserProfileRepository,
+            rating_repo: UserRatingRepository,
+            badge_repo: UserBadgeRepository,
     ):
         self.user_repo = user_repo
         self.profile_repo = profile_repo
@@ -64,7 +64,6 @@ class UserService:
             reliability_score=rating.reliability_score,
             badges=badges,
         )
-
 
     async def get_rating(self, user_id: UUID | str) -> RatingResponse | None:
         rating = await self.rating_repo.get_by_user_id(user_id)

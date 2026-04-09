@@ -67,9 +67,11 @@ class AdminService:
         except RuntimeError:
             raise HTTPException(status_code=503, detail="Spot service is temporarily unavailable")
 
-    async def moderate_spot(self, spot_id: str, action: str, reason: str | None = None, notes: str | None = None) -> dict | None:
+    async def moderate_spot(self, spot_id: str, action: str, reason: str | None = None,
+                            notes: str | None = None) -> dict | None:
         try:
-            resp = await request("admin.spot.moderate", {"spot_id": spot_id, "action": action, "reason": reason, "notes": notes})
+            resp = await request("admin.spot.moderate",
+                                 {"spot_id": spot_id, "action": action, "reason": reason, "notes": notes})
             if not resp.get("ok"):
                 return None
             return resp["data"]
