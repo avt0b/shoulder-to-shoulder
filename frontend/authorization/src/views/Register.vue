@@ -103,7 +103,14 @@ const loading = ref(false);
 
 const handleRegister = async () => {
   error.value = '';
-  if (!phone_number.value || !display_name.value || !password.value || !confirmPassword.value) {
+
+  const phoneRegex = /^(\+7|7|8)?\d{10}$/;
+  if (!phoneRegex.test(phone_number.value.replace(/[\s\-\(\)]/g, ''))) {
+    error.value = 'Неверный формат номера телефона. Используйте формат +7XXXXXXXXXX';
+    return;
+  }
+
+  if (!display_name.value || !password.value || !confirmPassword.value) {
     error.value = 'Заполните все поля';
     return;
   }
@@ -114,15 +121,25 @@ const handleRegister = async () => {
 
   loading.value = true;
   try {
-    await authApi.register({
+    const data = await authApi.register({
       phone_number: phone_number.value,
       password: password.value,
       display_name: display_name.value,
       email: email.value || undefined,
     });
-    router.push('/login');
+    localStorage.setItem('token', data.access_token);
+    router.push('/profile');
   } catch (e) {
-    error.value = e.message || 'Ошибка регистрации. Попробуйте снова.';
+    const msg = e.message || '';
+    if (msg.includes('номер телефона') || msg.toLowerCase().includes('phone')) {
+      error.value = 'Аккаунт с таким номером телефона уже существует';
+    } else if (msg.toLowerCase().includes('email')) {
+      error.value = 'Аккаунт с таким email уже существует';
+    } else if (msg.toLowerCase().includes('пароль') || msg.toLowerCase().includes('password')) {
+      error.value = 'Пароль должен содержать минимум 8 символов';
+    } else {
+      error.value = 'Ошибка регистрации. Попробуйте снова.';
+    }
   } finally {
     loading.value = false;
   }

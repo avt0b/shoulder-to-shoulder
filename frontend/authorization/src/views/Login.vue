@@ -78,7 +78,14 @@ const loading = ref(false);
 
 const handleLogin = async () => {
   error.value = '';
-  if (!phone_number.value || !password.value) {
+
+  const phoneRegex = /^(\+7|7|8)?\d{10}$/;
+  if (!phoneRegex.test(phone_number.value.replace(/[\s\-\(\)]/g, ''))) {
+    error.value = 'Неверный формат номера телефона. Используйте формат +7XXXXXXXXXX';
+    return;
+  }
+
+  if (!password.value) {
     error.value = 'Заполните все поля';
     return;
   }
@@ -89,7 +96,16 @@ const handleLogin = async () => {
     localStorage.setItem('token', data.access_token);
     router.push('/profile');
   } catch (e) {
-    error.value = e.message || 'Ошибка входа. Попробуйте снова.';
+    const msg = e.message || '';
+    if (msg.includes('номер телефона') || msg.toLowerCase().includes('phone')) {
+      error.value = 'Пользователь с таким номером не найден';
+    } else if (msg.includes('пароль') || msg.toLowerCase().includes('password')) {
+      error.value = 'Неверный пароль';
+    } else if (msg.includes('деактив')) {
+      error.value = 'Аккаунт заблокирован. Обратитесь в поддержку';
+    } else {
+      error.value = 'Ошибка входа. Попробуйте снова.';
+    }
   } finally {
     loading.value = false;
   }
