@@ -1,6 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-// Переключи на false когда бэкенд будет готов
+// Переключи на true для использования mock-данных
 const USE_MOCK = false;
 
 // ===== Mock helpers =====
@@ -68,7 +68,13 @@ async function request(path, options = {}) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || data.message || `Ошибка сервера: ${response.status}`);
+    const detail = data.detail || data.message;
+    const errorMessage = typeof detail === 'string'
+      ? detail
+      : (typeof detail === 'object' && detail !== null)
+        ? Object.values(detail).flat().join('. ') || `Ошибка сервера: ${response.status}`
+        : `Ошибка сервера: ${response.status}`;
+    throw new Error(errorMessage);
   }
 
   if (response.status === 204) return null;
