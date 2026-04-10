@@ -3,10 +3,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from backend.notification_service.app.api.v1 import notifications
-from backend.notification_service.app.core.database import init_db
 from backend.notification_service.app.core.nats_client import nats_client
-from backend.notification_service.app.workers.scheduler import start_scheduler, stop_scheduler
+from backend.notification_service.app.subscribers.event_subscriber import start_subscribers
 
 # API tags metadata
 tags_metadata = [
@@ -20,19 +18,12 @@ tags_metadata = [
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
-    # Initialize database
-    await init_db()
 
-    # Initialize NATS client
     await nats_client.connect()
-
-    # Start background scheduler
-    await start_scheduler()
+    await start_subscribers()
 
     yield
 
-    # Cleanup on shutdown
-    await stop_scheduler()
     await nats_client.disconnect()
 
 
@@ -44,8 +35,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Include routers
-app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
+# # Include routers
+# app.include_router(notifications.router, prefix="/api/v1", tags=["notifications"])
 
 
 @app.get("/health")
