@@ -22,5 +22,6 @@ class Event(Base):
     duration_minutes = Column(Integer, default=60, nullable=False)
     status = Column(String(20), default=EventStatus.PENDING, nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=False)
-    photo_url = Column(Text, nullable=True)  # 🔜 Для совместной фотки
+    photo_url = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
