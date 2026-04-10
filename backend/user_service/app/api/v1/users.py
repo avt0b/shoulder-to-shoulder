@@ -5,8 +5,7 @@ from backend.user_service.app.api.dependencies import get_current_user_id, get_u
 from backend.user_service.app.schemas.user import (
     UserProfileResponse,
     UserProfileUpdateRequest,
-    PublicUserInfoResponse,
-    RatingResponse, UserContactUpdateRequest, ThemeUpdateRequest,
+    RatingResponse, UserContactUpdateRequest, ThemeUpdateRequest, PublicUserProfileResponse,
 )
 from backend.user_service.app.services.user_service import UserService
 
@@ -15,12 +14,12 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/me", response_model=UserProfileResponse)
 async def get_my_profile(
-        current_user_id: str = Depends(get_current_user_id),
-        user_service: UserService = Depends(get_user_service),
-) -> UserProfileResponse:
-    profile = await user_service.get_user_by_id(current_user_id)
+    current_user_id: str = Depends(get_current_user_id),
+    svc: UserService = Depends(get_user_service),
+):
+    profile = await svc.get_user_by_id(current_user_id)
     if not profile:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+        raise HTTPException(404, detail="Profile not found")
     return profile
 
 
@@ -67,15 +66,15 @@ async def get_my_rating(
     return rating
 
 
-@router.get("/{user_id}/public", response_model=PublicUserInfoResponse)
-async def get_public_user_info(
-        user_id: UUID,
-        user_service: UserService = Depends(get_user_service),
-) -> PublicUserInfoResponse:
-    info = await user_service.get_public_user_info(user_id)
-    if not info:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return info
+@router.get("/{user_id}", response_model=PublicUserProfileResponse)
+async def get_public_profile(
+    user_id: UUID,
+    svc: UserService = Depends(get_user_service),
+):
+    profile = await svc.get_public_user_profile(user_id)
+    if not profile:
+        raise HTTPException(404, detail="User not found")
+    return profile
 
 
 @router.post("/me/theme")

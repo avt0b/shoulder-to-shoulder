@@ -25,3 +25,9 @@ class UserBadgeRepository:
             user_id = UUID(user_id)
         result = await self.db.execute(select(Badge.badge_type).where(Badge.user_id == user_id))
         return [row[0] for row in result.all()]
+
+    async def get_badge_types_by_user_id(self, user_id: UUID | str) -> list[str]:
+        uid = UUID(user_id) if isinstance(user_id, str) else user_id
+        stmt = select(Badge.badge_type).where(Badge.user_id == uid)
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())

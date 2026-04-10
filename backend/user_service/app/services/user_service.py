@@ -6,8 +6,7 @@ from backend.user_service.app.repositories.rating_repository import UserRatingRe
 from backend.user_service.app.repositories.badge_repository import UserBadgeRepository
 from backend.user_service.app.schemas.user import (
     UserProfileResponse,
-    PublicUserInfoResponse,
-    RatingResponse,
+    RatingResponse, PublicUserProfileResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,6 +35,8 @@ class UserService:
             return None
 
         event_counts = await self.profile_repo.get_event_counts(user.id)
+        badges = await self.badge_repo.get_badge_types_by_user_id(user.id)
+        theme = getattr(profile, "theme", None) or "light"
 
         return UserProfileResponse(
             user_id=str(user.id),
@@ -48,28 +49,34 @@ class UserService:
             avatar_url=profile.avatar_url,
             city=profile.city,
             preferences=profile.preferences or {},
-            # ← Новые поля:
-            theme=profile.theme or "light",
-            **event_counts,  # attended_events_count, joined_events_count
+            theme=theme,
+            badges=badges,
+            **event_counts,
         )
 
-    async def get_public_user_info(self, user_id: UUID | str) -> PublicUserInfoResponse | None:
+    async def get_public_user_profile(self, user_id: UUID | str) -> PublicUserProfileResponse | None:
+        """Публичный профиль для других (без theme и контактов)."""
         user = await self.user_repo.get_by_id(user_id)
         if not user:
             return None
+
         profile = await self.profile_repo.get_by_user_id(user.id)
-        rating = await self.rating_repo.get_by_user_id(user.id)
-        badges = await self.badge_repo.get_by_user_id(user.id)
-        if not profile or not rating:
+        if not profile:
             return None
 
-        return PublicUserInfoResponse(
+        event_counts = await self.profile_repo.get_event_counts(user.id)
+        badges = await self.badge_repo.get_badge_types_by_user_id(user.id)
+
+        return PublicUserProfileResponse(
             user_id=str(user.id),
             display_name=profile.display_name,
+            age=profile.age,
             fitness_level=profile.fitness_level,
-            empathy_score=rating.empathy_score,
-            reliability_score=rating.reliability_score,
+            bio=profile.bio,
+            avatar_url=profile.avatar_url,
+            city=profile.city,
             badges=badges,
+            **event_counts,
         )
 
     async def get_rating(self, user_id: UUID | str) -> RatingResponse | None:
