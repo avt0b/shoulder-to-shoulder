@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { authApi } from '../api'
+import { authApi, toProxyUrl } from '../api'
 
 const STORAGE_KEY = 'shoulder_auth'
 const LOG_PREFIX = '🔐 [Auth]'
@@ -62,10 +62,17 @@ export async function login(credentials) {
   try {
     const data = await authApi.login(credentials)
     authStore.token = data.access_token
-    authStore.user = data.user
     authStore.isAuthenticated = true
     saveToStorage()
-    console.log(`${LOG_PREFIX} ✅ Вход успешен:`, data.user.display_name || data.user.login)
+    console.log(`${LOG_PREFIX} ✅ Вход успешен, загружаем профиль...`)
+
+    // Бэкенд возвращает только токены — загружаем профиль отдельно
+    const profile = await loadProfile()
+    if (!profile) {
+      // Если не удалось загрузить профиль, используем минимум из токена
+      authStore.user = { login: credentials.phone_number }
+      saveToStorage()
+    }
     return data
   } catch (e) {
     authStore.error = e.message
@@ -81,13 +88,21 @@ export async function register(data) {
   authStore.loading = true
   authStore.error = null
   try {
-    const result = await authApi.register(data)
+    const { confirmPassword, ...apiData } = data
+    const result = await authApi.register(apiData)
     if (result.access_token) {
       authStore.token = result.access_token
-      authStore.user = result.user
       authStore.isAuthenticated = true
       saveToStorage()
-      console.log(`${LOG_PREFIX} ✅ Регистрация успешна:`, result.user.display_name)
+      console.log(`${LOG_PREFIX} ✅ Регистрация успешна, загружаем профиль...`)
+
+      // Бэкенд возвращает только токены — загружаем профиль отдельно
+      const profile = await loadProfile()
+      if (!profile) {
+        // Фоллбэк: используем данные из формы
+        authStore.user = { display_name: data.display_name, login: data.phone_number }
+        saveToStorage()
+      }
     }
     return result
   } catch (e) {
@@ -103,10 +118,14 @@ export async function loadProfile() {
   console.log(`${LOG_PREFIX} 📥 Загрузка профиля...`)
   try {
     const profile = await authApi.getProfile()
-    authStore.user = { ...authStore.user, ...profile }
+    const processedProfile = {
+      ...profile,
+      avatar_url: toProxyUrl(profile.avatar_url),
+    }
+    authStore.user = { ...authStore.user, ...processedProfile }
     saveToStorage()
-    console.log(`${LOG_PREFIX} ✅ Профиль загружен:`, profile.display_name || authStore.user.display_name)
-    return profile
+    console.log(`${LOG_PREFIX} ✅ Профиль загружен:`, processedProfile.display_name || authStore.user.display_name)
+    return processedProfile
   } catch (e) {
     console.warn(`${LOG_PREFIX} ⚠️ Не удалось загрузить профиль:`, e.message)
     return null
@@ -114,6 +133,7 @@ export async function loadProfile() {
 }
 
 export async function fetchRating() {
+  if (!authStore.isAuthenticated) return { empathy_score: 0, reliability_score: 100, total_events: 0, completed_events: 0 }
   try {
     console.log(`${LOG_PREFIX} 📥 Загрузка рейтинга...`)
     const rating = await authApi.getRating()
@@ -126,6 +146,7 @@ export async function fetchRating() {
 }
 
 export async function fetchBadges() {
+  if (!authStore.isAuthenticated) return []
   try {
     console.log(`${LOG_PREFIX} 📥 Загрузка достижений...`)
     const badges = await authApi.getBadges()

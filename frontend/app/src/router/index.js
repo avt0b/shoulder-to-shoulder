@@ -5,7 +5,6 @@ import { isLoggedIn } from '../stores/auth'
 import WelcomeScreen from '../views/WelcomeScreen.vue'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
-import ForgotPassword from '../views/ForgotPassword.vue'
 
 // App views
 import MainPage from '../components/MainPage.vue'
@@ -19,7 +18,6 @@ const routes = [
   { path: '/welcome', name: 'Welcome', component: WelcomeScreen, meta: { guest: true } },
   { path: '/login', name: 'Login', component: Login, meta: { guest: true } },
   { path: '/register', name: 'Register', component: Register, meta: { guest: true } },
-  { path: '/forgot-password', name: 'ForgotPassword', component: ForgotPassword, meta: { guest: true } },
 
   // Main app routes (требуют авторизации)
   { path: '/', name: 'Home', component: MainPage, meta: { requiresAuth: true } },
@@ -28,7 +26,7 @@ const routes = [
   { path: '/profile', name: 'Profile', component: Profile, meta: { requiresAuth: true } },
   { path: '/rating', name: 'Rating', component: Rating, meta: { requiresAuth: true } },
 
-  // Catch-all — редирект
+  // Catch-all — редирект на профиль (если авторизован) или welcome
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
@@ -54,10 +52,14 @@ router.beforeEach((to, from, next) => {
   // Если маршрут для гостей (login/register/welcome)
   else if (to.meta.guest) {
     if (authenticated) {
-      next('/')
+      next('/profile')
     } else {
       next()
     }
+  }
+  // Catch-all редирект
+  else if (to.path === '/' || to.path === '') {
+    next(authenticated ? '/profile' : (localStorage.getItem('app_visited') ? '/login' : '/welcome'))
   }
   else {
     next()

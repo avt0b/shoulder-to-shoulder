@@ -1,4 +1,4 @@
-import { config } from '../config'
+import { config, mediaApi } from '../config'
 
 const API_BASE_URL = config.apiBaseURL
 const IS_DEBUG = config.isDebug
@@ -75,6 +75,24 @@ function logMockCall(name, isRequest) {
   const icon = isRequest ? '📤' : '📥'
   const type = isRequest ? 'ЗАПРОС' : 'ОТВЕТ'
   console.log(`${LOG_PREFIX} ${icon} ${LOG_COLORS.magenta}[MOCK]${LOG_COLORS.reset} ${type}: ${LOG_COLORS.yellow}${name}${LOG_COLORS.reset}`)
+}
+
+// ===== Token Decoder =====
+function decodeTokenPayload(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload
+  } catch {
+    return null
+  }
+}
+
+// Конвертирует MinIO URL в Vite proxy URL (браузер не может напрямую к MinIO)
+export function toProxyUrl(url) {
+  if (!url) return url
+  return url
+    .replace('http://minio:9000/', '/minio-static/')
+    .replace('http://localhost:9000/', '/minio-static/')
 }
 
 // ===== Phone Normalizer =====
@@ -290,17 +308,6 @@ export const authApi = USE_MOCK
         console.log(`${LOG_PREFIX} ${LOG_COLORS.cyan}Payload:${LOG_COLORS.reset}`, { ...body, password: '****' })
         return mockLogin(data)
       },
-      sendResetCode(data) {
-        logMockCall('sendResetCode', true)
-        console.log(`${LOG_PREFIX} ${LOG_COLORS.cyan}Payload:${LOG_COLORS.reset}`, data)
-        return mockSendResetCode(data)
-      },
-      resetPassword(data) {
-        logMockCall('resetPassword', true)
-        const safeData = { ...data, new_password: '****', confirmPassword: '****' }
-        console.log(`${LOG_PREFIX} ${LOG_COLORS.cyan}Payload:${LOG_COLORS.reset}`, safeData)
-        return mockResetPassword(data)
-      },
       getProfile() {
         return mockGetProfile()
       },
@@ -348,6 +355,29 @@ export const authApi = USE_MOCK
       getAllUsers() {
         return request('/users')
       },
+      getUploadUrl({ purpose, content_type, file_size }) {
+        logMockCall('getUploadUrl', true)
+        return delay(300).then(() => {
+          const fileKey = `${purpose}/mock/${Date.now()}.${content_type.split('/')[1]}`
+          const result = {
+            file_key: fileKey,
+            upload_url: 'http://localhost:9000/dev-media',
+            fields: { key: fileKey, 'Content-Type': content_type },
+            public_url: `http://localhost:9000/dev-media/${fileKey}`,
+          }
+          logMockCall('getUploadUrl', false)
+          console.log(`${LOG_PREFIX} ${LOG_COLORS.bgGreen}${LOG_COLORS.green} MOCK OK ${LOG_COLORS.reset}`, result)
+          return result
+        })
+      },
+      uploadToS3({ file }) {
+        logMockCall('uploadToS3', true)
+        return delay(500).then(() => {
+          logMockCall('uploadToS3', false)
+          console.log(`${LOG_PREFIX} ${LOG_COLORS.bgGreen}${LOG_COLORS.green} MOCK OK ${LOG_COLORS.reset}`, { name: file?.name })
+          return { ok: true }
+        })
+      },
     }
   : {
       register(data) {
@@ -365,12 +395,6 @@ export const authApi = USE_MOCK
           password: data.password,
         }
         return request('/auth/login', { method: 'POST', body })
-      },
-      sendResetCode(data) {
-        return request('/auth/forgot-password/send-code', { method: 'POST', body: data })
-      },
-      resetPassword(data) {
-        return request('/auth/forgot-password/reset', { method: 'POST', body: data })
       },
       getProfile() {
         return request('/users/me')
@@ -395,5 +419,44 @@ export const authApi = USE_MOCK
       },
       getAllUsers() {
         return request('/users')
+      },
+
+      // Получение presigned URL для загрузки файла в S3
+      async getUploadUrl({ purpose, content_type, file_size }) {
+        const token = localStorage.getItem('token')
+        const userId = token ? decodeTokenPayload(token)?.sub : null
+        if (!userId) throw new Error('Не авторизован')
+
+        const url = mediaApi('/media/upload-url')
+        const body = { purpose, content_type, file_size, owner_id: userId }
+        logRequest('POST', url, { ...body }, token)
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.detail || 'Ошибка получения URL загрузки')
+        return data
+      },
+
+      // Прямая загрузка файла в S3 через presigned POST
+      async uploadToS3({ upload_url, fields, file }) {
+        // Проксируем через Vite dev server — браузер не может напрямую к MinIO
+        // из-за системного HTTP-прокси. Vite работает как обратный прокси.
+        const devServerUrl = upload_url
+          .replace('http://minio:9000', 'http://localhost:5173/minio-upload')
+          .replace('http://localhost:9000', 'http://localhost:5173/minio-upload')
+
+        const formData = new FormData()
+        Object.entries(fields).forEach(([key, value]) => {
+          formData.append(key, value)
+        })
+        formData.append('file', file)
+
+        const response = await fetch(devServerUrl, { method: 'POST', body: formData })
+        if (!response.ok) throw new Error('Ошибка загрузки файла в хранилище')
+        return response
       },
     }

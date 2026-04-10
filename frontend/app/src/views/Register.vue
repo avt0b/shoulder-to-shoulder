@@ -86,9 +86,8 @@ const handleRegister = async () => {
       password: password.value,
       display_name: displayName.value,
       email: email.value || undefined,
-      confirmPassword: confirmPassword.value,
     })
-    router.push('/')
+    router.push('/profile')
   } catch (e) {
     const msg = e.message || ''
     if (msg.toLowerCase().includes('phone') || msg.includes('номер')) {
