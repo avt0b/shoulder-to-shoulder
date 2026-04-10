@@ -32,3 +32,4 @@ ALTER TABLE event_participants ADD COLUMN photo_url TEXT;
 CREATE INDEX idx_event_participants_photo ON event_participants(photo_url) WHERE photo_url IS NOT NULL;
 
 ALTER TABLE events ADD COLUMN updated_at TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN anonymous BOOLEAN DEFAULT FALSE NOT NULL;

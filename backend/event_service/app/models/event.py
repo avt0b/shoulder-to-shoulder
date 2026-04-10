@@ -1,15 +1,17 @@
 import uuid, enum
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime, Enum, Text
+from sqlalchemy import Column, String, Integer, DateTime, Enum, Text, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from backend.event_service.app.core.database import Base
+
 
 class EventStatus(str, enum.Enum):
     PENDING = "pending"
     ACTIVE = "active"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
+
 
 class Event(Base):
     __tablename__ = "events"
@@ -25,3 +27,4 @@ class Event(Base):
     photo_url = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    anonymous = Column(Boolean, default=False, nullable=False)
