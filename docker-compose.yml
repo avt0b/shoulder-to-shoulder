@@ -19,10 +19,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       TZ: ${TZ}
-    ports:
-      - "${POSTGRES_PORT}:5432"
+    # Not exposed publicly
     volumes:
       - ${PROJECT_ROOT}/.docker/postgres:/var/lib/postgresql/data
+      - ${PROJECT_ROOT}/ops/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -36,8 +36,7 @@ services:
     container_name: s2s_redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "${REDIS_PORT}:6379"
+    # Not exposed publicly
     volumes:
       - ${PROJECT_ROOT}/.docker/redis:/data
     healthcheck:
@@ -53,9 +52,7 @@ services:
     container_name: s2s_nats
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
-    ports:
-      - "${NATS_PORT}:4222"
-      - "${NATS_MONITOR_PORT}:8222"
+    # Not exposed publicly
     networks:
       - s2s_network
 
@@ -70,9 +67,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       TZ: ${TZ}
     command: server /data --console-address ":9001"
-    ports:
-      - "${MINIO_PORT}:9000"
-      - "${MINIO_CONSOLE_PORT}:9001"
+    # Not exposed publicly
     volumes:
       - ${PROJECT_ROOT}/.docker/minio:/data
     healthcheck:
@@ -166,8 +161,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: ${DATABASE_URL}
       NATS_URL: ${NATS_URL}
-    ports:
-      - "${EVENT_SERVICE_PORT}:8002"
+    # Not exposed publicly
     depends_on:
       postgres:
         condition: service_healthy
@@ -194,8 +188,7 @@ services:
       NATS_URL: ${NATS_URL}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
       EVENT_SERVICE_URL: ${EVENT_SERVICE_URL}
-    ports:
-      - "${ADMIN_SERVICE_PORT}:8003"
+    # Not exposed publicly
     depends_on:
       nats:
         condition: service_started
@@ -282,8 +275,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       ALLOWED_ORIGINS: ${MAPS_ALLOWED_ORIGINS}
       TZ: ${TZ}
-    ports:
-      - "${MAPS_SERVICE_PORT}:8004"
+    # Not exposed publicly
     depends_on:
       postgres:
         condition: service_healthy
