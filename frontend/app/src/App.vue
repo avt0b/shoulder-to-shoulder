@@ -18,15 +18,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import MainPage from './components/MainPage.vue'
 import MapLight from './components/MapLight.vue'
 import EventsPage from './components/EventsPage.vue'
 
 const isMapExpanded = ref(false)
 const currentPage = ref('main')
+const mapKey = ref(0)
 
 const expandMap = () => {
+  mapKey.value++
   isMapExpanded.value = true
 }
 
@@ -41,6 +43,15 @@ const handleNavigate = (page) => {
 const handleNavigateFromMap = (page) => {
   isMapExpanded.value = false
   currentPage.value = page
+}
+
+// Глобальная функция для раскрытия карты из EventsPage
+window.__triggerMapExpand = async () => {
+  // Убеждаемся что MainPage смонтирован (currentPage = 'main')
+  if (currentPage.value === 'main') {
+    await nextTick()
+    isMapExpanded.value = true
+  }
 }
 </script>
 

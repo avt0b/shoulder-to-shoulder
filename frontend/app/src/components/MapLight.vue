@@ -17,9 +17,31 @@
       <button class="close-btn" @click="$emit('close')">
         <span class="material-symbols-outlined">close</span>
       </button>
-      <div class="search-bar">
+      <div class="search-bar" style="position: relative">
         <span class="material-symbols-outlined">search</span>
-        <input type="text" placeholder="Поиск мест..." />
+        <input
+          v-model="placeSearchQuery"
+          type="text"
+          placeholder="Поиск мест..."
+          @input="onPlaceSearch"
+          @focus="showPlaceSuggestions = true"
+          @blur="hidePlaceSuggestionsDelayed"
+        />
+        <!-- Подсказки мест -->
+        <div class="search-suggestions" v-if="showPlaceSuggestions && placeSearchResults.length > 0">
+          <div
+            v-for="place in placeSearchResults"
+            :key="place.id"
+            class="search-suggestion-item"
+            @mousedown="selectPlaceOnMap(place)"
+          >
+            <span class="search-suggestion-emoji">{{ place.emoji }}</span>
+            <div class="search-suggestion-info">
+              <span class="search-suggestion-name">{{ place.name }}</span>
+              <span class="search-suggestion-address">{{ place.address }}</span>
+            </div>
+          </div>
+        </div>
       </div>
       <button class="filter-toggle-btn" @click="showFilters = !showFilters">
         <span class="material-symbols-outlined">tune</span>
@@ -98,6 +120,17 @@
         </label>
       </div>
 
+      <!-- Анонимное место -->
+      <div class="filter-group">
+        <label class="filter-label">
+          <input type="checkbox" v-model="filters.anonymous" />
+          <span class="filter-checkbox-box">
+            <span class="material-symbols-outlined">check</span>
+          </span>
+          🤫 Анонимное место
+        </label>
+      </div>
+
       <!-- Apply Button -->
       <button class="apply-filters-btn" @click="applyFilters">
         <span class="material-symbols-outlined">search</span>
@@ -106,7 +139,7 @@
     </div>
 
     <!-- Map Controls — скрываются при выборе точки -->
-    <div class="map-controls" v-if="!pickMode">
+    <div class="map-controls" :class="{ 'raised': routeFast && routeSafety || isNavigating }" v-if="!pickMode">
       <button class="control-btn control-btn-ninja" ref="ninjaBtnRef" @click="toggleDarkMode" title="Режим ниндзя">
         <span class="material-symbols-outlined">sports_martial_arts</span>
       </button>
@@ -261,17 +294,17 @@
         <div class="pick-pin">
           <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 34 18 34s18-20.5 18-34C36 8.06 27.94 0 18 0z"
-                  :fill="pickMode === 'start' ? '#22c55e' : '#ea580c'"/>
+                  :fill="pickMode === 'start' ? '#22c55e' : pickMode === 'event' ? '#ea580c' : '#ea580c'"/>
             <circle cx="18" cy="18" r="8" fill="white"/>
             <circle :cx="18" cy="18" r="4"
-                    :fill="pickMode === 'start' ? '#22c55e' : '#ea580c'"/>
+                    :fill="pickMode === 'start' ? '#22c55e' : pickMode === 'event' ? '#ea580c' : '#ea580c'"/>
           </svg>
         </div>
 
         <!-- Подсказка -->
         <div class="pick-hint">
           <span class="pick-hint-text">
-            {{ pickMode === 'start' ? '🟢 Откуда' : '🟠 Куда' }} — переместите карту
+            {{ pickMode === 'start' ? '🟢 Откуда' : pickMode === 'event' ? '📍 Место встречи' : '🟠 Куда' }} — переместите карту
           </span>
         </div>
 
@@ -358,11 +391,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, api } from '../config'
-import { setNavigation, updateNavPosition, updateNavRemaining } from '../stores/navigation'
+import { setNavigation, updateNavPosition, updateNavRemaining, navigationStore } from '../stores/navigation'
 
 const emit = defineEmits(['close', 'navigate'])
 
@@ -380,6 +413,48 @@ let overlayStyle = ref({})
 // ============================================
 
 const showFilters = ref(false)
+
+// ============================================
+// 🔎 Поиск мест на карте
+// ============================================
+
+const placeSearchQuery = ref('')
+const placeSearchResults = ref([])
+const showPlaceSuggestions = ref(false)
+let hidePlaceTimer = null
+
+function onPlaceSearch() {
+  const q = placeSearchQuery.value.trim().toLowerCase()
+  if (!q) {
+    placeSearchResults.value = []
+    return
+  }
+  // Ищем только среди мест на карте (places.value)
+  placeSearchResults.value = places.value.filter(p =>
+    p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)
+  )
+}
+
+function hidePlaceSuggestionsDelayed() {
+  hidePlaceTimer = setTimeout(() => { showPlaceSuggestions.value = false }, 200)
+}
+
+function selectPlaceOnMap(place) {
+  placeSearchQuery.value = place.name
+  showPlaceSuggestions.value = false
+  if (map) {
+    map.setView([place.lat, place.lng], 16, { animate: true })
+    // Подсвечиваем маркер — открываем popup
+    const marker = markers.find(m => {
+      const ll = m.getLatLng()
+      return Math.abs(ll.lat - place.lat) < 0.0001 && Math.abs(ll.lng - place.lng) < 0.0001
+    })
+    if (marker) {
+      openPlacePopup(place)
+      marker.openPopup()
+    }
+  }
+}
 
 // ============================================
 // 🗺 Маршрутизация
@@ -402,7 +477,7 @@ const showEndSuggestions = ref(false)
 let geoSearchTimer = null
 
 // Режим выбора точки на карте
-const pickMode = ref(null) // 'start' | 'end' | null
+const pickMode = ref(null) // 'start' | 'end' | 'event' | null
 let prevCenter = null
 
 // Линия маршрута на карте
@@ -548,23 +623,34 @@ function selectEndPlace(place) {
 // ============================================
 
 function startPickMode(type) {
-  // type: 'start' или 'end'
   pickMode.value = type
   prevCenter = map.getCenter()
   showRouteForm.value = false
-  // Курсор crosshair
+  map.getContainer().style.cursor = 'crosshair'
+}
+
+// Вызывается из MainPage для режима выбора точки для Event
+function setMapPickMode(type) {
+  pickMode.value = type
+  if (prevCenter) {
+    map.setView(prevCenter, map.getZoom(), { animate: false })
+    prevCenter = null
+  }
   map.getContainer().style.cursor = 'crosshair'
 }
 
 function cancelPickMode() {
+  const wasEvent = pickMode.value === 'event'
   pickMode.value = null
   if (prevCenter) {
     map.setView(prevCenter, map.getZoom(), { animate: false })
     prevCenter = null
   }
   map.getContainer().style.cursor = ''
-  // Возвращаем форму
-  showRouteForm.value = true
+  // Возвращаем форму (кроме режима event)
+  if (!wasEvent) {
+    showRouteForm.value = true
+  }
 }
 
 async function confirmPickMode() {
@@ -574,7 +660,6 @@ async function confirmPickMode() {
 
   if (pickMode.value === 'start') {
     routeStartCoords.value = { lat, lng }
-    // Обратное геокодирование
     routeStartQuery.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
     try {
       const res = await fetch(
@@ -605,12 +690,38 @@ async function confirmPickMode() {
     } catch (e) {
       if (config.isDebug) console.warn('Reverse geocoding error:', e)
     }
+  } else if (pickMode.value === 'event') {
+    // Режим выбора места для Event
+    let address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ru`,
+        { headers: { 'User-Agent': 'ShoulderToShoulder/1.0' } }
+      )
+      const data = await res.json()
+      if (data.display_name) {
+        address = data.display_name.split(',').slice(0, 3).join(',').trim()
+      }
+    } catch (e) {
+      if (config.isDebug) console.warn('Reverse geocoding error:', e)
+    }
+    // Сохраняем данные и закрываем карту → MainPage откроет модалку
+    try {
+      localStorage.setItem('shoulder_pending_event_location', JSON.stringify({ lat, lng, address }))
+      if (config.isDebug) console.log('📍 Event location saved:', { lat, lng, address })
+    } catch (e) {
+      if (config.isDebug) console.warn('Failed to save event location:', e)
+    }
+    emit('close')
+    return
   }
 
   pickMode.value = null
   map.getContainer().style.cursor = ''
-  // Возвращаем форму
-  showRouteForm.value = true
+  // Возвращаем форму (кроме режима event — там модалка откроется из setEventLocation)
+  if (pickMode.value !== 'event') {
+    showRouteForm.value = true
+  }
 }
 
 // Геолокация
@@ -1061,7 +1172,8 @@ const activityTypes = [
   { key: 'running', emoji: '🏃', label: 'Бег' },
   { key: 'strength', emoji: '🏋️', label: 'Силовая' },
   { key: 'yoga', emoji: '🧘', label: 'Йога' },
-  { key: 'calisthenics', emoji: '💪', label: 'Воркаут' }
+  { key: 'workout', emoji: '💪', label: 'Воркаут' },
+  { key: 'other', emoji: '🎯', label: 'Другое' }
 ]
 
 const noiseLevels = [
@@ -1075,7 +1187,8 @@ const filters = ref({
   noiseLevel: '',
   lit: false,
   lockers: false,
-  benches: false
+  benches: false,
+  anonymous: false
 })
 
 // Места с бэкенда
@@ -1094,7 +1207,7 @@ const mockPlaces = [
       'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop'
     ],
     category: 'park', address: 'ул. Комсомольская, Орёл',
-    activityType: 'running', noiseLevel: 'moderate', lit: true, lockers: false, benches: true
+    activityType: 'running', noiseLevel: 'moderate', lit: true, lockers: false, benches: true, anonymous: false
   },
   {
     id: 2, name: 'Стадион «Центральный»',
@@ -1107,7 +1220,7 @@ const mockPlaces = [
       'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop'
     ],
     category: 'stadium', address: 'ул. Ленина, Орёл',
-    activityType: 'strength', noiseLevel: 'loud', lit: true, lockers: true, benches: true
+    activityType: 'strength', noiseLevel: 'loud', lit: true, lockers: true, benches: true, anonymous: false
   },
   {
     id: 3, name: 'Набережная Оки',
@@ -1120,7 +1233,7 @@ const mockPlaces = [
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop'
     ],
     category: 'river', address: 'Набережная Оки, Орёл',
-    activityType: 'yoga', noiseLevel: 'quiet', lit: false, lockers: false, benches: true
+    activityType: 'yoga', noiseLevel: 'quiet', lit: false, lockers: false, benches: true, anonymous: true
   },
   {
     id: 4, name: 'Спортивная площадка',
@@ -1133,7 +1246,18 @@ const mockPlaces = [
       'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop'
     ],
     category: 'playground', address: 'ул. Гая, Орёл',
-    activityType: 'calisthenics', noiseLevel: 'moderate', lit: true, lockers: false, benches: false
+    activityType: 'workout', noiseLevel: 'moderate', lit: true, lockers: false, benches: false, anonymous: false
+  },
+  {
+    id: 5, name: 'Тихий дворик',
+    description: 'Уютное место во дворе. Ничего особенного — просто тихо и спокойно.',
+    lat: 52.9640, lng: 36.0720, rating: 4.0, emoji: '🏠',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop',
+    gallery: [
+      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop'
+    ],
+    category: 'other', address: 'ул. М. Горького, Орёл',
+    activityType: 'other', noiseLevel: 'quiet', lit: false, lockers: false, benches: true, anonymous: true
   }
 ]
 
@@ -1145,6 +1269,7 @@ const filteredMockPlaces = computed(() => {
     if (filters.value.lit && !p.lit) return false
     if (filters.value.lockers && !p.lockers) return false
     if (filters.value.benches && !p.benches) return false
+    if (filters.value.anonymous && !p.anonymous) return false
     return true
   })
 })
@@ -1164,7 +1289,8 @@ function resetFilters() {
     noiseLevel: '',
     lit: false,
     lockers: false,
-    benches: false
+    benches: false,
+    anonymous: false
   }
 }
 
@@ -1175,21 +1301,107 @@ async function applyFilters() {
 
 // Получить места с бэкенда (с фильтрами)
 async function fetchPlaces() {
+  if (config.isDebug) console.log('🗺 fetchPlaces: запрос к API, фильтры:', JSON.stringify(filters.value))
   try {
-    const params = new URLSearchParams()
-    if (filters.value.activityType) params.append('activity_type', filters.value.activityType)
-    if (filters.value.noiseLevel) params.append('noise_level', filters.value.noiseLevel)
-    if (filters.value.lit) params.append('lit', 'true')
-    if (filters.value.lockers) params.append('lockers', 'true')
-    if (filters.value.benches) params.append('benches', 'true')
-
-    const url = params.toString() ? `${api('/places')}?${params.toString()}` : api('/places')
+    // Запрашиваем ВСЕ места с бэкенда (фильтруем локально)
+    const url = api('/places')
+    if (config.isDebug) console.log('🗺 fetchPlaces URL:', url)
+    
     const res = await fetch(url)
     const data = await res.json()
-    places.value = data.places
+    
+    if (config.isDebug) console.log('📦 fetchPlaces ответ:', JSON.stringify(data, null, 2))
+
+    // Маппим ответ бэкенда → внутренний формат, скипаем невалидные
+    const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
+    const rawPlaces = data.places || []
+    
+    if (config.isDebug) console.log('📍 Получено мест с бэка:', rawPlaces.length)
+
+    const mapped = rawPlaces
+      .filter(p => {
+        // Обязательные поля: id, name, lat, lon
+        if (!p.id || !p.name || typeof p.lat !== 'number' || typeof p.lon !== 'number') {
+          if (config.isDebug) console.warn('fetchPlaces: скипнуто невалидное место', p)
+          return false
+        }
+        return true
+      })
+      .map(p => {
+        // Конвертируем noise_level (0-10) → string
+        const noiseNum = typeof p.noise_level === 'number' ? p.noise_level : 5
+        const noiseLevel = noiseNum <= 3 ? 'quiet' : noiseNum <= 6 ? 'moderate' : 'loud'
+
+        // Конвертируем light_availability (0-10) → boolean
+        const lit = typeof p.light_availability === 'number' ? p.light_availability >= 5 : false
+
+        // conveniences → lockers/benches
+        const hasConveniences = p.conveniences_availability === true
+
+        // activity_type → валидный ключ
+        const activityType = validActivities.includes(p.activity_type) ? p.activity_type : 'other'
+
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description || '',
+          lat: p.lat,
+          lng: p.lon,
+          rating: typeof p.rating === 'number' ? p.rating : 0,
+          emoji: p.emoji || '📍',
+          category: p.category || 'other',
+          image: p.image || null,
+          gallery: Array.isArray(p.gallery) ? p.gallery : [],
+          address: p.address || '',
+          activityType: activityType,
+          noiseLevel: noiseLevel,
+          lit: lit,
+          lockers: hasConveniences,
+          benches: hasConveniences,
+          anonymous: p.is_anonymous === true
+        }
+      })
+
+    if (config.isDebug) console.log('✅ mapped мест (до фильтрации):', mapped.length)
+
+    // === ЛОКАЛЬНАЯ ФИЛЬТРАЦИЯ ===
+    const filtered = mapped.filter(p => {
+      if (filters.value.activityType && p.activityType !== filters.value.activityType) {
+        if (config.isDebug) console.log(`🚫 ${p.name}: activityType=${p.activityType} !== ${filters.value.activityType}`)
+        return false
+      }
+      if (filters.value.noiseLevel && p.noiseLevel !== filters.value.noiseLevel) {
+        if (config.isDebug) console.log(`🚫 ${p.name}: noiseLevel=${p.noiseLevel} !== ${filters.value.noiseLevel}`)
+        return false
+      }
+      if (filters.value.lit && !p.lit) {
+        if (config.isDebug) console.log(`🚫 ${p.name}: не освещён`)
+        return false
+      }
+      if (filters.value.lockers && !p.lockers) {
+        if (config.isDebug) console.log(`🚫 ${p.name}: нет раздевалок`)
+        return false
+      }
+      if (filters.value.benches && !p.benches) {
+        if (config.isDebug) console.log(`🚫 ${p.name}: нет скамеек`)
+        return false
+      }
+      if (filters.value.anonymous && !p.anonymous) {
+        if (config.isDebug) console.log(`🚫 ${p.name}: не анонимное`)
+        return false
+      }
+      return true
+    })
+
+    if (config.isDebug) console.log('✅ после фильтрации:', filtered.length, filtered.map(p => p.name))
+
+    places.value = filtered
+    
+    if (config.isDebug) console.log('📍 Вызываю addPlaceMarkers, markers count:', markers.length)
     addPlaceMarkers()
+    if (config.isDebug) console.log('📍 После addPlaceMarkers, markers count:', markers.length)
   } catch (e) {
-    if (config.isDebug) console.warn('fetchPlaces: API недоступен, локальная фильтрация')
+    if (config.isDebug) console.warn('fetchPlaces: API недоступен, локальная фильтрация', e)
     places.value = filteredMockPlaces.value
     addPlaceMarkers()
   }
@@ -1329,11 +1541,11 @@ const openPlacePopup = (place) => {
   const popupContent = `
     <div class="place-popup">
       <div class="popup-gallery">
-        ${place.gallery.map((img, i) => `
+        ${place.gallery?.map((img, i) => `
           <div class="gallery-item ${i === 0 ? 'gallery-main' : ''}">
             <img src="${img}" alt="${place.name}" />
           </div>
-        `).join('')}
+        `).join('') || ''}
       </div>
       <div class="popup-info">
         <div class="popup-header">
@@ -1341,16 +1553,16 @@ const openPlacePopup = (place) => {
             <span class="popup-emoji">${place.emoji}</span>
             <div>
               <h3>${place.name}</h3>
-              <p class="popup-address">${place.address}</p>
+              <p class="popup-address">${place.address || ''}</p>
             </div>
           </div>
           <div class="popup-rating">
             <span class="star">★</span>
-            <span>${place.rating}</span>
+            <span>${place.rating || '—'}</span>
           </div>
         </div>
-        <p class="popup-desc">${place.description}</p>
-        <button class="popup-btn">
+        <p class="popup-desc">${place.description || ''}</p>
+        <button class="popup-btn" data-place-id="${place.id}" data-place-name="${place.name}" data-place-lat="${place.lat}" data-place-lng="${place.lng}">
           <span class="material-symbols-outlined">directions_run</span>
           <span>Маршрут</span>
         </button>
@@ -1358,7 +1570,7 @@ const openPlacePopup = (place) => {
     </div>
   `
 
-  L.popup({
+  const popup = L.popup({
     closeButton: true,
     autoPan: true,
     className: 'custom-popup',
@@ -1367,6 +1579,28 @@ const openPlacePopup = (place) => {
     .setLatLng([place.lat, place.lng])
     .setContent(popupContent)
     .openOn(map)
+
+  // Обработчик кнопки "Маршрут" после рендера popup
+  setTimeout(() => {
+    const btn = document.querySelector(`.popup-btn[data-place-id="${place.id}"]`)
+    if (btn) {
+      btn.addEventListener('click', () => {
+        map.closePopup()
+        openRouteToPlace(place)
+      })
+    }
+  }, 100)
+}
+
+// Открыть форму навигации с подставленным местом
+function openRouteToPlace(place) {
+  // Открываем форму маршрута
+  showRouteForm.value = true
+
+  // Подставляем место в поле "Куда"
+  routeEndCoords.value = { lat: place.lat, lng: place.lng }
+  routeEndQuery.value = place.name
+  routeEndId.value = place.id
 }
 
 // Добавление маркеров на карту
@@ -1387,7 +1621,11 @@ const removePlaceMarkers = () => {
 }
 
 onMounted(async () => {
+  if (config.isDebug) console.log('🗺 MapLight onMounted')
   await nextTick()
+
+  // Экспортируем функции
+  window.__setMapPickMode = setMapPickMode
 
   if (mapRef.value && !map) {
     map = L.map(mapRef.value, {
@@ -1408,9 +1646,63 @@ onMounted(async () => {
 
     await fetchPlaces()
 
+    // Если навигация уже активна — восстанавливаем состояние
+    if (navigationStore.isNavigating && navigationStore.routeCoords.length > 0) {
+      if (config.isDebug) console.log('MapLight onMounted: restoring navigation state')
+      restoreNavigation()
+    }
+
     setTimeout(() => map.invalidateSize(), 100)
   }
 })
+
+// При уничтожении компонента — очищаем карту
+onUnmounted(() => {
+  if (map) {
+    map.remove()
+    map = null
+    markers = []
+  }
+})
+
+// Восстановление навигации при повторном открытии карты
+function restoreNavigation() {
+  if (!navigationStore.isNavigating || !navigationStore.routeCoords.length) return
+
+  isNavigating.value = true
+
+  // Создаём фейковые routeFast/routeSafety для совместимости с drawRoute
+  const coords = navigationStore.routeCoords
+  const fakeRoute = {
+    geometry: { type: 'LineString', coordinates: coords.map(c => [c[1], c[0]]) },
+    coords,
+    distance: navigationStore.navRemaining.distance,
+    duration: navigationStore.navRemaining.duration,
+    _rawDistance: 0,
+    _rawDuration: 0
+  }
+
+  routeFast.value = fakeRoute
+  routeSafety.value = fakeRoute
+  activeRoute.value = navigationStore.activeRoute
+  navRemaining.value = navigationStore.navRemaining
+
+  if (navigationStore.userPosition) {
+    userPosition.value = navigationStore.userPosition
+  }
+
+  // Рисуем маршрут
+  drawRoute(activeRoute.value)
+
+  // Перезапускаем GPS
+  if ('geolocation' in navigator) {
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => onUserPositionUpdate(pos),
+      (err) => { if (config.isDebug) console.warn('GPS error:', err) },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    )
+  }
+}
 </script>
 
 <style scoped>
@@ -1433,6 +1725,71 @@ onMounted(async () => {
 .leaflet-map {
   position: absolute;
   inset: 0;
+}
+
+/* Маркеры */
+
+/* Search Suggestions */
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e7e8e9;
+}
+
+.search-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f3f4f5;
+}
+
+.search-suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.search-suggestion-item:hover {
+  background: #fff7ed;
+}
+
+.search-suggestion-emoji {
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff7ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.search-suggestion-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-suggestion-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.search-suggestion-address {
+  font-size: 11px;
+  color: #a8a29e;
 }
 
 /* Стилизация кнопок зума Leaflet */
@@ -1881,6 +2238,13 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: bottom 0.3s ease;
+}
+
+/* Поднятые кнопки при отображении маршрута/навигации */
+.map-controls.raised {
+  bottom: 300px;
+  z-index: 60;
 }
 
 .control-btn {
