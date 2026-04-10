@@ -60,3 +60,5 @@ CREATE INDEX idx_ratings_empathy ON user_ratings(empathy_score DESC);
 CREATE INDEX idx_ratings_reliability ON user_ratings(reliability_score DESC);
 
 CREATE INDEX idx_user_profiles_city ON user_profiles(city);
+
+ALTER TABLE user_profiles ADD COLUMN theme VARCHAR(10) DEFAULT 'light' NOT NULL;

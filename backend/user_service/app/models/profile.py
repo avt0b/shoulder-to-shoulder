@@ -24,6 +24,7 @@ class UserProfile(Base):
     city = Column(String(100), nullable=True, index=True)
 
     preferences = Column(JSON, default=dict, nullable=False)
+    theme = Column(String(10), nullable=False, default="light")
 
     created_at = Column(
         DateTime(timezone=True),

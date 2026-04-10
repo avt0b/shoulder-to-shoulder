@@ -28,25 +28,31 @@ class UserContactUpdateRequest(BaseModel):
 class UserProfileResponse(BaseModel):
     user_id: str
     phone_number: str
-    email: EmailStr | None
+    email: str | None
     display_name: str
     age: int | None
     fitness_level: str
     bio: str | None
-    avatar_url: str | None = None
+    avatar_url: str | None
+    city: str | None
     preferences: dict
-    city: str | None = Field(None, max_length=100)
+    theme: Literal["light", "dark"] = "light"
+    joined_events_count: int = 0
+    attended_events_count: int = 0
+    badges: list[str] = []
 
 
-class PublicUserInfoResponse(BaseModel):
+class PublicUserProfileResponse(BaseModel):
     user_id: str
     display_name: str
+    age: int | None
     fitness_level: str
-    empathy_score: int
-    reliability_score: float
-    badges: list[str] = Field(default_factory=list)
-    city: str | None = Field(None, max_length=100)
-    # phone_number и email НЕ показываем публично
+    bio: str | None
+    avatar_url: str | None
+    city: str | None
+    joined_events_count: int = 0
+    attended_events_count: int = 0
+    badges: list[str] = []
 
 
 class RatingResponse(BaseModel):
@@ -54,3 +60,7 @@ class RatingResponse(BaseModel):
     reliability_score: float
     total_events: int
     completed_events: int
+
+
+class ThemeUpdateRequest(BaseModel):
+    theme: Literal["light", "dark"]
