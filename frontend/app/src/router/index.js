@@ -9,7 +9,6 @@ import ForgotPassword from '../views/ForgotPassword.vue'
 
 // App views
 import MainPage from '../components/MainPage.vue'
-import MapLight from '../components/MapLight.vue'
 import EventsPage from '../components/EventsPage.vue'
 import Profile from '../views/Profile.vue'
 import Rating from '../views/Rating.vue'
@@ -23,7 +22,6 @@ const routes = [
 
   // Main app routes (требуют авторизации)
   { path: '/', name: 'Home', component: MainPage, meta: { requiresAuth: true } },
-  { path: '/map', name: 'Map', component: MapLight, meta: { requiresAuth: true } },
   { path: '/events', name: 'Events', component: EventsPage, meta: { requiresAuth: true } },
   { path: '/profile', name: 'Profile', component: Profile, meta: { requiresAuth: true } },
   { path: '/rating', name: 'Rating', component: Rating, meta: { requiresAuth: true } },

@@ -1,5 +1,5 @@
 <template>
-  <div class="map-light" :class="{ dark: isDarkMode }">
+  <div class="map-light" :class="{ dark: isDarkMode || isNinjaMode }">
     <!-- Map Canvas -->
     <main class="map-canvas">
       <div ref="mapRef" class="leaflet-map"></div>
@@ -14,8 +14,8 @@
 
     <!-- Top AppBar -->
     <header class="top-bar">
-      <button class="close-btn" @click="$emit('close')">
-        <span class="material-symbols-outlined">close</span>
+      <button class="close-btn" @click="$emit('close')" style="position: relative; z-index: 10;">
+        <span class="material-symbols-outlined" style="font-size: 24px;">close</span>
       </button>
       <div class="search-bar" style="position: relative">
         <span class="material-symbols-outlined">search</span>
@@ -140,10 +140,10 @@
 
     <!-- Map Controls — скрываются при выборе точки -->
     <div class="map-controls" :class="{ 'raised': routeFast && routeSafety || isNavigating }" v-if="!pickMode">
-      <button class="control-btn control-btn-ninja" ref="ninjaBtnRef" @click="toggleDarkMode" title="Режим ниндзя">
-        <span class="material-symbols-outlined">sports_martial_arts</span>
+      <button class="control-btn control-btn-ninja" :class="{ active: isNinjaMode }" ref="ninjaBtnRef" @click="toggleNinjaMode" :title="isNinjaMode ? 'Обычный режим' : 'Режим ниндзя'">
+        <span class="material-symbols-outlined">{{ isNinjaMode ? 'visibility' : 'sports_martial_arts' }}</span>
       </button>
-      <button class="control-btn control-btn-primary" title="Моё местоположение">
+      <button class="control-btn control-btn-primary" @click="useMyLocation" title="Моё местоположение">
         <span class="material-symbols-outlined filled">my_location</span>
       </button>
     </div>
@@ -269,26 +269,22 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav" v-if="!pickMode">
-      <router-link to="/" class="nav-item">
-        <span class="material-symbols-outlined" :data-filled="$route.path === '/'">map</span>
+      <a class="nav-item" @click="$emit('close')">
+        <span class="material-symbols-outlined">map</span>
         <span>Карта</span>
-      </router-link>
-      <router-link to="/events" class="nav-item">
-        <span class="material-symbols-outlined" :data-filled="$route.path === '/events'">event</span>
+      </a>
+      <a class="nav-item" @click="router.push('/events'); $emit('close')">
+        <span class="material-symbols-outlined">event</span>
         <span>Ивенты</span>
-      </router-link>
-      <router-link to="/map" class="nav-item nav-item-active">
-        <span class="material-symbols-outlined" data-filled="true">directions_run</span>
-        <span>Маршруты</span>
-      </router-link>
-      <router-link to="/profile" class="nav-item">
-        <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
+      </a>
+      <a class="nav-item" @click="router.push('/profile'); $emit('close')">
+        <span class="material-symbols-outlined">person</span>
         <span>Профиль</span>
-      </router-link>
-      <router-link to="/rating" class="nav-item">
-        <span class="material-symbols-outlined" :data-filled="$route.path === '/rating'">emoji_events</span>
+      </a>
+      <a class="nav-item" @click="router.push('/rating'); $emit('close')">
+        <span class="material-symbols-outlined">emoji_events</span>
         <span>Рейтинг</span>
-      </router-link>
+      </a>
     </nav>
 
     <!-- Pick Point Overlay — режим выбора точки на карте -->
@@ -386,7 +382,7 @@
           </div>
         </div>
         <button class="nav-stop-btn" @click="stopNavigation">
-          <span class="material-symbols-outlined">stop</span>
+        
           <span>Завершить</span>
         </button>
       </div>
@@ -411,18 +407,26 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { config, api } from '../config'
+import { config, placesApi, eventsApi } from '../config'
 import { setNavigation, updateNavPosition, updateNavRemaining, navigationStore } from '../stores/navigation'
 
-const emit = defineEmits(['close', 'navigate'])
+const emit = defineEmits(['close'])
 const router = useRouter()
 const mapRef = ref(null)
 const ninjaBtnRef = ref(null)
 let map = null
 let markers = []
-let isDarkMode = ref(false)
+let isNinjaMode = ref(false)
 let isTransitioning = ref(false)
 let overlayStyle = ref({})
+
+// Theme
+const isDarkMode = ref(localStorage.getItem('theme') === 'dark')
+
+// Ивенты — маркеры на карте
+const events = ref([])
+let eventMarkers = []
+const selectedEvent = ref(null)
 
 // ============================================
 // 🔍 Фильтры
@@ -445,9 +449,10 @@ function onPlaceSearch() {
     placeSearchResults.value = []
     return
   }
-  // Ищем только среди мест на карте (places.value)
+  // Ищем только среди мест на карте, исключая my_spot
   placeSearchResults.value = places.value.filter(p =>
-    p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)
+    p.category !== 'my_spot' &&
+    (p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q))
   )
 }
 
@@ -773,7 +778,7 @@ async function buildRoute() {
 
   // 1. Пробуем свой бэкэнд — GET с query-параметрами
   try {
-    const url = `${api('/route/safe')}?start_lat=${start.lat}&start_lng=${start.lng}&end_lat=${end.lat}&end_lng=${end.lng}`
+    const url = `${placesApi('/route/safe')}?start_lat=${start.lat}&start_lng=${start.lng}&end_lat=${end.lat}&end_lng=${end.lng}`
     if (config.isDebug) console.log('🗺 Запрос маршрута:', url)
 
     const res = await fetch(url)
@@ -1324,7 +1329,7 @@ async function applyFilters() {
 async function fetchPlaces() {
   if (config.isDebug) console.log('🗺 fetchPlaces: запрос к API, фильтры:', JSON.stringify(filters.value))
   try {
-    const url = api('/places')
+    const url = placesApi('/places')
     if (config.isDebug) console.log('🗺 fetchPlaces URL:', url)
 
     const res = await fetch(url)
@@ -1409,7 +1414,9 @@ async function fetchPlaces() {
     if (config.isDebug) console.log('✅ mapped мест (до фильтрации):', mapped.length)
 
     // === ЛОКАЛЬНАЯ ФИЛЬТРАЦИЯ ===
+    // Исключаем my_spot — они отображаются как ивенты, не как площадки
     const filtered = mapped.filter(p => {
+      if (p.category === 'my_spot') return false
       if (filters.value.activityType && p.activityType !== filters.value.activityType) return false
       if (filters.value.noiseLevel && p.noiseLevel !== filters.value.noiseLevel) return false
       if (filters.value.lit && !p.lit) return false
@@ -1430,8 +1437,8 @@ async function fetchPlaces() {
   }
 }
 
-// Анимация растекания от кнопки ниндзя
-const toggleDarkMode = () => {
+// Режим ниндзя — показать ивенты, скрыть площадки
+const toggleNinjaMode = async () => {
   if (isTransitioning.value) return
   isTransitioning.value = true
 
@@ -1443,12 +1450,12 @@ const toggleDarkMode = () => {
     Math.pow(window.innerWidth, 2) + Math.pow(window.innerHeight, 2)
   )
 
-  const wasDark = isDarkMode.value
+  const wasNinja = isNinjaMode.value
 
-  if (!wasDark) {
-    // Светлый → Тёмный: круг расширяется от кнопки
+  if (!wasNinja) {
+    // Вход в режим ниндзя: круг расширяется
     overlayStyle.value = {
-      background: '#1a1a1a',
+      background: 'rgba(0, 0, 0, 0.7)',
       clipPath: `circle(0px at ${centerX}px ${centerY}px)`,
       transition: 'none'
     }
@@ -1456,19 +1463,24 @@ const toggleDarkMode = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         overlayStyle.value = {
-          background: '#1a1a1a',
+          background: 'rgba(0, 0, 0, 0.7)',
           clipPath: `circle(${maxRadius}px at ${centerX}px ${centerY}px)`,
           transition: 'clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
         }
       })
     })
 
-    setTimeout(() => {
-      isDarkMode.value = true
+    setTimeout(async () => {
+      isNinjaMode.value = true
+      // Инвертируем карту для тёмного режима
       if (map) {
         map.getContainer().style.filter = 'invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2)'
       }
-      addPlaceMarkers()
+      // Скрываем маркеры площадок
+      removePlaceMarkers()
+      // Загружаем и показываем ивенты
+      await fetchEvents()
+      addEventMarkers()
       setTimeout(() => {
         isTransitioning.value = false
         overlayStyle.value = {}
@@ -1476,9 +1488,9 @@ const toggleDarkMode = () => {
     }, 400)
 
   } else {
-    // Тёмный → Светлый: тёмный круг сворачивается к кнопке
+    // Выход из режима ниндзя
     overlayStyle.value = {
-      background: '#1a1a1a',
+      background: 'rgba(0, 0, 0, 0.7)',
       clipPath: `circle(${maxRadius}px at ${centerX}px ${centerY}px)`,
       transition: 'none'
     }
@@ -1486,18 +1498,21 @@ const toggleDarkMode = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         overlayStyle.value = {
-          background: '#1a1a1a',
+          background: 'rgba(0, 0, 0, 0.7)',
           clipPath: `circle(0px at ${centerX}px ${centerY}px)`,
           transition: 'clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
         }
       })
     })
 
-    // Сразу переключаем тему — overlay ещё покрывает экран
-    isDarkMode.value = false
+    isNinjaMode.value = false
+    // Сбрасываем фильтр карты
     if (map) {
       map.getContainer().style.filter = 'none'
     }
+    // Скрываем маркеры ивентов
+    removeEventMarkers()
+    // Показываем маркеры площадок
     addPlaceMarkers()
 
     setTimeout(() => {
@@ -1515,12 +1530,14 @@ const getMarkerSize = (zoom) => {
   return { size: 52, font: 26, border: 3 }
 }
 
-// Создание маркера: белый фон + оранжевая рамка (светлая), тёмный фон + оранжевая рамка (тёмная)
+// Создание маркера площадки
 const createPlaceMarker = (place) => {
   const zoom = map.getZoom()
   const { size, font, border } = getMarkerSize(zoom)
-  const bg = isDarkMode.value ? '#262626' : '#fff'
-  const textColor = isDarkMode.value ? '#f0f1f2' : '#1c1917'
+  const bg = '#fff'
+  const textColor = '#1c1917'
+  // При инверсии карты маркеры тоже инвертируются — добавляем контр-фильтр
+  const markerFilter = 'invert(1) hue-rotate(180deg)'
 
   const icon = L.divIcon({
     className: 'custom-marker',
@@ -1537,6 +1554,7 @@ const createPlaceMarker = (place) => {
       border: ${border}px solid #ea580c;
       cursor: pointer;
       user-select: none;
+      filter: ${markerFilter};
     ">${place.emoji}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2]
@@ -1597,6 +1615,16 @@ const openPlacePopup = (place) => {
 
   // Обработчик кнопки "Маршрут" после рендера popup
   setTimeout(() => {
+    // Контр-фильтр для popup
+    const popupEl = document.querySelector('.custom-popup .leaflet-popup-content-wrapper')
+    if (popupEl) {
+      popupEl.style.filter = 'invert(1) hue-rotate(180deg)'
+    }
+    const tipEl = document.querySelector('.custom-popup .leaflet-popup-tip')
+    if (tipEl) {
+      tipEl.style.filter = 'invert(1) hue-rotate(180deg)'
+    }
+
     const btn = document.querySelector(`.popup-btn[data-place-id="${place.id}"]`)
     if (btn) {
       btn.addEventListener('click', () => {
@@ -1624,9 +1652,189 @@ const addPlaceMarkers = () => {
   markers = places.value.map(place => createPlaceMarker(place))
 }
 
+// ============================================
+// 🎯 Ивенты — режим ниндзя
+// ============================================
+
+// Загрузка ивентов с бэка
+async function fetchEvents() {
+  try {
+    const url = eventsApi('/events')
+    if (config.isDebug) console.log('🎯 fetchEvents URL:', url)
+
+    const res = await fetch(url)
+    const data = await res.json()
+
+    if (config.isDebug) console.log('📦 fetchEvents ответ:', JSON.stringify(data, null, 2))
+
+    let rawEvents = []
+    if (Array.isArray(data)) {
+      rawEvents = data
+    } else if (data.events && Array.isArray(data.events)) {
+      rawEvents = data.events
+    } else if (data.event && typeof data.event === 'object') {
+      rawEvents = [data.event]
+    }
+
+    // Маппинг ивентов
+    events.value = rawEvents
+      .filter(e => e && e.id && e.name && typeof e.lat === 'number' && typeof e.lon === 'number')
+      .map(e => ({
+        id: e.id,
+        name: e.name,
+        description: e.description || '',
+        lat: e.lat,
+        lng: e.lon,
+        emoji: e.emoji || '📍',
+        time: e.time || e.start_time || '',
+        date: e.date || e.start_date || '',
+        level: e.level || 'Любой',
+        type: e.type || e.activity_type || '',
+        participants: e.participants || 0,
+        maxParticipants: e.max_participants || e.maxParticipants || 0,
+        organizer: e.organizer || e.organizer_name || '',
+        quietCompanion: e.quiet_companion || e.quietCompanion || false,
+        address: e.address || '',
+      }))
+
+    if (config.isDebug) console.log('🎯 Загружено ивентов:', events.value.length)
+  } catch (e) {
+    if (config.isDebug) console.warn('fetchEvents: API недоступен, использую моковые данные', e)
+    // Fallback — моковые ивенты
+    events.value = [
+      {
+        id: 101, name: 'Утренняя пробежка',
+        description: 'Лёгкий бег в парке для всех желающих',
+        lat: 52.9690, lng: 36.0820, emoji: '🏃',
+        time: '07:00', date: '2026-04-11',
+        level: 'Новичок', type: 'running',
+        participants: 5, maxParticipants: 10,
+        organizer: 'Алексей', quietCompanion: false,
+        address: 'Парк Победы, Орёл'
+      },
+      {
+        id: 102, name: 'Йога на закате',
+        description: 'Спокойная практика для расслабления',
+        lat: 52.9650, lng: 36.0790, emoji: '🧘',
+        time: '19:00', date: '2026-04-11',
+        level: 'Средний', type: 'yoga',
+        participants: 3, maxParticipants: 8,
+        organizer: 'Мария', quietCompanion: true,
+        address: 'Набережная, Орёл'
+      },
+      {
+        id: 103, name: 'Силовая тренировка',
+        description: 'Воркаут на турниках и брусьях',
+        lat: 52.9620, lng: 36.0740, emoji: '💪',
+        time: '18:00', date: '2026-04-12',
+        level: 'Профи', type: 'strength',
+        participants: 4, maxParticipants: 6,
+        organizer: 'Дмитрий', quietCompanion: false,
+        address: 'Стадион «Центральный», Орёл'
+      }
+    ]
+  }
+}
+
+// Создание маркера ивента
+const createEventMarker = (event) => {
+  const zoom = map.getZoom()
+  const { size, font, border } = getMarkerSize(zoom)
+  // Контр-фильтр чтобы маркеры не инвертировались
+  const markerFilter = 'invert(1) hue-rotate(180deg)'
+
+  const icon = L.divIcon({
+    className: 'custom-marker event-marker',
+    html: `
+      <div class="marker-emoji" style="
+        width: ${size}px;
+        height: ${size}px;
+        font-size: ${font}px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ea580c;
+        border-radius: 50%;
+        border: ${border}px solid #fff;
+        box-shadow: 0 3px 12px rgba(234, 88, 12, 0.5);
+        color: #fff;
+        filter: ${markerFilter};
+      ">${event.emoji || '📍'}</div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2]
+  })
+
+  const marker = L.marker([event.lat, event.lng], { icon })
+
+  // Popup с информацией об ивенте
+  const popupContent = `
+    <div class="event-popup">
+      <div class="event-popup-header">
+        <span class="event-popup-emoji">${event.emoji || '📍'}</span>
+        <h3 class="event-popup-title">${event.name}</h3>
+      </div>
+      ${event.description ? `<p class="event-popup-desc">${event.description}</p>` : ''}
+      <div class="event-popup-info">
+        ${event.time ? `<div><span class="material-symbols-outlined">schedule</span> ${event.time}${event.date ? ` • ${event.date}` : ''}</div>` : ''}
+        ${event.address ? `<div><span class="material-symbols-outlined">place</span> ${event.address}</div>` : ''}
+        ${event.type ? `<div><span class="material-symbols-outlined">sports</span> ${event.type}</div>` : ''}
+        ${event.level ? `<div><span class="material-symbols-outlined">trending_up</span> ${event.level}</div>` : ''}
+        ${event.organizer ? `<div><span class="material-symbols-outlined">person</span> ${event.organizer}</div>` : ''}
+        <div><span class="material-symbols-outlined">group</span> ${event.participants}/${event.maxParticipants} участников</div>
+        ${event.quietCompanion ? '<div class="event-quiet-tag">🤫 Тихий компаньон</div>' : ''}
+      </div>
+    </div>
+  `
+
+  marker.bindPopup(popupContent, {
+    maxWidth: 280,
+    className: 'event-popup-wrapper'
+  })
+
+  // Контр-фильтр для popup
+  marker.on('popupopen', () => {
+    setTimeout(() => {
+      const popupEl = document.querySelector('.event-popup-wrapper .leaflet-popup-content-wrapper')
+      if (popupEl) {
+        popupEl.style.filter = 'invert(1) hue-rotate(180deg)'
+      }
+      const tipEl = document.querySelector('.event-popup-wrapper .leaflet-popup-tip')
+      if (tipEl) {
+        tipEl.style.filter = 'invert(1) hue-rotate(180deg)'
+      }
+    }, 10)
+  })
+
+  return marker
+}
+
+// Добавление маркеров ивентов
+const addEventMarkers = () => {
+  removeEventMarkers()
+  eventMarkers = events.value.map(event => {
+    const marker = createEventMarker(event)
+    marker.addTo(map)
+    return marker
+  })
+}
+
+// Удаление маркеров ивентов
+const removeEventMarkers = () => {
+  eventMarkers.forEach(m => map.removeLayer(m))
+  eventMarkers = []
+}
+
+// ============================================
+
 // Перерисовка маркеров при зуме
 const onMapZoom = () => {
-  addPlaceMarkers()
+  if (isNinjaMode.value) {
+    addEventMarkers()
+  } else {
+    addPlaceMarkers()
+  }
 }
 
 // Удаление маркеров (для очистки)
@@ -1724,7 +1932,8 @@ function restoreNavigation() {
 .map-light {
   position: fixed;
   inset: 0;
-  background: var(--background);
+  z-index: 9999;
+  background: #f8f9fa;
   font-family: 'Inter', sans-serif;
   color: var(--on-surface);
   overflow: hidden;
@@ -2160,6 +2369,117 @@ function restoreNavigation() {
   height: 100%;
 }
 
+/* ============================================
+   🥷 Режим ниндзя — стили
+   ============================================ */
+
+/* Кнопка ниндзя в активном состоянии */
+.control-btn-ninja.active {
+  background: rgba(234, 88, 12, 0.2);
+  color: #ea580c;
+  border-color: rgba(234, 88, 12, 0.5);
+}
+
+/* Event marker */
+:global(.event-marker) {
+  z-index: 1050 !important;
+}
+
+/* Event Popup */
+:global(.event-popup-wrapper) {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+:global(.event-popup-wrapper .leaflet-popup-content-wrapper) {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  padding: 0;
+  overflow: hidden;
+}
+
+:global(.event-popup-wrapper .leaflet-popup-content) {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+:global(.event-popup-wrapper .leaflet-popup-tip) {
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+:global(.event-popup) {
+  padding: 16px;
+  max-width: 260px;
+}
+
+:global(.event-popup-header) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+:global(.event-popup-emoji) {
+  font-size: 28px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ea580c;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+:global(.event-popup-title) {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1c1917;
+  margin: 0;
+  line-height: 1.3;
+}
+
+:global(.event-popup-desc) {
+  font-size: 13px;
+  color: #787170;
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+:global(.event-popup-info) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+:global(.event-popup-info div) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #44403c;
+}
+
+:global(.event-popup-info .material-symbols-outlined) {
+  font-size: 16px;
+  color: #ea580c;
+}
+
+:global(.event-quiet-tag) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
 @keyframes ping {
   0% {
     transform: scale(1);
@@ -2182,30 +2502,31 @@ function restoreNavigation() {
   align-items: center;
   padding: 8px;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   border-radius: 0 0 16px 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 .close-btn {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(12px);
+  background: #fff;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 2px solid #ea580c;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.2);
   cursor: pointer;
   color: #ea580c;
   transition: transform 0.2s, background 0.2s;
 }
 
 .close-btn:hover {
-  background: rgba(255, 255, 255, 0.7);
+  background: #fef3f0;
+  transform: scale(1.05);
 }
 
 .close-btn:active {
@@ -2305,10 +2626,14 @@ function restoreNavigation() {
 
 /* Кнопка геолокации */
 .control-btn-primary {
-  background: var(--primary-container);
-  color: var(--on-primary-container);
+  background: #ea580c;
+  color: #ffffff;
   border: none;
-  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.3);
+  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.4);
+}
+
+.control-btn-primary:hover {
+  background: #c2410c;
 }
 
 /* FAB Quick Start */

@@ -106,10 +106,6 @@
         <span class="material-symbols-outlined" :data-filled="$route.path === '/events'">event</span>
         <span>Ивенты</span>
       </router-link>
-      <router-link to="/map" class="nav-item">
-        <span class="material-symbols-outlined" :data-filled="$route.path === '/map'">directions_run</span>
-        <span>Маршруты</span>
-      </router-link>
       <router-link to="/profile" class="nav-item">
         <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
         <span>Профиль</span>
