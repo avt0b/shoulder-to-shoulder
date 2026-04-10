@@ -196,3 +196,12 @@ class UserService:
             await self.user_repo.db.rollback()
             logger.exception("Contact info update failed")
             raise
+
+    async def list_public_users(self, limit: int, offset: int) -> dict:
+        users, total = await self.user_repo.list_public_users(limit, offset)
+        return {
+            "users": users,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+        }

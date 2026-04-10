@@ -64,3 +64,26 @@ class RatingResponse(BaseModel):
 
 class ThemeUpdateRequest(BaseModel):
     theme: Literal["light", "dark"]
+
+
+class PublicUserListItem(BaseModel):
+    user_id: str
+    display_name: str
+    city: str | None
+    age: int | None
+    avatar_url: str | None
+    empathy_score: float
+    reliability_score: float
+    badges: list[str] = []
+
+
+class PublicUserListResponse(BaseModel):
+    users: list[PublicUserListItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class PublicUserListQuery(BaseModel):
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)

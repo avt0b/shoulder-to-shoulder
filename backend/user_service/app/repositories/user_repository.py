@@ -2,8 +2,11 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.event_service.app.models.participant import EventParticipant
+from backend.user_service.app.models.profile import UserProfile
+from backend.user_service.app.models.rating import UserRating
 from backend.user_service.app.models.user import User
 from sqlalchemy import select, update, func, or_
+
 
 class UserRepository:
     def __init__(self, db: AsyncSession):
@@ -75,3 +78,49 @@ class UserRepository:
         )
         result = await self.db.execute(stmt)
         return result.rowcount > 0
+
+    async def list_public_users(self, limit: int, offset: int) -> tuple[list[dict], int]:
+        # Выбираем данные, склеиваем таблицы
+        stmt = select(
+            User.id,
+            UserProfile.display_name,
+            UserProfile.city,
+            UserProfile.age,
+            UserProfile.avatar_url,
+            func.coalesce(UserRating.empathy_score, 0).label("empathy_score"),
+            func.coalesce(UserRating.reliability_score, 0).label("reliability_score"),
+        )
+
+        # OUTER JOIN: если профиля/рейтинга нет, юзер всё равно вернётся
+        stmt = stmt.outerjoin(UserProfile, UserProfile.user_id == User.id)
+        stmt = stmt.outerjoin(UserRating, UserRating.user_id == User.id)
+
+        # Только активные
+        stmt = stmt.where(User.is_active == True)
+
+        # Считаем общее количество (без ошибки cartesian product)
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        # Сортируем по надёжности (тех у кого нет рейтинга - в конец)
+        stmt = stmt.order_by(
+            UserRating.reliability_score.desc().nullslast()
+        ).offset(offset).limit(limit)
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        users = [
+            {
+                "user_id": str(r.id),
+                "display_name": r.display_name,
+                "city": r.city,
+                "age": r.age,
+                "avatar_url": r.avatar_url,
+                "empathy_score": float(r.empathy_score),
+                "reliability_score": float(r.reliability_score),
+            }
+            for r in rows
+        ]
+
+        return users, total

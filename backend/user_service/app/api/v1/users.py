@@ -5,7 +5,8 @@ from backend.user_service.app.api.dependencies import get_current_user_id, get_u
 from backend.user_service.app.schemas.user import (
     UserProfileResponse,
     UserProfileUpdateRequest,
-    RatingResponse, UserContactUpdateRequest, ThemeUpdateRequest, PublicUserProfileResponse,
+    RatingResponse, UserContactUpdateRequest, ThemeUpdateRequest, PublicUserProfileResponse, PublicUserListResponse,
+    PublicUserListQuery,
 )
 from backend.user_service.app.services.user_service import UserService
 
@@ -14,8 +15,8 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/me", response_model=UserProfileResponse)
 async def get_my_profile(
-    current_user_id: str = Depends(get_current_user_id),
-    svc: UserService = Depends(get_user_service),
+        current_user_id: str = Depends(get_current_user_id),
+        svc: UserService = Depends(get_user_service),
 ):
     profile = await svc.get_user_by_id(current_user_id)
     if not profile:
@@ -68,8 +69,8 @@ async def get_my_rating(
 
 @router.get("/{user_id}", response_model=PublicUserProfileResponse)
 async def get_public_profile(
-    user_id: UUID,
-    svc: UserService = Depends(get_user_service),
+        user_id: UUID,
+        svc: UserService = Depends(get_user_service),
 ):
     profile = await svc.get_public_user_profile(user_id)
     if not profile:
@@ -88,3 +89,15 @@ async def update_theme(
     if not updated:
         raise HTTPException(404, detail="Profile not found")
     return {"theme": updated.theme}
+
+
+@router.get("", response_model=PublicUserListResponse)
+async def list_public_users(
+    filters: PublicUserListQuery = Depends(),
+    svc: UserService = Depends(get_user_service),
+):
+    """Public user listing. Simple pagination."""
+    return await svc.list_public_users(
+        limit=filters.limit,
+        offset=filters.offset,
+    )
