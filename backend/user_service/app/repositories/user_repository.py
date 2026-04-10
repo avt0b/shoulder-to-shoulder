@@ -52,7 +52,6 @@ class UserRepository:
             offset: int = 0,
             search: str | None = None,
     ) -> list[User]:
-        """Get users with pagination and optional search."""
         stmt = select(User).offset(offset).limit(limit)
 
         if search:
@@ -67,7 +66,6 @@ class UserRepository:
         return list(result.scalars().all())
 
     async def set_active(self, user_id: UUID | str, is_active: bool) -> bool:
-        """Ban/unban user by ID. Returns True if user was found and updated."""
         if isinstance(user_id, str):
             user_id = UUID(user_id)
 
@@ -80,7 +78,6 @@ class UserRepository:
         return result.rowcount > 0
 
     async def list_public_users(self, limit: int, offset: int) -> tuple[list[dict], int]:
-        # Выбираем данные, склеиваем таблицы
         stmt = select(
             User.id,
             UserProfile.display_name,
@@ -91,18 +88,14 @@ class UserRepository:
             func.coalesce(UserRating.reliability_score, 0).label("reliability_score"),
         )
 
-        # OUTER JOIN: если профиля/рейтинга нет, юзер всё равно вернётся
         stmt = stmt.outerjoin(UserProfile, UserProfile.user_id == User.id)
         stmt = stmt.outerjoin(UserRating, UserRating.user_id == User.id)
 
-        # Только активные
         stmt = stmt.where(User.is_active == True)
 
-        # Считаем общее количество (без ошибки cartesian product)
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await self.db.execute(count_stmt)).scalar() or 0
 
-        # Сортируем по надёжности (тех у кого нет рейтинга - в конец)
         stmt = stmt.order_by(
             UserRating.reliability_score.desc().nullslast()
         ).offset(offset).limit(limit)

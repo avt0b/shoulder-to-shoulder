@@ -164,7 +164,7 @@ class UserService:
                 bio=updated_profile.bio,
                 avatar_url=updated_profile.avatar_url,
                 preferences=updated_profile.preferences or {},
-                city=updated_profile.city
+                city=updated_profile.city,
             )
         except Exception:
             await self.user_repo.db.rollback()
