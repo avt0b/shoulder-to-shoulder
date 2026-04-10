@@ -1,0 +1,20 @@
+# GitHub Issues Config
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/Graf140/shoulder-to-shoulder/discussions
+    about: Ask questions and discuss ideas
+
+  - name: 📚 Wiki
+    url: https://github.com/Graf140/shoulder-to-shoulder/wiki
+    about: Project documentation and guides
+
+  - name: 🔗 Project Board
+    url: https://github.com/users/Graf140/projects
+    about: Track project progress and tasks
+
+  - name: 📋 Contributing Guide
+    url: CONTRIBUTING.md
+    about: How to contribute to this project

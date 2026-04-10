@@ -269,22 +269,26 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav" v-if="!pickMode">
-      <a href="#" class="nav-item active" @click.prevent>
-        <span class="material-symbols-outlined filled">map</span>
+      <router-link to="/" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/'">map</span>
         <span>Карта</span>
-      </a>
-      <a href="#" class="nav-item" @click.prevent="$emit('navigate', 'events')">
-        <span class="material-symbols-outlined">event</span>
+      </router-link>
+      <router-link to="/events" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/events'">event</span>
         <span>Ивенты</span>
-      </a>
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'routes' }" @click.prevent="handleNav('routes')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'routes' }">directions_run</span>
+      </router-link>
+      <router-link to="/map" class="nav-item nav-item-active">
+        <span class="material-symbols-outlined" data-filled="true">directions_run</span>
         <span>Маршруты</span>
-      </a>
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'profile' }" @click.prevent="handleNav('profile')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'profile' }">person</span>
+      </router-link>
+      <router-link to="/profile" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
         <span>Профиль</span>
-      </a>
+      </router-link>
+      <router-link to="/rating" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/rating'">emoji_events</span>
+        <span>Рейтинг</span>
+      </router-link>
     </nav>
 
     <!-- Pick Point Overlay — режим выбора точки на карте -->
@@ -404,14 +408,14 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, api } from '../config'
 import { setNavigation, updateNavPosition, updateNavRemaining, navigationStore } from '../stores/navigation'
 
 const emit = defineEmits(['close', 'navigate'])
-
-const activeNav = ref('map')
+const router = useRouter()
 const mapRef = ref(null)
 const ninjaBtnRef = ref(null)
 let map = null
@@ -1426,14 +1430,6 @@ async function fetchPlaces() {
   }
 }
 
-const handleNav = (nav) => {
-  activeNav.value = nav
-  // Если уходим с карты — очищаем маршрут
-  if (nav !== 'map') {
-    clearRoute()
-  }
-}
-
 // Анимация растекания от кнопки ниндзя
 const toggleDarkMode = () => {
   if (isTransitioning.value) return
@@ -2360,11 +2356,13 @@ function restoreNavigation() {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 12px 24px 24px;
-  background: rgba(255, 255, 255, 0.8);
+  gap: 2px;
+  padding: 8px 4px max(20px, env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 24px 24px 0 0;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06);
 }
 
 .nav-item {
@@ -2372,25 +2370,38 @@ function restoreNavigation() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 20px;
+  padding: 6px 4px;
   border-radius: 9999px;
   text-decoration: none;
-  color: #787170;
+  color: #59413a;
+  transition: all 0.2s;
+  min-width: 0;
+  flex: 1;
+  max-width: 72px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-item:hover {
+  background: #f3f4f5;
+  color: #ea580c;
+}
+
+.nav-item-active {
+  background: #ea580c !important;
+  color: #ffffff !important;
+  padding: 6px 8px;
+}
+
+.nav-item-active:hover {
+  background: #c2410c !important;
+}
+
+.nav-item .material-symbols-outlined {
+  font-size: 24px;
   transition: all 0.2s;
 }
 
-.nav-item.active {
-  background: #ffedd5;
-  color: #ea580c;
-  transform: scale(0.95);
-}
-
-.nav-item.active .material-symbols-outlined {
-  font-variation-settings: 'FILL' 1;
-}
-
-.nav-item:hover:not(.active) {
-  color: #ea580c;
+.nav-item span:last-child {
 }
 
 .nav-item span:first-child {

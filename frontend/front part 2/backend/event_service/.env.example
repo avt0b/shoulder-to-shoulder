@@ -1,0 +1,3 @@
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/shoulder_to_shoulder_events
+NATS_URL=nats://localhost:4222
+SECRET_KEY=

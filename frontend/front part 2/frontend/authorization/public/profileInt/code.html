@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+
+<html lang="ru"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#fea182",
+                    "surface-container-low": "#f3f4f5",
+                    "on-surface": "#191c1d",
+                    "surface-container-lowest": "#ffffff",
+                    "on-tertiary-container": "#ecf0ff",
+                    "on-background": "#191c1d",
+                    "surface-tint": "#ac3400",
+                    "error-container": "#ffdad6",
+                    "primary-container": "#c2410c",
+                    "inverse-surface": "#2e3132",
+                    "tertiary": "#0051af",
+                    "secondary-fixed-dim": "#ffb59d",
+                    "background": "#f8f9fa",
+                    "outline": "#8d7168",
+                    "surface-container": "#edeeef",
+                    "on-error": "#ffffff",
+                    "surface": "#f8f9fa",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed-variant": "#004494",
+                    "tertiary-container": "#0069de",
+                    "surface-variant": "#e1e3e4",
+                    "on-error-container": "#93000a",
+                    "on-surface-variant": "#59413a",
+                    "on-secondary-fixed": "#390c00",
+                    "on-primary-container": "#ffece7",
+                    "surface-container-high": "#e7e8e9",
+                    "outline-variant": "#e1bfb5",
+                    "inverse-on-surface": "#f0f1f2",
+                    "on-primary-fixed-variant": "#832600",
+                    "primary-fixed-dim": "#ffb59d",
+                    "on-tertiary": "#ffffff",
+                    "on-tertiary-fixed": "#001a41",
+                    "on-primary-fixed": "#390c00",
+                    "surface-dim": "#d9dadb",
+                    "surface-container-highest": "#e1e3e4",
+                    "secondary-fixed": "#ffdbd0",
+                    "secondary": "#924a31",
+                    "on-secondary-fixed-variant": "#75331c",
+                    "tertiary-fixed": "#d8e2ff",
+                    "surface-bright": "#f8f9fa",
+                    "primary-fixed": "#ffdbd0",
+                    "error": "#ba1a1a",
+                    "tertiary-fixed-dim": "#adc6ff",
+                    "on-secondary-container": "#78351e",
+                    "on-primary": "#ffffff",
+                    "primary": "#9b2f00",
+                    "inverse-primary": "#ffb59d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "1rem",
+                    "lg": "2rem",
+                    "xl": "3rem",
+                    "full": "9999px"
+            },
+            "fontFamily": {
+                    "headline": ["Inter"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .scale-98-active:active { transform: scale(0.98); }
+        .scale-95-active:active { transform: scale(0.95); }
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f5; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-surface">
+<!-- Top Navigation Bar -->
+<header class="w-full sticky top-0 z-50 bg-[#f3f4f5] dark:bg-slate-900 flex justify-between items-center px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="close up portrait of a friendly man with a warm smile, soft natural lighting in an outdoor setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCgfXXmitq4L0e-uRPLenyPhXrtqevgeg5COCrC3yOJdMQ1OrCATlQjuB-Y9JeBXjTjNHIvtCjcGyBfOH05FuvGXZPeJVXYrE85Lezaa1C-GYXh3UCeJOaPG_yb36N6KOOBUjc0__43u3Am509rvgzM_f_w420ezwnBz42BoOhYyvvEE4Vv1mp2YvlcFILiEa_zLh03LHvf-rOWntLG4BC-I6OvUaMSkTytFXo-Cpglg-8gI6Zoa_djGr83HZFVsB6j3REzER0vm8I"/>
+</div>
+<h1 class="font-['Inter'] font-semibold text-xl tracking-tight text-[#191c1d] dark:text-white">Плечом к плечу</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-slate-500 hover:opacity-80 transition-opacity">search</button>
+<button class="material-symbols-outlined text-slate-500 hover:opacity-80 transition-opacity">settings</button>
+</div>
+</header>
+<main class="max-w-3xl mx-auto px-4 pb-32 pt-4">
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<!-- Profile Hero Card (Large Avatar & Score) -->
+<div class="col-span-2 md:col-span-4 bg-surface-container-lowest rounded-lg p-6 flex flex-col md:flex-row items-center gap-6">
+<div class="relative">
+<div class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-primary-container p-1">
+<img class="w-full h-full rounded-full object-cover" data-alt="close up portrait of a friendly man with a warm smile, soft natural lighting in an outdoor setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBi2zlvk1CneokMGV2mfscCqUHiyZvQN26kZKtFmGynfO6mZagott0WNTadUS1VcAOGixG7yCaMcny9yGw09l0WHcW_o8Vc0jDTkn_dq0_U78yY2UXtXLv5c5sE1nHzYilevHr3DnapYT9g-Fo3vfPppkSB6VXLItAnPCftWraNTderGZ3UIsOnvW0NE_aPE545YkZhjkepicvOfv-P7q2MyCmYQNgBGbrEfJdUsSHmLXcGowElCLcdBzmd1nfIB_WwP9TyAlgDrtA"/>
+</div>
+<div class="absolute bottom-1 right-1 bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-surface-container-lowest">
+                        PRO
+                    </div>
+</div>
+<div class="flex-1 text-center md:text-left">
+<h2 class="text-2xl font-bold tracking-tight mb-1">Александр Волков</h2>
+<p class="text-slate-500 text-sm mb-4">Бегун-энтузиаст и проводник • Москва</p>
+<div class="flex flex-wrap justify-center md:justify-start gap-3">
+<div class="bg-primary-container text-on-primary-container px-4 py-2 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="text-sm font-semibold tracking-tight">Надёжность 94%</span>
+</div>
+<div class="bg-tertiary-fixed text-on-tertiary-fixed px-4 py-2 rounded-full flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">favorite</span>
+<span class="text-sm font-semibold tracking-tight">Эмпатия 12</span>
+</div>
+</div>
+</div>
+<button class="bg-surface-container-high text-on-surface-variant px-6 py-3 rounded-full font-semibold text-sm scale-98-active duration-200">
+                    Редактировать
+                </button>
+</div>
+<!-- Stats: Workouts Completed -->
+<div class="col-span-1 bg-surface-container-lowest rounded-lg p-4 flex flex-col justify-between aspect-square">
+<span class="material-symbols-outlined text-primary mb-2">exercise</span>
+<div>
+<div class="text-3xl font-bold mb-0.5">142</div>
+<div class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Тренировок</div>
+</div>
+</div>
+<!-- Stats: Friends Made -->
+<div class="col-span-1 bg-surface-container-lowest rounded-lg p-4 flex flex-col justify-between aspect-square">
+<span class="material-symbols-outlined text-primary mb-2">group</span>
+<div>
+<div class="text-3xl font-bold mb-0.5">86</div>
+<div class="text-[11px] font-medium text-slate-500 uppercase tracking-wider">Друзей</div>
+</div>
+</div>
+<!-- Stats: Safe Routes Shared -->
+<div class="col-span-2 bg-primary-container text-on-primary-container rounded-lg p-4 flex flex-col justify-between">
+<div class="flex justify-between items-start">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">map</span>
+<span class="bg-white/20 px-2 py-1 rounded-full text-[10px] font-bold">ТОП 5%</span>
+</div>
+<div>
+<div class="text-3xl font-bold mb-0.5">24</div>
+<div class="text-[11px] font-medium opacity-80 uppercase tracking-wider">Безопасных маршрутов создано</div>
+</div>
+</div>
+<!-- Recent Achievements Section -->
+<div class="col-span-2 md:col-span-2 bg-surface-container-lowest rounded-lg p-5">
+<h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Достижения</h3>
+<div class="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+<div class="flex-shrink-0 flex flex-col items-center gap-2">
+<div class="w-12 h-12 bg-secondary-fixed rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary-container" style="font-variation-settings: 'FILL' 1;">military_tech</span>
+</div>
+<span class="text-[10px] font-bold text-center">Лидер</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-2">
+<div class="w-12 h-12 bg-tertiary-fixed rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-on-tertiary-fixed" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<span class="text-[10px] font-bold text-center">Спринтер</span>
+</div>
+<div class="flex-shrink-0 flex flex-col items-center gap-2 opacity-40">
+<div class="w-12 h-12 bg-surface-container-highest rounded-full flex items-center justify-center border-2 border-dashed border-slate-300">
+<span class="material-symbols-outlined text-slate-400">lock</span>
+</div>
+<span class="text-[10px] font-bold text-center">Опора</span>
+</div>
+</div>
+</div>
+<!-- Settings/Quick Actions -->
+<div class="col-span-2 md:col-span-2 bg-surface-container-lowest rounded-lg p-5 flex flex-col justify-between">
+<h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Настройки</h3>
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between text-sm font-medium hover:text-primary transition-colors">
+<span>Приватность профиля</span>
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between text-sm font-medium hover:text-primary transition-colors">
+<span>Уведомления</span>
+<span class="material-symbols-outlined text-[20px]">chevron_right</span>
+</button>
+</div>
+</div>
+<!-- Community Pulse Banner -->
+<div class="col-span-2 md:col-span-4 bg-[#c2410c] text-white rounded-lg p-6 relative overflow-hidden">
+<div class="relative z-10">
+<h4 class="text-xl font-bold mb-2">Станьте куратором</h4>
+<p class="text-white/80 text-sm max-w-md mb-4">Ваш уровень надёжности позволяет вам организовывать групповые тренировки в вашем районе.</p>
+<button class="bg-white text-[#c2410c] px-6 py-2 rounded-full font-bold text-sm hover:bg-opacity-90 transition-all">Подробнее</button>
+</div>
+<!-- Abstract visual element -->
+<div class="absolute -right-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-3xl"></div>
+<div class="absolute right-10 top-10 w-24 h-24 bg-primary/20 rounded-full blur-2xl"></div>
+</div>
+</div>
+</main>
+<!-- Navigation Shell -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-6 pb-6 pt-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 rounded-t-[24px] shadow-[0_-8px_24px_rgba(0,0,0,0.04)]">
+<div class="flex flex-col items-center justify-center text-slate-500 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
+<span class="material-symbols-outlined">map</span>
+<span class="font-['Inter'] text-[11px] font-medium">Map</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
+<span class="material-symbols-outlined">group</span>
+<span class="font-['Inter'] text-[11px] font-medium">Groups</span>
+</div>
+<div class="flex flex-col items-center justify-center text-slate-500 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-all">
+<span class="material-symbols-outlined">directions_run</span>
+<span class="font-['Inter'] text-[11px] font-medium">Routes</span>
+</div>
+<div class="flex flex-col items-center justify-center bg-[#c2410c] text-white rounded-full px-5 py-1.5 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-['Inter'] text-[11px] font-medium">Profile</span>
+</div>
+</nav>
+</body></html>

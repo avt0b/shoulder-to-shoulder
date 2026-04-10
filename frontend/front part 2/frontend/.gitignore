@@ -1,0 +1,34 @@
+# ============================================
+# Корневой .gitignore — frontend/
+# ============================================
+
+# Node modules
+**/node_modules/
+
+# Build output
+**/dist/
+
+# Environment files
+**/.env
+**/*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Qwen settings (optional)
+.qwen/
+
+# Примеры HTML (прототипы, не нужны для работы)
+examples/
+
+# Корневой package.json — артефакт, всё в app/
+package.json
+package-lock.json
+__init__.py
