@@ -13,6 +13,7 @@ class EventCreateRequest(BaseModel):
     duration_minutes: int = Field(default=60, ge=30, le=180)
     start_time: datetime
     photo_url: str | None = None
+    anonymous: bool
 
 
 class EventResponse(BaseModel):
@@ -26,6 +27,7 @@ class EventResponse(BaseModel):
     status: str
     start_time: datetime
     created_at: datetime
+    anonymous: bool
 
 
 class CheckInResponse(BaseModel):
@@ -57,6 +59,7 @@ class EventListItem(BaseModel):
     photo_url: str | None
     created_at: datetime
     participant_count: int
+    anonymous: bool
 
 
 class EventListResponse(BaseModel):
@@ -64,6 +67,7 @@ class EventListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
 
 
 class EventListFilters(BaseModel):
@@ -89,3 +93,4 @@ class EventDetailResponse(BaseModel):
     created_at: datetime
     participant_count: int
     participant_ids: list[UUID]
+    anonymous: bool

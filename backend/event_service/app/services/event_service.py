@@ -85,6 +85,7 @@ class EventService:
                 "photo_url": e.photo_url,
                 "created_at": e.created_at,
                 "participant_count": count,
+                "anonymous": e.anonymous
             })
 
         return {
