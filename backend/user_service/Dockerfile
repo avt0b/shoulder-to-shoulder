@@ -1,30 +1,44 @@
-FROM python:3.12
+FROM python:3.12-slim
+
+ARG APP_HOME=/shoulder-to-shoulder
+ARG SERVICE_MODULE=backend.user_service.app.main:app
+ARG SERVICE_PORT=8000
+ARG UV_SYNC_EXTRA=
+
+ENV APP_HOME=${APP_HOME} \
+    SERVICE_MODULE=${SERVICE_MODULE} \
+    SERVICE_PORT=${SERVICE_PORT} \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=${APP_HOME} \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/opt/shoulder-to-shoulder-venv \
+    PATH=/opt/shoulder-to-shoulder-venv/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+WORKDIR ${APP_HOME}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
+    build-essential \
+    ca-certificates \
+    curl \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+RUN pip install --no-cache-dir uv
 
-COPY pyproject.toml ./pyproject.toml
+COPY pyproject.toml uv.lock ./
 
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system --no-cache-dir -e .
+RUN uv sync --frozen --no-dev --no-install-project
 
-COPY backend/user_service/app ./app
+COPY backend ./backend
+COPY main.py ./main.py
 
-ENV PYTHONPATH=/app \
-    ENVIRONMENT=development \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+RUN if [ -n "${UV_SYNC_EXTRA}" ]; then pip install --no-cache-dir ${UV_SYNC_EXTRA}; fi
 
-RUN useradd -m -r appuser && chown -R appuser:appuser /app
-USER appuser
+EXPOSE ${SERVICE_PORT}
 
-EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=5 \
+    CMD curl -fsS "http://localhost:${SERVICE_PORT}/health" || exit 1
 
-CMD ["uvicorn", "backend.user_service.app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "2"]
+CMD ["sh", "-lc", "exec /opt/shoulder-to-shoulder-venv/bin/python -m uvicorn ${SERVICE_MODULE} --host 0.0.0.0 --port ${SERVICE_PORT}"]

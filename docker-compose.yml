@@ -1,216 +1,294 @@
+name: shoulder-to-shoulder
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+  env_file:
+    - ./.env
+  networks:
+    - s2s_network
+
 services:
-  # PostgreSQL Database
   postgres:
     image: postgres:16-alpine
     container_name: s2s_postgres
+    restart: unless-stopped
+    env_file:
+      - ./.env
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: shoulder_to_shoulder_db
-      POSTGRES_INITDB_ARGS: "-c shared_preload_libraries=pg_stat_statements"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ${PROJECT_ROOT}/.docker/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - s2s_network
 
-  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: s2s_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
-      - redis_data:/data
+      - ${PROJECT_ROOT}/.docker/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
     networks:
       - s2s_network
 
-  # NATS Message Broker
   nats:
-    image: nats:2-alpine
+    image: nats:2.10-alpine
     container_name: s2s_nats
+    restart: unless-stopped
+    command: ["-js", "-m", "8222"]
     ports:
-      - "4222:4222"      # Client port
-      - "8222:8222"      # HTTP monitoring port
-    command: -js         # Enable JetStream
+      - "${NATS_PORT}:4222"
+      - "${NATS_MONITOR_PORT}:8222"
     networks:
       - s2s_network
 
-  # User Service
+  minio:
+    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    container_name: s2s_minio
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      TZ: ${TZ}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    volumes:
+      - ${PROJECT_ROOT}/.docker/minio:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - s2s_network
+
   user_service:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *backend-common
     container_name: s2s_user_service
-    ports:
-      - "8000:8000"
+    build:
+      context: .
+      dockerfile: ./backend/user_service/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.user_service.app.main:app
+        SERVICE_PORT: 8000
     environment:
-      ENVIRONMENT: development
-      PROJECT_NAME: User Service Плечом к плечу
-      API_V1_STR: /api/v1
-      SECRET_KEY: super-secret-key-change-in-production-please-use-64-characters-minimum-!!!
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db
-      REDIS_URL: redis://redis:6379/0
-      NATS_URL: nats://nats:4222
-      FIRST_SUPERUSER_EMAIL: admin@example.com
-      FIRST_SUPERUSER_PASSWORD: admin123
-      PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/user_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      ENVIRONMENT: ${ENVIRONMENT}
+      PROJECT_NAME: ${USER_SERVICE_PROJECT_NAME}
+      API_V1_STR: ${API_V1_STR}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      NATS_URL: ${NATS_URL}
+      FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
+    ports:
+      - "${USER_SERVICE_PORT}:8000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend/user_service:/app/backend/user_service
-    networks:
-      - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      nats:
+        condition: service_started
 
-  # Notification Service
   notification_service:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *backend-common
     container_name: s2s_notification_service
-    ports:
-      - "8001:8001"
+    build:
+      context: .
+      dockerfile: ./backend/notification_service/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.notification_service.app.main:app
+        SERVICE_PORT: 8001
     environment:
-      ENVIRONMENT: development
-      PROJECT_NAME: Notification Service Плечом к плечу
-      API_V1_STR: /api/v1
-      SECRET_KEY: super-secret-key-change-in-production-please-use-64-characters-minimum-!!!
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db
-      REDIS_URL: redis://redis:6379/0
-      NATS_URL: nats://nats:4222
-      PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/notification_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+      ENVIRONMENT: ${ENVIRONMENT}
+      PROJECT_NAME: ${NOTIFICATION_SERVICE_PROJECT_NAME}
+      API_V1_STR: ${API_V1_STR}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      NATS_URL: ${NATS_URL}
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      GATEWAY_URL: ${GATEWAY_URL}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS}
+      LOG_LEVEL: ${LOG_LEVEL}
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT}:8001"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend/notification_service:/app/backend/notification_service
-    networks:
-      - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      nats:
+        condition: service_started
 
-  # Event Service
   event_service:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *backend-common
     container_name: s2s_event_service
-    ports:
-      - "8002:8002"
-    environment:
-      ENVIRONMENT: development
-      PROJECT_NAME: Event Service Плечом к плечу
-      API_V1_STR: /api/v1
-      SECRET_KEY: super-secret-key-change-in-production-please-use-64-characters-minimum-!!!
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db
-      REDIS_URL: redis://redis:6379/0
-      NATS_URL: nats://nats:4222
-      PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/event_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./backend/event_service:/app/backend/event_service
-    networks:
-      - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Admin Service
-  admin_service:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: s2s_admin_service
-    ports:
-      - "8003:8003"
+      dockerfile: ./backend/event_service/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.event_service.app.main:app
+        SERVICE_PORT: 8002
     environment:
-      ENVIRONMENT: development
-      PROJECT_NAME: Admin Service Плечом к плечу
-      API_V1_STR: /api/v1
-      SECRET_KEY: super-secret-key-change-in-production-please-use-64-characters-minimum-!!!
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db
-      REDIS_URL: redis://redis:6379/0
-      NATS_URL: nats://nats:4222
-      PYTHONUNBUFFERED: "1"
-    working_dir: /app/backend/admin_service
-    command: python -m uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
+      ENVIRONMENT: ${ENVIRONMENT}
+      PROJECT_NAME: ${EVENT_SERVICE_PROJECT_NAME}
+      API_V1_STR: ${API_V1_STR}
+      SECRET_KEY: ${SECRET_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      NATS_URL: ${NATS_URL}
+    ports:
+      - "${EVENT_SERVICE_PORT}:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+
+  admin_service:
+    <<: *backend-common
+    container_name: s2s_admin_service
+    build:
+      context: .
+      dockerfile: ./backend/admin_service/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.admin_service.app.main:app
+        SERVICE_PORT: 8003
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      PROJECT_NAME: ${ADMIN_SERVICE_PROJECT_NAME}
+      API_V1_STR: ${API_V1_STR}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      NATS_URL: ${NATS_URL}
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      EVENT_SERVICE_URL: ${EVENT_SERVICE_URL}
+    ports:
+      - "${ADMIN_SERVICE_PORT}:8003"
+    depends_on:
+      nats:
+        condition: service_started
+      user_service:
+        condition: service_started
+      event_service:
+        condition: service_started
+
+  media_service:
+    <<: *backend-common
+    container_name: s2s_media_service
+    build:
+      context: .
+      dockerfile: ./backend/media_service/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.media_service.app.main:app
+        SERVICE_PORT: 8006
+        UV_SYNC_EXTRA: boto3 botocore
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      PROJECT_NAME: ${MEDIA_SERVICE_PROJECT_NAME}
+      API_V1_STR: ${API_V1_STR}
+      DATABASE_URL: ${DATABASE_URL}
+      NATS_URL: ${NATS_URL}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_S3_BUCKET: ${MEDIA_BUCKET}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL}
+      AWS_PUBLIC_URL: ${AWS_PUBLIC_URL}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
+      ALLOWED_CONTENT_TYPES_STR: ${ALLOWED_CONTENT_TYPES_STR}
+      ALLOWED_PURPOSES_STR: ${ALLOWED_PURPOSES_STR}
+    ports:
+      - "${MEDIA_SERVICE_PORT}:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      minio:
+        condition: service_healthy
+
+  frontend:
+    container_name: s2s_frontend
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: ./frontend/authorization/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_APP_ENV: ${VITE_APP_ENV}
+        VITE_DEBUG: ${VITE_DEBUG}
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    depends_on:
+      user_service:
+        condition: service_started
+    networks:
+      - s2s_network
+
+  maps_service:
+    <<: *backend-common
+    container_name: s2s_maps_service
+    profiles:
+      - maps
+    build:
+      context: .
+      dockerfile: ./backend/maps_service/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.maps_service.main:app
+        SERVICE_PORT: 8004
+        UV_SYNC_EXTRA: loguru
+    environment:
+      APP_PORT: ${MAPS_SERVICE_PORT}
+      PORT: ${MAPS_SERVICE_PORT}
+      POSTGRES_URL: ${DATABASE_URL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      ALLOWED_ORIGINS: ${MAPS_ALLOWED_ORIGINS}
+      TZ: ${TZ}
+    ports:
+      - "${MAPS_SERVICE_PORT}:8004"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend/admin_service:/app/backend/admin_service
-    networks:
-      - s2s_network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Frontend (Vue.js)
-  frontend:
-    build:
-      context: ./frontend/authorization
-      dockerfile: Dockerfile
-    container_name: s2s_frontend
-    ports:
-      - "3000:3000"
-    environment:
-      VITE_API_URL: http://localhost:8000
-      VITE_NATS_URL: ws://localhost:9222
-    depends_on:
-      - user_service
-    volumes:
-      - ./frontend/authorization:/app
-      - /app/node_modules
-    networks:
-      - s2s_network
-
-volumes:
-  postgres_data:
-  redis_data:
 
 networks:
   s2s_network:

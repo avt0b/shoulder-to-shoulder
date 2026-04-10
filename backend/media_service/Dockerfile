@@ -1,9 +1,9 @@
 FROM python:3.12-slim
 
 ARG APP_HOME=/shoulder-to-shoulder
-ARG SERVICE_MODULE=backend.user_service.app.main:app
-ARG SERVICE_PORT=8000
-ARG UV_SYNC_EXTRA=
+ARG SERVICE_MODULE=backend.media_service.app.main:app
+ARG SERVICE_PORT=8006
+ARG UV_SYNC_EXTRA="boto3 botocore"
 
 ENV APP_HOME=${APP_HOME} \
     SERVICE_MODULE=${SERVICE_MODULE} \

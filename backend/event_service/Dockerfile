@@ -1,8 +1,8 @@
 FROM python:3.12-slim
 
 ARG APP_HOME=/shoulder-to-shoulder
-ARG SERVICE_MODULE=backend.user_service.app.main:app
-ARG SERVICE_PORT=8000
+ARG SERVICE_MODULE=backend.event_service.app.main:app
+ARG SERVICE_PORT=8002
 ARG UV_SYNC_EXTRA=
 
 ENV APP_HOME=${APP_HOME} \
