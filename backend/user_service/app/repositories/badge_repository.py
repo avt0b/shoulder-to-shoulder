@@ -31,3 +31,22 @@ class UserBadgeRepository:
         stmt = select(Badge.badge_type).where(Badge.user_id == uid)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def get_badges_for_users(self, user_ids: list[UUID]) -> dict[str, list[str]]:
+        """Возвращает {user_id: [badge_types]} для массового получения."""
+        if not user_ids:
+            return {}
+
+        stmt = select(Badge.user_id, Badge.badge_type).where(
+            Badge.user_id.in_(user_ids)
+        )
+        result = await self.db.execute(stmt)
+
+        badges_map: dict[str, list[str]] = {}
+        for user_id, badge_type in result.all():
+            uid_str = str(user_id)
+            if uid_str not in badges_map:
+                badges_map[uid_str] = []
+            badges_map[uid_str].append(badge_type)
+
+        return badges_map
