@@ -735,9 +735,7 @@ async function submitEventToBackend(eventData) {
     }
 
     myMeetups.value.unshift(newEventObj)
-    const allStored = loadFromLocalStorage() || []
-    allStored.unshift(newEventObj)
-    saveToLocalStorage(allStored)
+    syncMyMeetupsLocal()
     return newEventObj
   }
 }
@@ -809,7 +807,7 @@ async function handleJoinMeetup(meetupId, userId = 1) {
       selectedMeetup.value.isJoined = true
       selectedMeetup.value.participants = data.participants
     }
-
+    syncMyMeetupsLocal()
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`handleJoinMeetup: API недоступен, localStorage`)
@@ -819,16 +817,15 @@ async function handleJoinMeetup(meetupId, userId = 1) {
       const m = myMeetups.value[idx]
       if (m.participants < m.maxParticipants && !m.isJoined) {
         myMeetups.value[idx] = { ...m, isJoined: true, participants: m.participants + 1 }
-        saveToLocalStorage(myMeetups.value)
       }
     }
+    syncMyMeetupsLocal()
     return null
   }
 }
 
 async function handleLeaveMeetup(meetupId, userId = 1) {
   try {
-    // Бэк: POST /events/{id}/cancel (не DELETE!)
     const res = await fetch(api(`/events/${meetupId}/cancel`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -845,7 +842,7 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
       selectedMeetup.value.isJoined = false
       selectedMeetup.value.participants = data.participants
     }
-
+    syncMyMeetupsLocal()
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`handleLeaveMeetup: API недоступен, localStorage`)
@@ -855,9 +852,9 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
       const m = myMeetups.value[idx]
       if (m.isJoined) {
         myMeetups.value[idx] = { ...m, isJoined: false, participants: m.participants - 1 }
-        saveToLocalStorage(myMeetups.value)
       }
     }
+    syncMyMeetupsLocal()
     return null
   }
 }
@@ -978,19 +975,16 @@ const mockMeetups = [
 ]
 
 // 5. Получить мои мероприятия
-// В Swagger нет GET эндпоинта для списка — используем localStorage/mocks
+// Читаем из localStorage (EventsPage сохраняет при join/leave)
+const MY_MEETUPS_KEY = 'shoulder_my_meetups'
+
 async function fetchMyMeetups() {
   try {
-    // Когда бэк добавит GET /api/v1/events/my — раскомментировать:
-    // const res = await fetch(api('/events/my'))
-    // const data = await res.json()
-    // myMeetups.value = data.events || []
-    // return
-
-    // localStorage
-    const stored = loadFromLocalStorage()
-    if (stored && stored.length > 0) {
-      myMeetups.value = stored
+    const stored = localStorage.getItem(MY_MEETUPS_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      myMeetups.value = parsed
+      if (config.isDebug) console.log('📋 fetchMyMeetups: из localStorage,', parsed.length, 'встреч')
       return
     }
 
@@ -999,6 +993,24 @@ async function fetchMyMeetups() {
   } catch (e) {
     if (config.isDebug) console.warn('fetchMyMeetups: ошибка', e)
     myMeetups.value = mockMeetups
+  }
+}
+
+// Слушаем изменения localStorage (join/leave из EventsPage)
+window.addEventListener('storage', (e) => {
+  if (e.key === MY_MEETUPS_KEY) {
+    if (config.isDebug) console.log('📋 MainPage: обновление моих встреч из storage')
+    fetchMyMeetups()
+  }
+})
+
+// Синхронизация: сохраняем мои встречи в localStorage
+function syncMyMeetupsLocal() {
+  try {
+    localStorage.setItem(MY_MEETUPS_KEY, JSON.stringify(myMeetups.value))
+    window.dispatchEvent(new Event('storage'))
+  } catch (e) {
+    console.warn('syncMyMeetupsLocal error:', e)
   }
 }
 

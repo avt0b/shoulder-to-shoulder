@@ -181,7 +181,7 @@
             @blur="hideStartSuggestionsDelayed"
           />
           <button class="route-geo-btn" @click="useMyLocation" title="Моё местоположение">
-            <span class="material-symbols-outlined">my_location</span>
+            <span class="material-symbols-outlined">directions_run</span>
           </button>
         </div>
         <!-- Подсказки адресов (Nominatim) -->
@@ -387,6 +387,18 @@
         </button>
       </div>
     </transition>
+
+    <!-- Loading Overlay — анимация тигра при построении маршрута -->
+    <transition name="loading-overlay-fade">
+      <div v-if="isBuildingRoute" class="loading-overlay">
+        <p class="loading-text">Маскот обегает все возможные маршруты 🐅</p>
+        <div class="loading-video-wrapper">
+          <video class="loading-tiger" autoplay loop muted playsinline>
+            <source src="/assets/TIGER.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -461,6 +473,7 @@ function selectPlaceOnMap(place) {
 // ============================================
 
 const showRouteForm = ref(false)
+const isBuildingRoute = ref(false)
 
 // Точки маршрута
 const routeStartQuery = ref('')
@@ -748,6 +761,8 @@ async function useMyLocation() {
 async function buildRoute() {
   if (!canBuildRoute.value) return
 
+  isBuildingRoute.value = true
+
   const start = routeStartCoords.value
   const end = routeEndCoords.value
   let routeBuilt = false
@@ -821,6 +836,8 @@ async function buildRoute() {
   if (!routeBuilt && config.isDebug) {
     console.warn('❌ Не удалось построить ни один маршрут')
   }
+
+  isBuildingRoute.value = false
 }
 
 // Форматируем ответ бэка
@@ -1303,25 +1320,43 @@ async function applyFilters() {
 async function fetchPlaces() {
   if (config.isDebug) console.log('🗺 fetchPlaces: запрос к API, фильтры:', JSON.stringify(filters.value))
   try {
-    // Запрашиваем ВСЕ места с бэкенда (фильтруем локально)
     const url = api('/places')
     if (config.isDebug) console.log('🗺 fetchPlaces URL:', url)
-    
+
     const res = await fetch(url)
     const data = await res.json()
-    
+
     if (config.isDebug) console.log('📦 fetchPlaces ответ:', JSON.stringify(data, null, 2))
+
+    // Бэк может вернуть:
+    // 1. { "places": [...] } — массив мест
+    // 2. { "place": {...} } — одно место
+    // 3. [...] — просто массив
+    // Поддерживаем все форматы
+    let rawPlaces = []
+    if (Array.isArray(data)) {
+      rawPlaces = data
+    } else if (data.places && Array.isArray(data.places)) {
+      rawPlaces = data.places
+    } else if (data.place && typeof data.place === 'object') {
+      rawPlaces = [data.place]
+    }
+
+    if (config.isDebug) console.log('📍 Получено мест с бэка:', rawPlaces.length)
 
     // Маппим ответ бэкенда → внутренний формат, скипаем невалидные
     const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
-    const rawPlaces = data.places || []
-    
-    if (config.isDebug) console.log('📍 Получено мест с бэка:', rawPlaces.length)
 
     const mapped = rawPlaces
       .filter(p => {
-        // Обязательные поля: id, name, lat, lon
-        if (!p.id || !p.name || typeof p.lat !== 'number' || typeof p.lon !== 'number') {
+        // Обязательные поля: id, name, lat, lon (или lng)
+        const hasId = p && (p.id || p.id === 0)
+        const hasName = p && typeof p.name === 'string' && p.name.trim()
+        const hasLat = p && typeof p.lat === 'number'
+        const hasLon = p && typeof p.lon === 'number'
+        const hasLng = p && typeof p.lng === 'number'
+
+        if (!hasId || !hasName || (!hasLat && !hasLng)) {
           if (config.isDebug) console.warn('fetchPlaces: скипнуто невалидное место', p)
           return false
         }
@@ -1341,18 +1376,23 @@ async function fetchPlaces() {
         // activity_type → валидный ключ
         const activityType = validActivities.includes(p.activity_type) ? p.activity_type : 'other'
 
+        // image может быть null
+        const image = p.image || null
+        // gallery может быть null или не массивом
+        const gallery = Array.isArray(p.gallery) ? p.gallery : []
+
         return {
           id: p.id,
           name: p.name,
-          description: p.description || '',
+          description: typeof p.description === 'string' ? p.description : '',
           lat: p.lat,
-          lng: p.lon,
+          lng: p.lon || p.lng || 0, // lon от бэка, lng как fallback
           rating: typeof p.rating === 'number' ? p.rating : 0,
-          emoji: p.emoji || '📍',
-          category: p.category || 'other',
-          image: p.image || null,
-          gallery: Array.isArray(p.gallery) ? p.gallery : [],
-          address: p.address || '',
+          emoji: typeof p.emoji === 'string' ? p.emoji : '📍',
+          category: typeof p.category === 'string' ? p.category : 'other',
+          image: image,
+          gallery: gallery,
+          address: typeof p.address === 'string' ? p.address : '',
           activityType: activityType,
           noiseLevel: noiseLevel,
           lit: lit,
@@ -1366,40 +1406,19 @@ async function fetchPlaces() {
 
     // === ЛОКАЛЬНАЯ ФИЛЬТРАЦИЯ ===
     const filtered = mapped.filter(p => {
-      if (filters.value.activityType && p.activityType !== filters.value.activityType) {
-        if (config.isDebug) console.log(`🚫 ${p.name}: activityType=${p.activityType} !== ${filters.value.activityType}`)
-        return false
-      }
-      if (filters.value.noiseLevel && p.noiseLevel !== filters.value.noiseLevel) {
-        if (config.isDebug) console.log(`🚫 ${p.name}: noiseLevel=${p.noiseLevel} !== ${filters.value.noiseLevel}`)
-        return false
-      }
-      if (filters.value.lit && !p.lit) {
-        if (config.isDebug) console.log(`🚫 ${p.name}: не освещён`)
-        return false
-      }
-      if (filters.value.lockers && !p.lockers) {
-        if (config.isDebug) console.log(`🚫 ${p.name}: нет раздевалок`)
-        return false
-      }
-      if (filters.value.benches && !p.benches) {
-        if (config.isDebug) console.log(`🚫 ${p.name}: нет скамеек`)
-        return false
-      }
-      if (filters.value.anonymous && !p.anonymous) {
-        if (config.isDebug) console.log(`🚫 ${p.name}: не анонимное`)
-        return false
-      }
+      if (filters.value.activityType && p.activityType !== filters.value.activityType) return false
+      if (filters.value.noiseLevel && p.noiseLevel !== filters.value.noiseLevel) return false
+      if (filters.value.lit && !p.lit) return false
+      if (filters.value.lockers && !p.lockers) return false
+      if (filters.value.benches && !p.benches) return false
+      if (filters.value.anonymous && !p.anonymous) return false
       return true
     })
 
-    if (config.isDebug) console.log('✅ после фильтрации:', filtered.length, filtered.map(p => p.name))
+    if (config.isDebug) console.log('✅ после фильтрации:', filtered.length)
 
     places.value = filtered
-    
-    if (config.isDebug) console.log('📍 Вызываю addPlaceMarkers, markers count:', markers.length)
     addPlaceMarkers()
-    if (config.isDebug) console.log('📍 После addPlaceMarkers, markers count:', markers.length)
   } catch (e) {
     if (config.isDebug) console.warn('fetchPlaces: API недоступен, локальная фильтрация', e)
     places.value = filteredMockPlaces.value
@@ -3450,5 +3469,81 @@ function restoreNavigation() {
 .fab-fade-leave-to {
   opacity: 0;
   transform: scale(0.8);
+}
+
+/* ============================================
+   🐅 Loading Overlay — анимация тигра
+   ============================================ */
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 20px;
+}
+
+.loading-text {
+  color: #ea580c;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  padding: 0 24px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  animation: text-pulse 2s ease-in-out infinite;
+}
+
+.loading-video-wrapper {
+  position: relative;
+  width: 95vw;
+  max-width: 700px;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.loading-tiger {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  animation: tiger-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes tiger-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+@keyframes text-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.loading-overlay-fade-enter-active,
+.loading-overlay-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.loading-overlay-fade-enter-from,
+.loading-overlay-fade-leave-to {
+  opacity: 0;
 }
 </style>
