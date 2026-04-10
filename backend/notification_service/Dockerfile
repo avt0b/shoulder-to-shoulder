@@ -41,4 +41,4 @@ EXPOSE ${SERVICE_PORT}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=5 \
     CMD curl -fsS "http://localhost:${SERVICE_PORT}/health" || exit 1
 
-CMD ["sh", "-lc", "exec python -m uvicorn ${SERVICE_MODULE} --host 0.0.0.0 --port ${SERVICE_PORT}"]
+CMD ["sh", "-lc", "exec /opt/shoulder-to-shoulder-venv/bin/python -m uvicorn ${SERVICE_MODULE} --host 0.0.0.0 --port ${SERVICE_PORT}"]

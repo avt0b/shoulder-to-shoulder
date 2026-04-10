@@ -33,7 +33,7 @@ dev = [
 ]
 
 [tool.uv]
-python = "3.12"
+package = false
 
 [tool.ruff]
 line-length = 100

@@ -33,3 +33,5 @@ script.py.mako
 Thumbs.db
 
 .qwen/
+
+.docker/
