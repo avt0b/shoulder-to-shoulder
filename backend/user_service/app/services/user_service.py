@@ -30,9 +30,12 @@ class UserService:
         user = await self.user_repo.get_by_id(user_id)
         if not user:
             return None
+
         profile = await self.profile_repo.get_by_user_id(user.id)
         if not profile:
             return None
+
+        event_counts = await self.profile_repo.get_event_counts(user.id)
 
         return UserProfileResponse(
             user_id=str(user.id),
@@ -43,7 +46,11 @@ class UserService:
             fitness_level=profile.fitness_level,
             bio=profile.bio,
             avatar_url=profile.avatar_url,
+            city=profile.city,
             preferences=profile.preferences or {},
+            # ← Новые поля:
+            theme=profile.theme or "light",
+            **event_counts,  # attended_events_count, joined_events_count
         )
 
     async def get_public_user_info(self, user_id: UUID | str) -> PublicUserInfoResponse | None:

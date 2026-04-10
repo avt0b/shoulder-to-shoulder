@@ -28,14 +28,17 @@ class UserContactUpdateRequest(BaseModel):
 class UserProfileResponse(BaseModel):
     user_id: str
     phone_number: str
-    email: EmailStr | None
+    email: str | None
     display_name: str
     age: int | None
     fitness_level: str
     bio: str | None
-    avatar_url: str | None = None
+    avatar_url: str | None
+    city: str | None
     preferences: dict
-    city: str | None = Field(None, max_length=100)
+    theme: Literal["light", "dark"] = "light"
+    attended_events_count: int = 0
+    joined_events_count: int = 0
 
 
 class PublicUserInfoResponse(BaseModel):
@@ -54,3 +57,7 @@ class RatingResponse(BaseModel):
     reliability_score: float
     total_events: int
     completed_events: int
+
+
+class ThemeUpdateRequest(BaseModel):
+    theme: Literal["light", "dark"]

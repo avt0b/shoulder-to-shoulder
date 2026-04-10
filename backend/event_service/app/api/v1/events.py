@@ -105,6 +105,9 @@ async def cancel_event(
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Cancel event failed: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/{event_id}", response_model=EventResponse)
