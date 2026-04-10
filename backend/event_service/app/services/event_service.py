@@ -24,13 +24,33 @@ class EventService:
         event = await self.repo.get_by_id(event_id)
         if not event:
             raise ValueError("Event not found")
+
         if str(event.host_id) == str(user_id):
             raise ValueError("Host is already a participant by default")
+
         if event.status != EventStatus.PENDING:
             raise ValueError("Event is not open for joining")
+
         if await self.repo.count_active_participants(event_id) >= event.max_participants:
             raise ValueError("Event is full")
-        return await self.repo.join(event_id, user_id)
+
+        success = await self.repo.join(event_id, user_id)
+
+        if success:
+            try:
+                await publish_event("event.user_joined", {
+                    "event_id": str(event_id),
+                    "host_id": str(event.host_id),
+                    "user_id": str(user_id),
+                    "event_title": event.title,
+                    "joined_at": datetime.now(timezone.utc).isoformat()
+                })
+
+                logger.info(f"Published event.user_joined for host {event.host_id} (user {user_id} joined)")
+
+            except Exception as e:
+                logger.error(f"Failed to publish user_joined event: {e}")
+        return success
 
     async def checkin_event(self, user_id: str, event_id: UUID) -> dict:
         event = await self.repo.get_by_id(event_id)
