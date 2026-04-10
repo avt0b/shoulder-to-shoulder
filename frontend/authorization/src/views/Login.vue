@@ -23,11 +23,11 @@
 
         <form class="login-form" @submit.prevent="handleLogin">
           <div class="field">
-            <label class="field-label">Логин</label>
+            <label class="field-label">Номер телефона</label>
             <input
-              v-model="login"
-              type="text"
-              placeholder="Введите ваш логин"
+              v-model="phone_number"
+              type="tel"
+              placeholder="+7 (900) 000-00-00"
               class="form-input"
             />
           </div>
@@ -71,25 +71,41 @@ import { authApi } from '../api/index';
 import heroImage from '../assets/LoginPicture.jpg';
 
 const router = useRouter();
-const login = ref('');
+const phone_number = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
 
 const handleLogin = async () => {
   error.value = '';
-  if (!login.value || !password.value) {
+
+  const phoneRegex = /^(\+7|7|8)?\d{10}$/;
+  if (!phoneRegex.test(phone_number.value.replace(/[\s\-\(\)]/g, ''))) {
+    error.value = 'Неверный формат номера телефона. Используйте формат +7XXXXXXXXXX';
+    return;
+  }
+
+  if (!password.value) {
     error.value = 'Заполните все поля';
     return;
   }
 
   loading.value = true;
   try {
-    const data = await authApi.login({ login: login.value, password: password.value });
+    const data = await authApi.login({ phone_number: phone_number.value, password: password.value });
     localStorage.setItem('token', data.access_token);
     router.push('/profile');
   } catch (e) {
-    error.value = e.message || 'Ошибка входа. Попробуйте снова.';
+    const msg = e.message || '';
+    if (msg.includes('номер телефона') || msg.toLowerCase().includes('phone')) {
+      error.value = 'Пользователь с таким номером не найден';
+    } else if (msg.includes('пароль') || msg.toLowerCase().includes('password')) {
+      error.value = 'Неверный пароль';
+    } else if (msg.includes('деактив')) {
+      error.value = 'Аккаунт заблокирован. Обратитесь в поддержку';
+    } else {
+      error.value = 'Ошибка входа. Попробуйте снова.';
+    }
   } finally {
     loading.value = false;
   }

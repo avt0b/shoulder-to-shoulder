@@ -86,3 +86,42 @@ class AdminService:
             return True
         except RuntimeError:
             raise HTTPException(status_code=503, detail="Spot service is temporarily unavailable")
+
+    async def list_events(self, limit: int, offset: int, status_filter: str | None, host_id: str | None, spot_id: str | None) -> dict:
+        try:
+            resp = await request("admin.event.list", {
+                "limit": limit, "offset": offset, "status": status_filter,
+                "host_id": host_id, "spot_id": spot_id
+            })
+            if not resp.get("ok"):
+                raise HTTPException(400, detail=resp.get("error"))
+            return resp["data"]
+        except RuntimeError:
+            raise HTTPException(503, detail="Event service is temporarily unavailable")
+
+    async def get_event(self, event_id: str) -> dict | None:
+        try:
+            resp = await request("admin.event.get", {"event_id": event_id})
+            if not resp.get("ok"):
+                return None
+            return resp["data"]
+        except RuntimeError:
+            raise HTTPException(503, detail="Event service is temporarily unavailable")
+
+    async def update_event(self, event_id: str, data: dict) -> dict | None:
+        try:
+            resp = await request("admin.event.update", {"event_id": event_id, **data})
+            if not resp.get("ok"):
+                return None
+            return resp["data"]
+        except RuntimeError:
+            raise HTTPException(503, detail="Event service is temporarily unavailable")
+
+    async def delete_event(self, event_id: str) -> bool:
+        try:
+            resp = await request("admin.event.delete", {"event_id": event_id})
+            if not resp.get("ok"):
+                return False
+            return True
+        except RuntimeError:
+            raise HTTPException(503, detail="Event service is temporarily unavailable")

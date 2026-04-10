@@ -28,33 +28,54 @@
           </div>
           <div class="profile-info">
             <h2 class="display-name">{{ profile.display_name }}</h2>
-            <p class="profile-subtitle">{{ profile.bio || 'Участник сообщества' }} • {{ profile.city || 'Россия' }}</p>
-            <div class="chips">
-              <div class="chip chip-reliability">
-                <span class="material-symbols chip-icon" :data-filled="true">verified_user</span>
-                <span>Надёжность {{ ratings.reliability_score }}%</span>
-              </div>
-              <div class="chip chip-empathy">
-                <span class="material-symbols chip-icon" :data-filled="true">favorite</span>
-                <span>Эмпатия {{ ratings.empathy_score }}</span>
-              </div>
+            <p class="profile-subtitle">{{ profile.login }}</p>
+            <div class="profile-meta">
+              <span v-if="profile.age" class="meta-item">
+                <span class="material-symbols meta-icon">cake</span>
+                {{ profile.age }} лет
+              </span>
+              <span v-if="profile.city" class="meta-item">
+                <span class="material-symbols meta-icon">location_on</span>
+                {{ profile.city }}
+              </span>
+            </div>
+            <p v-if="profile.bio" class="profile-bio">{{ profile.bio }}</p>
+          </div>
+        </div>
+
+        <!-- Reliability Card -->
+        <div class="card reliability-card">
+          <div class="rating-header">
+            <span class="material-symbols rating-icon" :data-filled="true">verified_user</span>
+            <div class="rating-info">
+              <span class="rating-label">Надёжность</span>
+              <span class="rating-value">{{ ratings.reliability_score.toFixed(1) }}%</span>
             </div>
           </div>
-          <button class="btn-edit" @click="editProfile">Редактировать</button>
+          <div class="progress-bar">
+            <div class="progress-fill reliability-fill" :style="{ width: ratings.reliability_score + '%' }"></div>
+          </div>
+          <div class="rating-detail">
+            <span>Завершено: {{ ratings.completed_events }}</span>
+            <span>Всего: {{ ratings.total_events }}</span>
+          </div>
         </div>
 
-        <!-- Stat: Тренировок -->
-        <div class="card workouts-card">
-          <span class="material-symbols stat-icon" :data-filled="true">exercise</span>
-          <div class="stat-value">{{ stats.workouts }}</div>
-          <div class="stat-label">{{ workoutsLabel(stats.workouts) }}</div>
-        </div>
-
-        <!-- Stat: Созданных тренировок -->
-        <div class="card meetups-card">
-          <span class="material-symbols stat-icon" :data-filled="true">group</span>
-          <div class="stat-value">{{ stats.meetups }}</div>
-          <div class="stat-label">{{ createdLabel(stats.meetups) }}</div>
+        <!-- Empathy Card -->
+        <div class="card empathy-card">
+          <div class="rating-header">
+            <span class="material-symbols rating-icon" :data-filled="true">favorite</span>
+            <div class="rating-info">
+              <span class="rating-label">Эмпатия</span>
+              <span class="rating-value">{{ ratings.empathy_score }}</span>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill empathy-fill" :style="{ width: Math.min(ratings.empathy_score, 100) + '%' }"></div>
+          </div>
+          <div class="rating-detail rating-detail-center">
+            <span>Баллов поддержки</span>
+          </div>
         </div>
 
         <!-- Achievements -->
@@ -163,19 +184,13 @@ const badgeLabels = {
 const getBadgeIcon = (type) => badgeIcons[type] || 'star';
 const getBadgeLabel = (type) => badgeLabels[type] || type;
 
-const editProfile = () => {
-  // TODO: navigate to edit profile
-};
-
 onMounted(async () => {
-  // TODO: replace with real API calls
-  // For now, load mock data
   profile.value = {
     display_name: 'Александр Волков',
-    login: 'alexrunner',
+    login: '@alexrunner',
     age: 28,
     fitness_level: 'advanced',
-    bio: 'Бегун-энтузиаст и проводник',
+    bio: 'Бегун-энтузиаст. Люблю утренние пробежки в парке. Всегда рад составить компанию на тренировку!',
     avatar_url: '',
     role: 'user',
     city: 'Москва',
@@ -305,6 +320,19 @@ onMounted(async () => {
   }
 }
 
+/* ===== Reliability & Empathy Cards ===== */
+.reliability-card,
+.empathy-card {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 480px) {
+  .reliability-card,
+  .empathy-card {
+    grid-column: span 2;
+  }
+}
+
 .avatar-large {
   position: relative;
   width: 96px;
@@ -362,62 +390,127 @@ onMounted(async () => {
 .profile-subtitle {
   font-size: 14px;
   color: #59413a;
-  margin: 0 0 16px;
+  margin: 0 0 12px;
 }
 
-.chips {
+.profile-meta {
   display: flex;
-  flex-wrap: nowrap;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 16px;
   justify-content: center;
+  margin-bottom: 12px;
 }
 
 @media (min-width: 768px) {
-  .chips {
+  .profile-meta {
     justify-content: flex-start;
   }
 }
 
-.chip {
+.meta-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 9999px;
+  gap: 4px;
   font-size: 14px;
-  font-weight: 600;
-}
-
-.chip-reliability {
-  background: #ffece7;
-  color: #832600;
-}
-
-.chip-empathy {
-  background: #d8e2ff;
-  color: #001a41;
-}
-
-.chip-icon {
-  font-size: 18px;
-}
-
-.btn-edit {
-  background: #e7e8e9;
   color: #59413a;
-  border: none;
-  border-radius: 9999px;
-  padding: 12px 24px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.15s;
-  font-family: 'Inter', sans-serif;
-  min-height: 44px;
+  font-weight: 500;
 }
 
-.btn-edit:active {
-  transform: scale(0.98);
+.meta-icon {
+  font-size: 18px;
+  color: #9ca3af;
+}
+
+.profile-bio {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #191c1d;
+  margin: 0;
+  padding: 12px;
+  background: #f3f4f5;
+  border-radius: 12px;
+}
+
+/* ===== Rating Cards ===== */
+.rating-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.rating-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.reliability-card .rating-icon {
+  color: #c2410c;
+}
+
+.empathy-card .rating-icon {
+  color: #0069de;
+}
+
+.rating-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.rating-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
+.rating-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.reliability-card .rating-value {
+  color: #c2410c;
+}
+
+.empathy-card .rating-value {
+  color: #0069de;
+}
+
+.progress-bar {
+  height: 8px;
+  background: #f3f4f5;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.6s ease;
+}
+
+.reliability-fill {
+  background: linear-gradient(90deg, #c2410c, #9b2f00);
+}
+
+.empathy-fill {
+  background: linear-gradient(90deg, #0069de, #0047a1);
+}
+
+.rating-detail {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.rating-detail-center {
+  justify-content: center;
 }
 
 /* ===== Stats ===== */
@@ -433,45 +526,6 @@ onMounted(async () => {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-/* ===== Workouts & Meetups Cards ===== */
-.workouts-card,
-.meetups-card {
-  grid-column: span 2;
-  background: #c2410c;
-  color: #ffffff;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.meetups-card {
-  background: #0069de;
-}
-
-.stat-icon {
-  font-size: 24px;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  line-height: 1;
-  margin-bottom: 4px;
-}
-
-.stat-label {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.workouts-card .stat-label,
-.meetups-card .stat-label {
-  color: rgba(255, 255, 255, 0.8);
 }
 
 /* ===== Achievements ===== */

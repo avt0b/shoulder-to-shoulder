@@ -14,29 +14,72 @@ from backend.user_service.app.repositories.user_repository import UserRepository
 from backend.user_service.app.repositories.rating_repository import UserRatingRepository
 from backend.user_service.app.services.user_service import UserService
 from backend.user_service.app.core.permissions import has_permission
+from backend.user_service.app.services.badge_service import evaluate_and_award_badges
 
 logger = logging.getLogger(__name__)
 nc = NATS()
 
 
+nats_connected = False
+
+
 async def connect_nats():
     """Connect to NATS server."""
+    global nats_connected
     try:
         await nc.connect(
             servers=[settings.NATS_URL],
             name="user_service",
             reconnect_time_wait=2,
-            max_reconnect_attempts=10,
+            max_reconnect_attempts=3,
+            connect_timeout=2,
         )
+        nats_connected = True
         logger.info(f"Connected to NATS at {settings.NATS_URL}")
     except Exception as e:
-        logger.error(f"Failed to connect to NATS: {e}")
+        nats_connected = False
+        logger.warning(f"NATS unavailable, running without event bus: {e}")
 
 
 async def close_nats():
     """Close NATS connection."""
-    await nc.close()
-    logger.info("NATS connection closed")
+    if nats_connected:
+        await nc.close()
+        logger.info("NATS connection closed")
+
+
+async def _safe_subscribe(topic, cb, description="subscription"):
+    """Subscribe only if connected to NATS."""
+    if not nats_connected:
+        return
+    try:
+        await nc.subscribe(topic, cb=cb)
+        logger.info(f"Subscribed to {topic}")
+    except Exception as e:
+        logger.error(f"Failed to subscribe to {topic}: {e}")
+
+
+async def setup_nats_subscribers():
+    """Subscribe to relevant NATS topics."""
+    if not nats_connected:
+        logger.info("Skipping NATS subscribers (not connected)")
+        return
+    await nc.subscribe("workout.completed", cb=handle_workout_event)
+    await nc.subscribe("empathy.awarded", cb=handle_empathy_event)
+    await nc.subscribe("auth.validate_token", cb=handle_auth_validate_token)
+    logger.info("NATS subscribers registered")
+
+
+async def setup_admin_subscribers():
+    if not nats_connected:
+        logger.info("Skipping admin subscribers (not connected)")
+        return
+    await nc.subscribe("admin.user.list", cb=handle_admin_user_list)
+    await nc.subscribe("admin.user.ban", cb=handle_admin_user_ban)
+    await nc.subscribe("admin.user.unban", cb=handle_admin_user_unban)
+    await nc.subscribe("admin.user.award_badge", cb=handle_admin_award_badge)
+    await nc.subscribe("admin.user.check_permission", cb=handle_admin_check_permission)
+    logger.info("Admin command subscribers registered")
 
 
 async def handle_workout_event(msg):
@@ -53,11 +96,22 @@ async def handle_workout_event(msg):
         async with AsyncSessionLocal() as db:
             user_repo = UserRepository(db)
             rating_repo = UserRatingRepository(db)
-            user_service = UserService(user_repo, None, rating_repo, None)
+            badge_repo = UserBadgeRepository(db)
+            user_service = UserService(user_repo, None, rating_repo, badge_repo)
+            rating = await user_service.update_reliability(user_id, success)
+            if not rating:
+                logger.warning(f"User {user_id} not found for reliability update")
+                return
+            awarded = await evaluate_and_award_badges(user_id, {
+                "completed_events": rating.completed_events,
+                "total_events": rating.total_events,
+                "reliability_score": rating.reliability_score,
+                "empathy_score": rating.empathy_score,
+            }, db)
 
-            await user_service.update_reliability(user_id, success)
             await db.commit()
-
+            if awarded:
+                logger.info(f"User {user_id} earned badges: {awarded}")
         logger.info(f"Updated reliability for user {user_id}: success={success}")
 
     except Exception as e:

@@ -21,6 +21,7 @@ dependencies = [
     "redis>=5.0.0",
     "sqlalchemy[asyncio]>=2.0.49",
     "uvicorn[standard]>=0.44.0",
+    "boto3>=1.42.86",
 ]
 
 [project.optional-dependencies]

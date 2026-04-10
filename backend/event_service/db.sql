@@ -27,3 +27,6 @@ CREATE INDEX idx_events_start_time ON events(start_time);
 CREATE INDEX idx_event_participants_event_id ON event_participants(event_id);
 CREATE INDEX idx_event_participants_user_id ON event_participants(user_id);
 CREATE INDEX idx_event_participants_status ON event_participants(status);
+
+ALTER TABLE event_participants ADD COLUMN photo_url TEXT;
+CREATE INDEX idx_event_participants_photo ON event_participants(photo_url) WHERE photo_url IS NOT NULL;
