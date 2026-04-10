@@ -1,5 +1,10 @@
+// Жёстко задаём URL бэкенда, т.к. Vite на Windows кэширует env из родительских директорий
+const API_BASE_URL = 'http://localhost:8000/api/v1'
+const MEDIA_BASE_URL = 'http://localhost:8006/api/v1'
+
 export const config = {
-  apiBaseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002/api/v1',
+  apiBaseURL: API_BASE_URL,
+  mediaBaseURL: MEDIA_BASE_URL,
   osrmBaseURL: import.meta.env.VITE_OSRM_BASE_URL || 'https://router.project-osrm.org',
   appEnv: import.meta.env.VITE_APP_ENV || 'development',
   isDebug: import.meta.env.VITE_DEBUG === 'true'
@@ -7,3 +12,4 @@ export const config = {
 
 // Helper: полный URL эндпоинта
 export const api = (path) => `${config.apiBaseURL}${path}`
+export const mediaApi = (path) => `${config.mediaBaseURL}${path}`
