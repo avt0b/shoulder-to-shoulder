@@ -1,29 +1,12 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
+from backend.media_service.app.api.v1.dependencies import get_media_repo
 from backend.media_service.app.core.s3_client import s3
 from backend.media_service.app.core.config import settings
 from backend.media_service.app.repositories.media_repository import MediaRepository
-from backend.media_service.app.core.database import get_db
-from pydantic import BaseModel, Field
+from backend.media_service.app.schemas.media import UploadUrlRequest, FileDeleteResponse
 
 router = APIRouter(prefix="/media", tags=["media"])
-
-
-# --- Схемы ---
-class UploadUrlRequest(BaseModel):
-    purpose: str
-    content_type: str = Field(..., pattern=r"^image/(jpeg|png|webp)$")
-    file_size: int = Field(..., le=10_485_760)  # Макс 10МБ
-    owner_id: str
-
-
-class FileDeleteResponse(BaseModel):
-    status: str
-    message: str
-
-
-def get_media_repo(db=Depends(get_db)) -> MediaRepository:
-    return MediaRepository(db)
 
 
 @router.post("/upload-url")
