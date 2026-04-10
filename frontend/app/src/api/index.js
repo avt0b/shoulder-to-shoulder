@@ -1,6 +1,6 @@
 import { config, mediaApi } from '../config'
 
-const API_BASE_URL = config.apiBaseURL
+const API_BASE_URL = config.userApiURL
 const IS_DEBUG = config.isDebug
 
 // Переключи на true для использования mock-данных

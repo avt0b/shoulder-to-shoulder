@@ -19,7 +19,7 @@
     <!-- Main Content -->
     <main class="content">
       <!-- Map Card -->
-      <section class="map-card" @click="$emit('expand-map')">
+      <section class="map-card" @click="openMapLight()">
         <div ref="mapRef" class="map-container"></div>
 
         <!-- Map Overlay -->
@@ -61,7 +61,7 @@
       <section class="meetups-section">
         <div class="section-header">
           <h2>Ваши встречи</h2>
-          <span class="see-all" @click="$emit('navigate', 'events')">Все встречи →</span>
+          <span class="see-all" @click="router.push('/events')">Все встречи →</span>
         </div>
 
         <button class="create-btn" type="button" @click.stop="openCreateModal">
@@ -118,7 +118,7 @@
           <div v-if="myMeetups.length === 0" class="meetup-empty">
             <span class="material-symbols-outlined empty-icon">event_busy</span>
             <p>Вы пока не записаны ни на одно мероприятие</p>
-            <button class="empty-cta" @click="$emit('navigate', 'events')">Найти встречу</button>
+            <button class="empty-cta" @click="router.push('/events')">Найти встречу</button>
           </div>
         </div>
       </section>
@@ -149,10 +149,6 @@
         <span class="material-symbols-outlined" :data-filled="$route.path === '/events'">event</span>
         <span>Ивенты</span>
       </router-link>
-      <router-link to="/map" class="nav-item" active-class="nav-item-active">
-        <span class="material-symbols-outlined" :data-filled="$route.path === '/map'">directions_run</span>
-        <span>Маршруты</span>
-      </router-link>
       <router-link to="/profile" class="nav-item" active-class="nav-item-active">
         <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
         <span>Профиль</span>
@@ -164,11 +160,11 @@
     </nav>
 
     <!-- Create Event Modal -->
-    <div class="modal-overlay" v-if="showCreateModal" @click="closeModal">
+    <div class="modal-overlay" v-if="showCreateModal" @click="closeModalAndReset">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2>Создать встречу</h2>
-          <button class="modal-close" @click="closeModal">
+          <button class="modal-close" @click="closeModalAndReset">
             <span class="material-symbols-outlined">close</span>
           </button>
         </div>
@@ -178,6 +174,12 @@
           <div class="form-group">
             <label>Название</label>
             <input v-model="form.name" type="text" placeholder="Утренняя пробежка" required />
+          </div>
+
+          <!-- Описание -->
+          <div class="form-group">
+            <label>Описание</label>
+            <textarea v-model="form.description" placeholder="Лёгкий бег трусцой по парку. Темп разговорный, подойдёт для начинающих." rows="3"></textarea>
           </div>
 
           <!-- Тип мероприятия -->
@@ -402,6 +404,11 @@
         </div>
       </div>
     </div>
+
+    <!-- MapLight — полноэкранная карта (модальный оверлей) -->
+    <transition name="maplight-fade">
+      <MapLight v-if="showMapLight" @close="closeMapLight" />
+    </transition>
   </div>
 </template>
 
@@ -410,12 +417,13 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { config, api } from '../config'
+import { config, placesApi, eventsApi } from '../config'
 import { navigationStore } from '../stores/navigation'
+import MapLight from './MapLight.vue'
 
-const emit = defineEmits(['expand-map', 'navigate'])
 const router = useRouter()
 const mapRef = ref(null)
+const showMapLight = ref(false)
 let map = null
 let miniRouteLayer = null
 let miniUserLayer = null
@@ -423,6 +431,47 @@ let miniUserLayer = null
 // Подписка на навигацию из общего стора
 const isNavigating = computed(() => navigationStore.isNavigating)
 const navRemaining = computed(() => navigationStore.navRemaining)
+
+// ============================================
+// 🗺 Полноэкранная карта (MapLight)
+// ============================================
+
+function openMapLight() {
+  showMapLight.value = true
+}
+
+function closeMapLight() {
+  showMapLight.value = false
+  // Проверяем есть ли координаты от MapLight (пользователь выбрал точку)
+  setTimeout(() => {
+    try {
+      const pending = localStorage.getItem('shoulder_pending_event_location')
+      const source = localStorage.getItem('shoulder_pending_event_source')
+      if (pending) {
+        const { lat, lng, address } = JSON.parse(pending)
+        localStorage.removeItem('shoulder_pending_event_location')
+        localStorage.removeItem('shoulder_pending_event_source')
+        if (config.isDebug) console.log('📍 Event location received from MapLight:', { lat, lng, address, source })
+
+        if (source === 'events_page') {
+          localStorage.setItem('shoulder_event_location_ready', JSON.stringify({ lat, lng, address }))
+          if (config.isDebug) console.log('📍 Redirecting back to EventsPage')
+          router.push('/events')
+        } else {
+          // Стандартный путь — открываем модалку на MainPage
+          form.value.customLat = lat
+          form.value.customLng = lng
+          form.value.customAddress = address
+          form.value.meetupId = null
+          locationMode.value = 'map'
+          showCreateModal.value = true
+        }
+      }
+    } catch (e) {
+      if (config.isDebug) console.warn('closeMapLight: location restore error:', e)
+    }
+  }, 200)
+}
 
 // ============================================
 // 📋 Детали мероприятия (модалка)
@@ -507,7 +556,7 @@ const locationMode = ref('meetup')
 // Загрузка списка мест с бэка (GET /places)
 async function fetchMeetups() {
   try {
-    const res = await fetch(api('/places'))
+    const res = await fetch(placesApi('/places'))
     const data = await res.json()
     
     // Маппим ответ бэкенда → внутренний формат
@@ -576,6 +625,7 @@ const mainLevels = [
 
 const form = ref({
   name: '',
+  description: '',
   type: '',
   maxParticipants: 4,
   date: '',
@@ -630,12 +680,17 @@ function closeModal() {
     clearInterval(window.__mainPagePendingCheckInterval)
     window.__mainPagePendingCheckInterval = null
   }
+}
+
+function closeModalAndReset() {
+  closeModal()
   resetForm()
 }
 
 function resetForm() {
   form.value = {
     name: '',
+    description: '',
     type: '',
     maxParticipants: 4,
     date: '',
@@ -657,8 +712,10 @@ function resetForm() {
 // ============================================
 
 function openMapForPick() {
-  closeModal()
-  emit('expand-map')
+  // Не закрываем модалку полностью — просто скрываем
+  // чтобы форма не сбрасывалась
+  showCreateModal.value = false
+  showMapLight.value = true
   setTimeout(() => {
     if (window.__setMapPickMode) {
       window.__setMapPickMode('event')
@@ -700,13 +757,64 @@ function saveToLocalStorage(events) {
   }
 }
 
-// Создать мероприятие — бэк + localStorage fallback
+// Создать мероприятие — бэк (places + events) + localStorage fallback
 async function submitEventToBackend(eventData) {
   try {
-    const res = await fetch(api('/events'), {
+    let spotId = null
+
+    // Если место из базы — используем его ID
+    if (eventData.meetupId) {
+      spotId = eventData.meetupId
+    } else {
+      // Своё место — создаём через places service
+      const placePayload = {
+        name: eventData.locationShort,
+        description: eventData.description || '',
+        lat: eventData.customLat,
+        lon: eventData.customLng,
+        address: eventData.customAddress || eventData.locationShort,
+        rating: 0,
+        emoji: '📍',
+        category: 'my_spot',
+        image: '',
+        gallery: [],
+        is_anonymous: eventData.anonymous,
+        activity_type: eventData.type,
+        noise_level: 0,
+        light_availability: 0,
+        conveniences_availability: false
+      }
+
+      if (config.isDebug) console.log('📍 Создаём место:', placePayload)
+
+      const placeRes = await fetch(placesApi('/places/create'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(placePayload)
+      })
+      const placeData = await placeRes.json()
+      spotId = placeData.place?.id || placeData.id
+      if (config.isDebug) console.log('✅ Место создано, spot_id:', spotId)
+    }
+
+    // Создаём event
+    const eventPayload = {
+      spot_id: spotId,
+      title: eventData.name,
+      description: eventData.description,
+      max_participants: eventData.maxParticipants,
+      duration_minutes: 60,
+      start_time: eventData.startTime,
+      photo_url: null,
+      anonymous: eventData.anonymous
+    }
+
+    if (config.isDebug) console.log('📅 Создаём event:', eventPayload)
+
+    const res = await fetch(eventsApi('/events'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(eventData)
+      body: JSON.stringify(eventPayload)
     })
     const data = await res.json()
     if (data.event) {
@@ -717,7 +825,7 @@ async function submitEventToBackend(eventData) {
     saveToLocalStorage(allStored)
     return data.event
   } catch (e) {
-    if (config.isDebug) console.warn('submitEventToBackend: API недоступен, localStorage')
+    if (config.isDebug) console.warn('submitEventToBackend: API недоступен, localStorage', e)
 
     const newEventObj = {
       id: Date.now(),
@@ -727,10 +835,11 @@ async function submitEventToBackend(eventData) {
       time: eventData.time,
       locationShort: eventData.locationShort,
       location: eventData.location,
-      description: '',
+      description: eventData.description,
       level: eventData.level,
       type: eventData.type,
       quietCompanion: eventData.quietCompanion,
+      anonymous: eventData.anonymous,
       participants: 1,
       maxParticipants: eventData.maxParticipants,
       isJoined: true,
@@ -762,19 +871,24 @@ function submitEvent() {
     location = form.value.customAddress || `${form.value.customLat.toFixed(5)}, ${form.value.customLng.toFixed(5)}`
   }
 
+  // Формируем ISO datetime для start_time
+  const startTime = new Date(`${form.value.date}T${form.value.time}:00`).toISOString()
+
   const eventData = {
     name: form.value.name,
+    description: form.value.description,
     type: form.value.type,
     date: form.value.date,
     time: form.value.time,
+    startTime,
     meetupId: form.value.meetupId,
     customAddress: form.value.customAddress || null,
     customLat: form.value.customLat,
     customLng: form.value.customLng,
     locationShort,
     location,
-    description: '',
     quietCompanion: form.value.quietCompanion,
+    anonymous: form.value.quietCompanion, // quietCompanion → anonymous
     level: form.value.level,
     maxParticipants: form.value.maxParticipants,
     user_id: 1
@@ -795,7 +909,7 @@ function submitEvent() {
 
 async function handleJoinMeetup(meetupId, userId = 1) {
   try {
-    const res = await fetch(api(`/events/${meetupId}/join`), {
+    const res = await fetch(eventsApi(`/events/${meetupId}/join`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId })
@@ -830,7 +944,7 @@ async function handleJoinMeetup(meetupId, userId = 1) {
 
 async function handleLeaveMeetup(meetupId, userId = 1) {
   try {
-    const res = await fetch(api(`/events/${meetupId}/cancel`), {
+    const res = await fetch(eventsApi(`/events/${meetupId}/cancel`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId })
@@ -866,7 +980,7 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
 // Checkin на мероприятие (новый эндпоинт из Swagger)
 async function handleCheckinMeetup(meetupId, userId = 1) {
   try {
-    const res = await fetch(api(`/events/${meetupId}/checkin`), {
+    const res = await fetch(eventsApi(`/events/${meetupId}/checkin`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: userId })
@@ -889,7 +1003,7 @@ const places = ref([])
 // 1. Получить все места
 async function fetchPlaces() {
   try {
-    const res = await fetch(api('/places'))
+    const res = await fetch(placesApi('/places'))
     const data = await res.json()
     places.value = data.places
     return data.places
@@ -902,7 +1016,7 @@ async function fetchPlaces() {
 // 2. Получить одно место по ID
 async function fetchPlaceById(id) {
   try {
-    const res = await fetch(api(`/places/${id}`))
+    const res = await fetch(placesApi(`/places/${id}`))
     const data = await res.json()
     return data.place
   } catch (e) {
@@ -915,7 +1029,7 @@ async function fetchPlaceById(id) {
 async function fetchNearbyPlaces(lat, lng, radius = 2000) {
   try {
     const res = await fetch(
-      api(`/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}`)
+      placesApi(`/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}`)
     )
     const data = await res.json()
     return data.places
@@ -1030,22 +1144,53 @@ onMounted(async () => {
   // Загружаем meetups
   await fetchMeetups()
 
+  // Проверяем пришёл ли пользователь с EventsPage для выбора точки
+  const eventSource = localStorage.getItem('shoulder_pending_event_source')
+  if (eventSource === 'events_page') {
+    if (config.isDebug) console.log('📍 EventsPage user — opening MapLight in event mode')
+    // Открываем MapLight
+    showMapLight.value = true
+    // Устанавливаем режим event после монтирования MapLight
+    await nextTick()
+    setTimeout(() => {
+      if (window.__setMapPickMode) {
+        window.__setMapPickMode('event')
+      }
+    }, 300)
+  }
+
   // Проверяем есть ли pending location от карты
   // Небольшая задержка чтобы MapLight успел сохранить данные
   setTimeout(() => {
     try {
       const pending = localStorage.getItem('shoulder_pending_event_location')
+      const source = localStorage.getItem('shoulder_pending_event_source')
       if (pending) {
         const { lat, lng, address } = JSON.parse(pending)
         localStorage.removeItem('shoulder_pending_event_location')
-        if (config.isDebug) console.log('📍 Pending location restored:', { lat, lng, address })
-        // Открываем модалку с данными
-        form.value.customLat = lat
-        form.value.customLng = lng
-        form.value.customAddress = address
-        form.value.meetupId = null
-        locationMode.value = 'map'
-        showCreateModal.value = true
+        localStorage.removeItem('shoulder_pending_event_source')
+        if (config.isDebug) console.log('📍 Pending location restored:', { lat, lng, address, source })
+
+        if (source === 'events_page') {
+          // Сохраняем координаты для EventsPage
+          localStorage.setItem('shoulder_event_location_ready', JSON.stringify({ lat, lng, address }))
+          // Возвращаемся на EventsPage
+          if (config.isDebug) console.log('📍 Redirect back to EventsPage')
+          // Навигация через router
+          router.push('/events')
+          // Ждём пока EventsPage смонтируется и заберёт данные
+          setTimeout(() => {
+            window.__eventsPageLocationReady = { lat, lng, address }
+          }, 300)
+        } else {
+          // Открываем модалку с данными
+          form.value.customLat = lat
+          form.value.customLng = lng
+          form.value.customAddress = address
+          form.value.meetupId = null
+          locationMode.value = 'map'
+          showCreateModal.value = true
+        }
       }
     } catch (e) {
       if (config.isDebug) console.warn('Pending location restore error:', e)
@@ -1057,16 +1202,27 @@ onMounted(async () => {
   const pendingCheckInterval = setInterval(() => {
     try {
       const pending = localStorage.getItem('shoulder_pending_event_location')
+      const source = localStorage.getItem('shoulder_pending_event_source')
       if (pending) {
         const { lat, lng, address } = JSON.parse(pending)
         localStorage.removeItem('shoulder_pending_event_location')
-        if (config.isDebug) console.log('📍 Pending location restored (interval):', { lat, lng, address })
-        form.value.customLat = lat
-        form.value.customLng = lng
-        form.value.customAddress = address
-        form.value.meetupId = null
-        locationMode.value = 'map'
-        showCreateModal.value = true
+        localStorage.removeItem('shoulder_pending_event_source')
+        if (config.isDebug) console.log('📍 Pending location restored (interval):', { lat, lng, address, source })
+
+        if (source === 'events_page') {
+          localStorage.setItem('shoulder_event_location_ready', JSON.stringify({ lat, lng, address }))
+          router.push('/events')
+          setTimeout(() => {
+            window.__eventsPageLocationReady = { lat, lng, address }
+          }, 300)
+        } else {
+          form.value.customLat = lat
+          form.value.customLng = lng
+          form.value.customAddress = address
+          form.value.meetupId = null
+          locationMode.value = 'map'
+          showCreateModal.value = true
+        }
         clearInterval(pendingCheckInterval)
         window.__mainPagePendingCheckInterval = null
       }
@@ -2738,5 +2894,18 @@ function clearMiniRoute() {
 
 .submit-btn .material-symbols-outlined {
   font-size: 20px;
+}
+</style>
+
+<style>
+/* Анимация MapLight — без scoped, так как это модальный оверлей */
+.maplight-fade-enter-active,
+.maplight-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.maplight-fade-enter-from,
+.maplight-fade-leave-to {
+  opacity: 0;
 }
 </style>
