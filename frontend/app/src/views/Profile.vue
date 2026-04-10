@@ -408,7 +408,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router'
-import { authApi } from '../api/index'
+import { authApi, toProxyUrl } from '../api/index'
+import { authStore } from '../stores/auth'
 import defaultAvatar from '../assets/default-avatar.svg'
 
 const router = useRouter();
@@ -440,6 +441,7 @@ const badges = ref([]);
 
 const fileInput = ref(null);
 const editAvatarFileInput = ref(null);
+const uploadError = ref('');
 const showSettings = ref(false);
 const showAbout = ref(false);
 const showPrivacy = ref(false);
@@ -540,46 +542,74 @@ const triggerFileInput = () => {
   fileInput.value?.click();
 };
 
+/**
+ * Загрузка аватара через S3 presigned URL:
+ * 1. GET presigned URL от media_service
+ * 2. POST файла напрямую в S3
+ * 3. Возврат public_url
+ */
+async function uploadAvatarFile(file) {
+  // 1. Получаем presigned URL
+  const uploadUrlData = await authApi.getUploadUrl({
+    purpose: 'avatar',
+    content_type: file.type || 'image/jpeg',
+    file_size: file.size,
+  });
+
+  // 2. Загружаем файл напрямую в S3 (через Vite proxy)
+  await authApi.uploadToS3({
+    upload_url: uploadUrlData.upload_url,
+    fields: uploadUrlData.fields,
+    file,
+  });
+
+  // 3. Возвращаем ОРИГИНАЛЬНЫЙ public_url для сохранения на бэкенде
+  return uploadUrlData.public_url;
+}
+
+/** Конвертирует серверный URL в Vite proxy для отображения */
+function avatarToDisplay(url) {
+  return toProxyUrl(url);
+}
+
 const handleFileSelect = async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  // Validate file type
   if (!file.type.startsWith('image/')) {
     uploadError.value = 'Выберите изображение';
     return;
   }
-
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    uploadError.value = 'Файл слишком большой (макс. 5МБ)';
+  if (file.size > 10 * 1024 * 1024) {
+    uploadError.value = 'Файл слишком большой (макс. 10МБ)';
     return;
   }
 
   try {
-    // Convert to base64/data URL
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const dataUrl = e.target.result;
-      profile.value.avatar_url = dataUrl;
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = reject;
+      r.readAsDataURL(file);
+    });
+    profile.value.avatar_url = dataUrl;
 
-      // Upload to server
-      try {
-        await authApi.updateProfile({ avatar_url: dataUrl });
-      } catch (e) {
-        console.error('Failed to save avatar:', e.message);
-        uploadError.value = 'Ошибка сохранения. Попробуйте снова.';
-        // Revert on error
-        profile.value.avatar_url = '';
-      }
-    };
-    reader.readAsDataURL(file);
+    // Загрузка через S3 presigned URL
+    try {
+      const publicUrl = await uploadAvatarFile(file);
+      profile.value.avatar_url = avatarToDisplay(publicUrl);
+      // Сохраняем ОРИГИНАЛЬНЫЙ public_url на бэкенде
+      await authApi.updateProfile({ avatar_url: publicUrl });
+      uploadError.value = '';
+    } catch (e) {
+      console.error('Failed to save avatar:', e.message);
+      uploadError.value = 'Ошибка сохранения. Попробуйте снова.';
+      profile.value.avatar_url = '';
+    }
   } catch (e) {
     console.error('Failed to process avatar:', e.message);
     uploadError.value = 'Ошибка обработки. Попробуйте снова.';
   }
-
-  // Reset input
   event.target.value = '';
 };
 
@@ -591,22 +621,19 @@ const handleEditAvatarSelect = async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
 
-  // Validate file type
   if (!file.type.startsWith('image/')) {
     editModal.value.error_avatar = 'Выберите изображение';
     return;
   }
-
-  // Validate file size (max 5MB)
-  if (file.size > 5 * 1024 * 1024) {
-    editModal.value.error_avatar = 'Файл слишком большой (макс. 5МБ)';
+  if (file.size > 10 * 1024 * 1024) {
+    editModal.value.error_avatar = 'Файл слишком большой (макс. 10МБ)';
     return;
   }
 
   editModal.value.error_avatar = '';
   editModal.value.avatar_file = file;
 
-  // Convert to base64/data URL for preview
+  // Превью файла
   const reader = new FileReader();
   reader.onload = (e) => {
     editModal.value.avatar_url = e.target.result;
@@ -720,15 +747,10 @@ const saveEditProfile = async () => {
     updateData.fitness_level = fitnessVal;
     updateData.bio = bioVal || 'Пусто';
 
-    // Convert avatar file to base64 if changed
+    // Загрузка аватара через S3 если файл изменён
     if (editModal.value.avatar_file) {
-      const reader = new FileReader();
-      const avatarBase64 = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(editModal.value.avatar_file);
-      });
-      updateData.avatar_url = avatarBase64;
+      const publicUrl = await uploadAvatarFile(editModal.value.avatar_file);
+      updateData.avatar_url = publicUrl;
     }
 
     await authApi.updateProfile(updateData);
@@ -741,7 +763,7 @@ const saveEditProfile = async () => {
     profile.value.fitness_level = fitnessVal;
     profile.value.bio = bioVal || 'Пусто';
     if (updateData.avatar_url) {
-      profile.value.avatar_url = updateData.avatar_url;
+      profile.value.avatar_url = toProxyUrl(updateData.avatar_url);
     }
 
     showEditProfile.value = false;
@@ -882,7 +904,7 @@ const loadProfile = async () => {
       age: data.age,
       fitness_level: data.fitness_level || '',
       bio: data.bio ?? null,
-      avatar_url: data.avatar_url || '',
+      avatar_url: toProxyUrl(data.avatar_url) || '',
       role: payload?.role || 'user',
       city: data.city || data.preferences?.city || '',
       preferences: data.preferences || {},

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [vue()],
+  envDir: fileURLToPath(new URL('.', import.meta.url)),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -32,6 +33,17 @@ export default defineConfig({
         target: 'http://localhost:8002',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/events/, '/api/v1'),
+      },
+      // MinIO не доступен из браузера (системный прокси), проксируем через Vite
+      '/minio-upload': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio-upload/, ''),
+      },
+      '/minio-static': {
+        target: 'http://localhost:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio-static/, ''),
       },
     }
   },

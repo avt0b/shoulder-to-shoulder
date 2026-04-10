@@ -25,10 +25,7 @@
             />
           </div>
           <div class="field">
-            <div class="field-header">
-              <label class="field-label">Пароль</label>
-              <router-link to="/forgot-password" class="forgot-link">Забыли пароль?</router-link>
-            </div>
+            <label class="field-label">Пароль</label>
             <input v-model="password" type="password" placeholder="••••••••" class="form-input" />
           </div>
           <p v-if="authStore.error" class="error">{{ authStore.error }}</p>
@@ -71,7 +68,7 @@ const handleLogin = async () => {
 
   try {
     await login({ phone_number: phoneNumber.value, password: password.value })
-    router.push('/')
+    router.push('/profile')
   } catch (e) {
     const msg = e.message || ''
     if (msg.toLowerCase().includes('phone') || msg.includes('найт')) {
@@ -165,24 +162,7 @@ const handleLogin = async () => {
 
 .field { display: flex; flex-direction: column; }
 
-.field-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
 .field-label { font-size: 11px; font-weight: 500; color: #59413a; margin-left: 4px; }
-
-.forgot-link {
-  font-size: 10px;
-  font-weight: 500;
-  color: #ea580c;
-  text-decoration: none;
-  text-transform: uppercase;
-}
-
-.forgot-link:hover { text-decoration: underline; }
 
 .form-input {
   width: 100%;
