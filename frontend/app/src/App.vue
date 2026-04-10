@@ -1,42 +1,16 @@
 <template>
   <div class="app-container">
-    <!-- Map Fullscreen -->
-    <transition name="map-expand" mode="out-in">
-      <MapLight v-if="isMapExpanded" @close="closeMap" />
-
-      <!-- Events Page -->
-      <EventsPage
-        v-else-if="currentPage === 'events'"
-        @close="currentPage = 'main'"
-        @navigate="handleNavigate"
-      />
-
-      <!-- Main Page -->
-      <MainPage v-else @expand-map="expandMap" @navigate="handleNavigate" />
-    </transition>
+    <router-view v-slot="{ Component }">
+      <transition name="page" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import MainPage from './components/MainPage.vue'
-import MapLight from './components/MapLight.vue'
-import EventsPage from './components/EventsPage.vue'
-
-const isMapExpanded = ref(false)
-const currentPage = ref('main')
-
-const expandMap = () => {
-  isMapExpanded.value = true
-}
-
-const closeMap = () => {
-  isMapExpanded.value = false
-}
-
-const handleNavigate = (page) => {
-  currentPage.value = page
-}
+// App.vue теперь просто рендерит роутер
+// Вся навигация управляется через router
 </script>
 
 <style scoped>
@@ -44,21 +18,20 @@ const handleNavigate = (page) => {
   position: relative;
   width: 100%;
   min-height: 100dvh;
-  overflow: hidden;
 }
 
-.map-expand-enter-active,
-.map-expand-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+.page-enter-active,
+.page-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.map-expand-enter-from {
+.page-enter-from {
   opacity: 0;
-  transform: scale(0.95);
+  transform: translateX(20px);
 }
 
-.map-expand-leave-to {
+.page-leave-to {
   opacity: 0;
-  transform: scale(0.95);
+  transform: translateX(-20px);
 }
 </style>

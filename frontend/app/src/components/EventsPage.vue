@@ -36,15 +36,21 @@
           v-for="event in filteredEvents"
           :key="event.id"
           class="event-card"
-          :class="{ 'event-card-joined': event.isJoined }"
+          :class="{ 'event-card-joined': event.isJoined, 'event-card-live': event.isLive }"
+          @click="openEventDetail(event)"
         >
           <div class="event-header">
             <div class="event-emoji">{{ event.emoji }}</div>
             <div class="event-info">
-              <h3 class="event-name">{{ event.name }}</h3>
+              <h3 class="event-name">
+                {{ event.name }}
+                <span v-if="event.isLive" class="live-badge">LIVE</span>
+              </h3>
               <div class="event-meta">
+                <span class="material-symbols-outlined">calendar_today</span>
+                <span>{{ event.dateDisplay }}</span>
                 <span class="material-symbols-outlined">schedule</span>
-                <span>{{ event.date }}, {{ event.time }}</span>
+                <span>{{ event.time }}</span>
                 <span class="material-symbols-outlined">location_on</span>
                 <span>{{ event.locationShort }}</span>
               </div>
@@ -75,7 +81,7 @@
               <button
                 class="action-btn"
                 :class="{ 'action-btn-joined': event.isJoined }"
-                @click="event.isJoined ? leaveEvent(event.id) : joinEvent(event.id)"
+                @click.stop="event.isJoined ? leaveEvent(event.id) : joinEvent(event.id)"
               >
                 <span class="material-symbols-outlined">{{ event.isJoined ? 'check_circle' : 'person_add' }}</span>
                 <span>{{ event.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
@@ -91,6 +97,66 @@
         </div>
       </section>
     </main>
+
+    <!-- Event Detail Modal -->
+    <div class="modal-overlay" v-if="selectedEvent" @click="closeEventDetail">
+      <div class="event-detail-modal" @click.stop>
+        <div class="event-detail-header">
+          <div class="event-detail-emoji">{{ selectedEvent.emoji || '🏋️' }}</div>
+          <div class="event-detail-title-area">
+            <h2>
+              {{ selectedEvent.name }}
+              <span v-if="selectedEvent.isLive" class="live-badge">LIVE</span>
+            </h2>
+            <div class="event-detail-meta">
+              <span class="material-symbols-outlined">calendar_today</span>
+              <span>{{ selectedEvent.dateDisplay }}</span>
+              <span class="material-symbols-outlined">schedule</span>
+              <span>{{ selectedEvent.time }}</span>
+              <span class="material-symbols-outlined">location_on</span>
+              <span>{{ selectedEvent.location }}</span>
+            </div>
+          </div>
+          <button class="event-detail-close" @click="closeEventDetail">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="event-detail-body">
+          <!-- Теги -->
+          <div class="event-detail-tags" v-if="selectedEvent.type || selectedEvent.quietCompanion || selectedEvent.level">
+            <span class="event-detail-tag" v-if="selectedEvent.type">{{ typeLabels[selectedEvent.type] || selectedEvent.type }}</span>
+            <span class="event-detail-tag quiet" v-if="selectedEvent.quietCompanion">🤫 Тихий компаньон</span>
+            <span class="event-detail-tag level">{{ selectedEvent.level }}</span>
+          </div>
+
+          <!-- Описание -->
+          <p class="event-detail-desc" v-if="selectedEvent.description">{{ selectedEvent.description }}</p>
+
+          <!-- Участники -->
+          <div class="event-detail-participants">
+            <h4>Участники</h4>
+            <div class="event-detail-avatars">
+              <img v-for="(avatar, i) in selectedEvent.avatars?.slice(0, 6)" :key="i" class="event-detail-avatar" :src="avatar" alt="User" />
+              <div class="event-detail-avatar-more" v-if="selectedEvent.moreCount > 0">+{{ selectedEvent.moreCount }}</div>
+            </div>
+            <div class="event-detail-count">
+              <span>{{ selectedEvent.participants }}/{{ selectedEvent.maxParticipants }} записано</span>
+            </div>
+          </div>
+
+          <!-- Кнопка действия -->
+          <button
+            class="event-detail-action"
+            :class="{ joined: selectedEvent.isJoined }"
+            @click="selectedEvent.isJoined ? leaveEvent(selectedEvent.id) : joinEvent(selectedEvent.id)"
+          >
+            <span class="material-symbols-outlined">{{ selectedEvent.isJoined ? 'check_circle' : 'person_add' }}</span>
+            <span>{{ selectedEvent.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- FAB -->
     <div class="fab-create" @click="openCreateModal">
@@ -120,14 +186,7 @@
           <div class="form-group">
             <label>Тип мероприятия</label>
             <div class="type-selector">
-              <button
-                v-for="type in eventTypes"
-                :key="type.key"
-                type="button"
-                class="type-btn"
-                :class="{ 'type-btn-active': form.type === type.key }"
-                @click="form.type = type.key"
-              >
+              <button v-for="type in eventTypes" :key="type.key" type="button" class="type-btn" :class="{ 'type-btn-active': form.type === type.key }" @click="form.type = type.key">
                 <span class="type-emoji">{{ type.emoji }}</span>
                 <span class="type-name">{{ type.label }}</span>
               </button>
@@ -141,22 +200,12 @@
               <button type="button" class="counter-btn" @click="form.maxParticipants = Math.max(2, form.maxParticipants - 1)">
                 <span class="material-symbols-outlined">remove</span>
               </button>
-              <input
-                v-model.number="form.maxParticipants"
-                type="range"
-                min="2"
-                max="10"
-                step="1"
-                class="range-slider"
-              />
+              <input v-model.number="form.maxParticipants" type="range" min="2" max="10" step="1" class="range-slider" />
               <button type="button" class="counter-btn" @click="form.maxParticipants = Math.min(10, form.maxParticipants + 1)">
                 <span class="material-symbols-outlined">add</span>
               </button>
             </div>
-            <div class="counter-labels">
-              <span>2</span>
-              <span>10</span>
-            </div>
+            <div class="counter-labels"><span>2</span><span>10</span></div>
           </div>
 
           <!-- Дата и время -->
@@ -178,10 +227,7 @@
               <span class="checkbox-box">
                 <span class="material-symbols-outlined checkbox-icon">check</span>
               </span>
-              <span class="checkbox-text">
-                🤫 Тихий компаньон
-                <small>— пометка для спокойной тренировки без лишних разговоров</small>
-              </span>
+              <span class="checkbox-text">🤫 Тихий компаньон <small>— для спокойной тренировки</small></span>
             </label>
           </div>
 
@@ -189,53 +235,61 @@
           <div class="form-group">
             <label>Уровень подготовки</label>
             <div class="level-selector">
-              <button
-                v-for="lvl in levels"
-                :key="lvl.key"
-                type="button"
-                class="level-btn"
-                :class="{ 'level-btn-active': form.level === lvl.key }"
-                @click="form.level = lvl.key"
-              >
+              <button v-for="lvl in levels" :key="lvl.key" type="button" class="level-btn" :class="{ 'level-btn-active': form.level === lvl.key }" @click="form.level = lvl.key">
                 <span class="level-emoji">{{ lvl.emoji }}</span>
                 <span class="level-name">{{ lvl.label }}</span>
               </button>
             </div>
           </div>
 
-          <!-- Выбор места (поиск + dropdown) -->
+          <!-- Место проведения -->
           <div class="form-group location-group">
             <label>Место проведения</label>
-            <div class="location-search">
-              <span class="material-symbols-outlined search-icon">location_on</span>
-              <input
-                v-model="locationQuery"
-                type="text"
-                placeholder="Начните вводить адрес..."
-                @input="onLocationSearch"
-                @focus="showLocationDropdown = true"
-                @blur="hideLocationDropdownDelayed"
-                ref="locationInputRef"
-              />
+            <div class="location-tabs">
+              <button class="location-tab" :class="{ active: locationMode === 'meetup' }" @click="locationMode = 'meetup'">
+                <span class="material-symbols-outlined">sports_martial_arts</span><span>Места</span>
+              </button>
+              <button class="location-tab" :class="{ active: locationMode === 'address' }" @click="locationMode = 'address'">
+                <span class="material-symbols-outlined">edit_location</span><span>Адрес</span>
+              </button>
+              <button class="location-tab" :class="{ active: locationMode === 'map' }" @click="locationMode = 'map'">
+                <span class="material-symbols-outlined">map</span><span>На карте</span>
+              </button>
             </div>
-            <div class="location-dropdown" v-if="showLocationDropdown && filteredPlaces.length > 0">
-              <div
-                v-for="place in filteredPlaces"
-                :key="place.id"
-                class="location-option"
-                :class="{ 'location-option-selected': form.locationId === place.id }"
-                @mousedown="selectLocation(place)"
-              >
-                <span class="location-option-emoji">{{ place.emoji }}</span>
-                <div class="location-option-info">
-                  <span class="location-option-name">{{ place.name }}</span>
-                  <span class="location-option-address">{{ place.address }}</span>
+
+            <!-- Режим: выбор Meetup из списка -->
+            <div v-if="locationMode === 'meetup'" class="location-meetup-list">
+              <input v-model="locationQuery" type="text" placeholder="Поиск места..." @input="showLocationDropdown = true" @focus="showLocationDropdown = true" @blur="hideLocationDropdownDelayed" />
+              <div class="location-dropdown" v-if="showLocationDropdown && filteredMeetups.length > 0">
+                <div v-for="meetup in filteredMeetups" :key="meetup.id" class="location-option" :class="{ 'location-option-selected': form.meetupId === meetup.id }" @mousedown="selectMeetup(meetup)">
+                  <span class="location-option-emoji">{{ meetup.emoji }}</span>
+                  <div class="location-option-info">
+                    <span class="location-option-name">{{ meetup.name }}</span>
+                    <span class="location-option-address">{{ meetup.address }}</span>
+                  </div>
                 </div>
               </div>
+              <div v-if="form.meetupId" class="location-selected">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span>{{ selectedMeetupName }}</span>
+              </div>
             </div>
-            <div v-if="form.locationId" class="location-selected">
-              <span class="material-symbols-outlined">check_circle</span>
-              <span>Выбрано: {{ selectedLocationName }}</span>
+
+            <!-- Режим: ввод адреса вручную -->
+            <div v-if="locationMode === 'address'" class="location-address-input">
+              <input v-model="form.customAddress" type="text" placeholder="Введите адрес проведения..." @input="form.meetupId = null" />
+            </div>
+
+            <!-- Режим: указать на карте -->
+            <div v-if="locationMode === 'map'" class="location-map-pick">
+              <button class="pick-on-map-btn" type="button" @click="openMapForPick">
+                <span class="material-symbols-outlined">pin_drop</span>
+                <span>Указать точку на карте</span>
+              </button>
+              <div v-if="form.customLat && form.customLng" class="location-selected">
+                <span class="material-symbols-outlined">check_circle</span>
+                <span>{{ form.customAddress || `${form.customLat.toFixed(5)}, ${form.customLng.toFixed(5)}` }}</span>
+              </div>
             </div>
           </div>
 
@@ -250,22 +304,26 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'map' }" @click.prevent="handleNav('map')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'map' }">map</span>
+      <router-link to="/" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/'">map</span>
         <span>Карта</span>
-      </a>
-      <a href="#" class="nav-item active" @click.prevent>
-        <span class="material-symbols-outlined filled">event</span>
+      </router-link>
+      <router-link to="/events" class="nav-item nav-item-active">
+        <span class="material-symbols-outlined" data-filled="true">event</span>
         <span>Ивенты</span>
-      </a>
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'routes' }" @click.prevent="handleNav('routes')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'routes' }">directions_run</span>
+      </router-link>
+      <router-link to="/map" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/map'">directions_run</span>
         <span>Маршруты</span>
-      </a>
-      <a href="#" class="nav-item" :class="{ active: activeNav === 'profile' }" @click.prevent="handleNav('profile')">
-        <span class="material-symbols-outlined" :class="{ filled: activeNav === 'profile' }">person</span>
+      </router-link>
+      <router-link to="/profile" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
         <span>Профиль</span>
-      </a>
+      </router-link>
+      <router-link to="/rating" class="nav-item">
+        <span class="material-symbols-outlined" :data-filled="$route.path === '/rating'">emoji_events</span>
+        <span>Рейтинг</span>
+      </router-link>
     </nav>
   </div>
 </template>
@@ -275,55 +333,118 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { config, api } from '../config'
 
 const emit = defineEmits(['close', 'navigate'])
-
-const activeNav = ref('events')
 const activeTab = ref('all')
 const showCreateModal = ref(false)
 
+// ============================================
+// 📋 Детали мероприятия (модалка)
+// ============================================
+
+const selectedEvent = ref(null)
+
+function openEventDetail(event) {
+  selectedEvent.value = event
+}
+
+function closeEventDetail() {
+  selectedEvent.value = null
+}
+
 const tabs = [
   { key: 'all', label: 'Все' },
-  { key: 'running', label: 'Бег' },
-  { key: 'powerlifting', label: 'Пауэрлифтинг' },
-  { key: 'stretching', label: 'Растяжка' },
-  { key: 'gymnastics', label: 'Гимнастика' },
+  { key: 'running', label: '🏃 Бег' },
+  { key: 'strength', label: '🏋️ Силовая' },
+  { key: 'yoga', label: '🧘 Йога' },
+  { key: 'workout', label: '💪 Воркаут' },
+  { key: 'other', label: '🎯 Другое' },
   { key: 'my', label: 'Мои' }
 ]
 
 const eventTypes = [
   { key: 'running', emoji: '🏃', label: 'Бег' },
-  { key: 'powerlifting', emoji: '🏋️', label: 'Пауэрлифтинг' },
-  { key: 'stretching', emoji: '🧘', label: 'Растяжка' },
-  { key: 'gymnastics', emoji: '🤸', label: 'Гимнастика' }
+  { key: 'strength', emoji: '🏋️', label: 'Силовая' },
+  { key: 'yoga', emoji: '🧘', label: 'Йога' },
+  { key: 'workout', emoji: '💪', label: 'Воркаут' },
+  { key: 'other', emoji: '🎯', label: 'Другое' }
 ]
 
 const typeEmoji = {
   running: '🏃',
-  powerlifting: '🏋️',
-  stretching: '🧘',
-  gymnastics: '🤸'
+  strength: '🏋️',
+  yoga: '🧘',
+  workout: '💪',
+  other: '🎯'
 }
 
 const typeLabels = {
   running: 'Бег',
-  powerlifting: 'Пауэрлифтинг',
-  stretching: 'Растяжка',
-  gymnastics: 'Гимнастика'
+  strength: 'Силовая',
+  yoga: 'Йога',
+  workout: 'Воркаут',
+  other: 'Другое'
 }
 
 // Заглушки всех мероприятий
+// date — строка ISO (YYYY-MM-DD), time — HH:MM
 const mockEvents = [
   {
     id: 1,
     name: 'Утренняя пробежка',
     emoji: '🏃',
-    date: 'Сегодня',
+    date: '2026-04-10',
     time: '07:00',
+    dateDisplay: 'Сегодня',
     locationShort: 'Парк Победы',
     location: 'Парк Победы, ул. Комсомольская',
     description: 'Лёгкий бег трусцой по парку. Темп разговорный, подойдёт для начинающих.',
     level: 'Новичок',
     type: 'running',
     quietCompanion: false,
+    participants: 3,
+    maxParticipants: 8,
+    isJoined: false,
+    avatars: [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxu',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541'
+    ],
+    moreCount: 2
+  },
+  {
+    id: 2,
+    name: 'Силовая на турниках',
+    emoji: '🏋️',
+    date: '2026-04-10',
+    time: '18:30',
+    dateDisplay: 'Сегодня',
+    locationShort: 'Площадка ул. Гая',
+    location: 'Спортивная площадка, ул. Гая',
+    description: 'Подтягивания, отжимания, выходы силой. Разминка + основная часть.',
+    level: 'Средний',
+    type: 'strength',
+    quietCompanion: false,
+    participants: 2,
+    maxParticipants: 6,
+    isJoined: false,
+    avatars: [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuC2URqWk5H4FTDLDLL0v1ywXo2oDhzArVrw_IEetPVa6vnn1NyW1eW8iBJz_J5WnNkQJA1y6sWyVhCQ8dx2z99T',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'
+    ],
+    moreCount: 1
+  },
+  {
+    id: 3,
+    name: 'Йога на набережной',
+    emoji: '🧘',
+    date: '2026-04-11',
+    time: '08:00',
+    dateDisplay: 'Завтра',
+    locationShort: 'Набережная Оки',
+    location: 'Набережная Оки, Орёл',
+    description: 'Утренняя йога на свежем воздухе. Коврик с собой!',
+    level: 'Новичок',
+    type: 'yoga',
+    quietCompanion: true,
     participants: 5,
     maxParticipants: 10,
     isJoined: false,
@@ -335,135 +456,132 @@ const mockEvents = [
     moreCount: 3
   },
   {
-    id: 2,
-    name: 'Силовая на турниках',
+    id: 4,
+    name: 'Воркаут-батл',
     emoji: '💪',
-    date: 'Сегодня',
-    time: '18:30',
-    locationShort: 'Площадка ул. Гая',
-    location: 'Спортивная площадка, ул. Гая',
-    description: 'Подтягивания, отжимания, выходы силой. Разминка + основная часть.',
-    level: 'Средний',
-    type: 'gymnastics',
+    date: '2026-04-12',
+    time: '15:00',
+    dateDisplay: 'Вс, 12 апр',
+    locationShort: 'Стадион «Центральный»',
+    location: 'Стадион «Центральный», ул. Ленина',
+    description: 'Дружеский батл: подтягивания, брусья, выход силой. Покажи на что способен!',
+    level: 'Профи',
+    type: 'workout',
     quietCompanion: false,
-    participants: 3,
-    maxParticipants: 6,
-    isJoined: true,
+    participants: 4,
+    maxParticipants: 12,
+    isJoined: false,
     avatars: [
       'https://lh3.googleusercontent.com/aida-public/AB6AXuC2URqWk5H4FTDLDLL0v1ywXo2oDhzArVrw_IEetPVa6vnn1NyW1eW8iBJz_J5WnNkQJA1y6sWyVhCQ8dx2z99T',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9'
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'
+    ],
+    moreCount: 2
+  },
+  {
+    id: 5,
+    name: 'Вечерняя растяжка',
+    emoji: '🎯',
+    date: '2026-04-11',
+    time: '20:00',
+    dateDisplay: 'Завтра',
+    locationShort: 'Парк Победы',
+    location: 'Парк Победы, ул. Комсомольская',
+    description: 'Расслабление и восстановление после тяжёлого дня. Шпагаты, мостики, медитация.',
+    level: 'Открыто',
+    type: 'other',
+    quietCompanion: true,
+    participants: 2,
+    maxParticipants: 6,
+    isJoined: false,
+    avatars: [
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0'
     ],
     moreCount: 1
   },
   {
-    id: 3,
-    name: 'Йога на набережной',
-    emoji: '🧘',
-    date: 'Завтра',
-    time: '08:00',
+    id: 6,
+    name: 'Ночной забег',
+    emoji: '🏃',
+    date: '2026-04-13',
+    time: '23:00',
+    dateDisplay: 'Пн, 13 апр',
     locationShort: 'Набережная Оки',
     location: 'Набережная Оки, Орёл',
-    description: 'Утренняя йога на свежем воздухе. Коврик с собой!',
-    level: 'Открыто',
-    type: 'stretching',
-    quietCompanion: true,
-    participants: 8,
-    maxParticipants: 10,
+    description: 'Ночной забег по набережной. Фонарики обязательно! Темп средний, дистанция 5 км.',
+    level: 'Средний',
+    type: 'running',
+    quietCompanion: false,
+    participants: 7,
+    maxParticipants: 15,
     isJoined: false,
     avatars: [
       'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0',
       'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxu',
       'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541'
     ],
-    moreCount: 6
-  },
-  {
-    id: 4,
-    name: 'Жим лёжа — прогрессия',
-    emoji: '🏋️',
-    date: 'Сегодня',
-    time: '17:00',
-    locationShort: 'Стадион «Центральный»',
-    location: 'Стадион «Центральный», ул. Ленина',
-    description: 'Работа над максимумом жима. Разминка 60%, рабочие подходы 80-90%.',
-    level: 'Продвинутый',
-    type: 'powerlifting',
-    quietCompanion: true,
-    participants: 2,
-    maxParticipants: 4,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC2URqWk5H4FTDLDLL0v1ywXo2oDhzArVrw_IEetPVa6vnn1NyW1eW8iBJz_J5WnNkQJA1y6sWyVhCQ8dx2z99T',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9'
-    ],
-    moreCount: 0
-  },
-  {
-    id: 5,
-    name: 'Растяжка после тренировки',
-    emoji: '🤸',
-    date: 'Завтра',
-    time: '21:00',
-    locationShort: 'Парк Победы',
-    location: 'Парк Победы, ул. Комсомольская',
-    description: 'Стретчинг и восстановление после тяжёлых тренировок.',
-    level: 'Новичок',
-    type: 'stretching',
-    quietCompanion: false,
-    participants: 4,
-    maxParticipants: 8,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0'
-    ],
-    moreCount: 4
+    moreCount: 5
   }
 ]
 
-// Места с полными данными
-const places = ref([
-  { id: 1, name: 'Парк Победы', address: 'ул. Комсомольская, Орёл', lat: 52.9690, lng: 36.0820, emoji: '🏃' },
-  { id: 2, name: 'Стадион «Центральный»', address: 'ул. Ленина, Орёл', lat: 52.9620, lng: 36.0740, emoji: '🏋️' },
-  { id: 3, name: 'Набережная Оки', address: 'Набережная Оки, Орёл', lat: 52.9670, lng: 36.0680, emoji: '🧘' },
-  { id: 4, name: 'Спортивная площадка', address: 'ул. Гая, Орёл', lat: 52.9610, lng: 36.0860, emoji: '💪' }
-])
+// Места (загружаются с сервера через GET /places)
+const meetups = ref([])
+
+async function fetchMeetups() {
+  try {
+    const res = await fetch(api('/places'))
+    const data = await res.json()
+    
+    const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
+    
+    meetups.value = (data.places || [])
+      .filter(p => p.id && p.name && typeof p.lat === 'number' && typeof p.lon === 'number')
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        address: p.address || '',
+        lat: p.lat,
+        lng: p.lon,
+        emoji: p.emoji || '📍',
+        activityType: validActivities.includes(p.activity_type) ? p.activity_type : 'other',
+      }))
+      
+    if (config.isDebug) console.log('📍 EventsPage fetchMeetups: загружено мест:', meetups.value.length)
+  } catch (e) {
+    if (config.isDebug) console.warn('fetchMeetups: API недоступен', e)
+    meetups.value = []
+  }
+}
 
 // Все мероприятия
 const allEvents = ref([])
 
-// Поиск места
 const locationQuery = ref('')
 const showLocationDropdown = ref(false)
-const locationInputRef = ref(null)
 let hideDropdownTimer = null
+const locationMode = ref('meetup') // 'meetup' | 'address' | 'map'
 
-const filteredPlaces = computed(() => {
-  if (!locationQuery.value.trim()) return places.value
+const filteredMeetups = computed(() => {
+  if (!locationQuery.value.trim()) return meetups.value
   const q = locationQuery.value.toLowerCase()
-  return places.value.filter(p =>
-    p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q)
-  )
+  return meetups.value.filter(p => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q))
 })
 
-const selectedLocationName = computed(() => {
-  const place = places.value.find(p => p.id === form.value.locationId)
-  return place ? `${place.emoji} ${place.name} — ${place.address}` : ''
+const selectedMeetupName = computed(() => {
+  const m = meetups.value.find(p => p.id === form.value.meetupId)
+  return m ? `${m.emoji} ${m.name} — ${m.address}` : ''
 })
 
-function onLocationSearch() {
-  showLocationDropdown.value = true
-}
-
-function selectLocation(place) {
-  form.value.locationId = place.id
-  locationQuery.value = place.name
+function selectMeetup(meetup) {
+  form.value.meetupId = meetup.id
+  form.value.customAddress = ''
+  form.value.customLat = null
+  form.value.customLng = null
+  locationQuery.value = meetup.name
   showLocationDropdown.value = false
 }
 
 function hideLocationDropdownDelayed() {
-  hideDropdownTimer = setTimeout(() => {
-    showLocationDropdown.value = false
-  }, 200)
+  hideDropdownTimer = setTimeout(() => { showLocationDropdown.value = false }, 200)
 }
 
 // Уровни
@@ -482,27 +600,80 @@ const form = ref({
   time: '',
   quietCompanion: false,
   level: 'Новичок',
-  locationId: ''
+  meetupId: null,
+  customAddress: '',
+  customLat: null,
+  customLng: null
 })
 
 // Валидация
 const isFormValid = computed(() => {
-  return form.value.name &&
-    form.value.type &&
-    form.value.date &&
-    form.value.time &&
-    form.value.locationId
+  if (!form.value.name || !form.value.type || !form.value.date || !form.value.time) return false
+  if (form.value.meetupId) return true
+  if (locationMode.value === 'address' && form.value.customAddress.trim()) return true
+  if (locationMode.value === 'map' && form.value.customLat && form.value.customLng) return true
+  return false
+})
+
+// ============================================
+// 🟢 Проверка: идёт ли мероприятие сейчас
+// ============================================
+
+// Мероприятие считается «live», если его дата = сегодня и время в пределах ±1 часа
+function isEventLive(event) {
+  if (!event.date || !event.time) return false
+
+  const now = new Date()
+  const [hours, minutes] = event.time.split(':').map(Number)
+
+  const eventStart = new Date(event.date)
+  eventStart.setHours(hours, minutes, 0, 0)
+
+  // Длительность по умолчанию — 1 час
+  const eventEnd = new Date(eventStart.getTime() + 60 * 60 * 1000)
+
+  return now >= eventStart && now <= eventEnd
+}
+
+// Форматирование даты для отображения
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return ''
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const eventDate = new Date(dateStr)
+  eventDate.setHours(0, 0, 0, 0)
+
+  if (eventDate.getTime() === today.getTime()) return 'Сегодня'
+  if (eventDate.getTime() === tomorrow.getTime()) return 'Завтра'
+
+  // Формат: «10 апр»
+  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  return `${eventDate.getDate()} ${months[eventDate.getMonth()]}`
+}
+
+// Обёртка событий с полем isLive
+const enrichedEvents = computed(() => {
+  return allEvents.value.map(e => ({
+    ...e,
+    isLive: isEventLive(e),
+    dateDisplay: e.dateDisplay || formatDateDisplay(e.date)
+  }))
 })
 
 // Фильтрация
 const filteredEvents = computed(() => {
+  let events = enrichedEvents.value
+
   if (activeTab.value === 'my') {
-    return allEvents.value.filter(e => e.isJoined)
+    return events.filter(e => e.isJoined)
   }
   if (activeTab.value === 'all') {
-    return allEvents.value
+    return events
   }
-  return allEvents.value.filter(e => e.type === activeTab.value)
+  return events.filter(e => e.type === activeTab.value)
 })
 
 // ============================================
@@ -534,12 +705,12 @@ function saveToLocalStorage(events) {
 // Получить все мероприятия
 async function fetchAllEvents() {
   try {
-    const res = await fetch(api('/events'))
-    const data = await res.json()
-    allEvents.value = data.events
-    return data.events
-  } catch (e) {
-    if (config.isDebug) console.warn('fetchAllEvents: API недоступен')
+    // Пока нет GET эндпоинта в Swagger — используем localStorage/mocks
+    // Когда бэк добавит GET /api/v1/events — раскомментировать:
+    // const res = await fetch(api('/events'))
+    // const data = await res.json()
+    // allEvents.value = data.events || []
+    // return data.events
 
     // Пробуем localStorage
     const stored = loadFromLocalStorage()
@@ -549,6 +720,10 @@ async function fetchAllEvents() {
     }
 
     // Fallback на моки
+    allEvents.value = mockEvents
+    return mockEvents
+  } catch (e) {
+    if (config.isDebug) console.warn('fetchAllEvents: ошибка', e)
     allEvents.value = mockEvents
     return mockEvents
   }
@@ -568,6 +743,8 @@ async function joinEvent(eventId, userId = 1) {
       event.isJoined = true
       event.participants = data.participants
     }
+    // Синхронизация: сохраняем мои встречи в общий ключ
+    syncMyMeetups()
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`joinEvent: API недоступен`)
@@ -577,6 +754,8 @@ async function joinEvent(eventId, userId = 1) {
       event.participants++
       saveToLocalStorage(allEvents.value)
     }
+    // Синхронизация: сохраняем мои встречи в общий ключ
+    syncMyMeetups()
     return null
   }
 }
@@ -584,8 +763,10 @@ async function joinEvent(eventId, userId = 1) {
 // Отписаться от мероприятия
 async function leaveEvent(eventId, userId = 1) {
   try {
-    const res = await fetch(api(`/events/${eventId}/leave?user_id=${userId}`), {
-      method: 'DELETE'
+    const res = await fetch(api(`/events/${eventId}/cancel`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
     })
     const data = await res.json()
     const event = allEvents.value.find(e => e.id === eventId)
@@ -593,6 +774,7 @@ async function leaveEvent(eventId, userId = 1) {
       event.isJoined = false
       event.participants = data.participants
     }
+    syncMyMeetups()
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`leaveEvent: API недоступен`)
@@ -602,6 +784,55 @@ async function leaveEvent(eventId, userId = 1) {
       event.participants--
       saveToLocalStorage(allEvents.value)
     }
+    syncMyMeetups()
+    return null
+  }
+}
+
+// Синхронизация: сохраняем «мои встречи» (isJoined=true) для MainPage
+const MY_MEETUPS_KEY = 'shoulder_my_meetups'
+
+function syncMyMeetups() {
+  const myMeetups = allEvents.value
+    .filter(e => e.isJoined)
+    .map(e => ({
+      id: e.id,
+      name: e.name,
+      time: e.time,
+      locationShort: e.locationShort,
+      location: e.location,
+      level: e.level,
+      description: e.description || '',
+      type: typeLabels[e.type] || e.type,
+      quietCompanion: e.quietCompanion,
+      participants: e.participants,
+      maxParticipants: e.maxParticipants,
+      isJoined: true,
+      avatars: e.avatars || [],
+      moreCount: e.moreCount || 0,
+      emoji: e.emoji || '📍'
+    }))
+  try {
+    localStorage.setItem(MY_MEETUPS_KEY, JSON.stringify(myMeetups))
+    // Уведомляем MainPage об изменении
+    window.dispatchEvent(new Event('storage'))
+  } catch (e) {
+    console.warn('syncMyMeetups error:', e)
+  }
+}
+
+// Checkin на мероприятие (новый эндпоинт)
+async function checkinEvent(eventId, userId = 1) {
+  try {
+    const res = await fetch(api(`/events/${eventId}/checkin`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
+    })
+    const data = await res.json()
+    return data
+  } catch (e) {
+    if (config.isDebug) console.warn(`checkinEvent: API недоступен`)
     return null
   }
 }
@@ -617,6 +848,7 @@ async function submitEventToBackend(eventData) {
     const data = await res.json()
     allEvents.value.unshift(data.event)
     saveToLocalStorage(allEvents.value)
+    syncMyMeetups()
     return data.event
   } catch (e) {
     if (config.isDebug) console.warn('submitEventToBackend: API недоступен, сохраняем локально')
@@ -628,6 +860,7 @@ async function submitEventToBackend(eventData) {
       emoji: typeEmoji[eventData.type] || '🏋️',
       date: eventData.date,
       time: eventData.time,
+      dateDisplay: formatDateDisplay(eventData.date),
       locationShort: eventData.locationShort,
       location: eventData.location,
       description: eventData.description || '',
@@ -643,6 +876,7 @@ async function submitEventToBackend(eventData) {
 
     allEvents.value.unshift(newEventObj)
     saveToLocalStorage(allEvents.value)
+    syncMyMeetups()
     return newEventObj
   }
 }
@@ -650,12 +884,11 @@ async function submitEventToBackend(eventData) {
 // Открыть модалку
 function openCreateModal() {
   showCreateModal.value = true
-  // Установить дату по умолчанию — сегодня
+  locationMode.value = 'meetup'
   const today = new Date()
   form.value.date = today.toISOString().split('T')[0]
-  nextTick(() => {
-    if (locationInputRef.value) locationInputRef.value.focus()
-  })
+  // Обновляем список мест при открытии модалки
+  fetchMeetups()
 }
 
 // Закрыть модалку
@@ -675,25 +908,63 @@ function resetForm() {
     time: '',
     quietCompanion: false,
     level: 'Новичок',
-    locationId: ''
+    meetupId: null,
+    customAddress: '',
+    customLat: null,
+    customLng: null
   }
   locationQuery.value = ''
+  locationMode.value = 'meetup'
   showLocationDropdown.value = false
+}
+
+// Указать место на карте
+function openMapForPick() {
+  closeModal()
+  // Сначала переходим на main, потом раскрываем карту
+  emit('navigate', 'main')
+  setTimeout(() => {
+    if (window.__triggerMapExpand) {
+      window.__triggerMapExpand()
+    }
+  }, 100)
+  setTimeout(() => {
+    if (window.__setMapPickMode) {
+      window.__setMapPickMode('event')
+    }
+  }, 600)
 }
 
 // Отправка формы
 function submitEvent() {
   if (!isFormValid.value) return
 
-  const location = places.value.find(p => p.id === form.value.locationId)
+  let locationShort = ''
+  let location = ''
+
+  if (locationMode.value === 'meetup' && form.value.meetupId) {
+    const m = meetups.value.find(p => p.id === form.value.meetupId)
+    locationShort = m?.name || ''
+    location = m ? `${m.name}, ${m.address}` : ''
+  } else if (locationMode.value === 'address') {
+    locationShort = form.value.customAddress
+    location = form.value.customAddress
+  } else if (locationMode.value === 'map') {
+    locationShort = form.value.customAddress || `${form.value.customLat.toFixed(5)}, ${form.value.customLng.toFixed(5)}`
+    location = form.value.customAddress || `${form.value.customLat.toFixed(5)}, ${form.value.customLng.toFixed(5)}`
+  }
+
   const eventData = {
     name: form.value.name,
     type: form.value.type,
     date: form.value.date,
     time: form.value.time,
-    locationId: form.value.locationId,
-    locationShort: location?.name || '',
-    location: `${location?.name}, ${location?.address}`,
+    meetupId: form.value.meetupId,
+    customAddress: form.value.customAddress || null,
+    customLat: form.value.customLat,
+    customLng: form.value.customLng,
+    locationShort,
+    location,
     description: '',
     quietCompanion: form.value.quietCompanion,
     level: form.value.level,
@@ -702,19 +973,13 @@ function submitEvent() {
   }
 
   submitEventToBackend(eventData)
+  syncMyMeetups()
   closeModal()
-}
-
-// Навигация
-function handleNav(nav) {
-  activeNav.value = nav
-  if (nav !== 'events') {
-    emit('navigate', nav)
-  }
 }
 
 onMounted(async () => {
   await fetchAllEvents()
+  await fetchMeetups()
 })
 </script>
 
@@ -805,17 +1070,17 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.filters-section::-webkit-scrollbar {
+  display: none;
 }
 
 .tabs {
   display: flex;
   gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-
-.tabs::-webkit-scrollbar {
-  display: none;
 }
 
 .tab {
@@ -855,6 +1120,7 @@ onMounted(async () => {
   flex-direction: column;
   gap: 12px;
   transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
 }
 
 .event-card:hover {
@@ -864,6 +1130,53 @@ onMounted(async () => {
 
 .event-card-joined {
   border-left: 4px solid var(--primary);
+}
+
+/* Карточка мероприятия, которое идёт сейчас */
+.event-card-live {
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1px solid #86efac;
+  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.15);
+}
+
+.map-light.dark .event-card-live {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(22, 163, 74, 0.1));
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+/* LIVE бейдж */
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #ef4444;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-left: 8px;
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.live-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: white;
+  animation: live-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes live-dot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
 }
 
 .event-header {
@@ -1477,21 +1790,35 @@ onMounted(async () => {
   position: relative;
 }
 
-.location-search {
-  position: relative;
+.location-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.location-tab {
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 2px solid #e7e8e9;
+  background: var(--surface-container-low);
+  color: #787170;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.location-search .search-icon {
-  position: absolute;
-  left: 12px;
-  color: #a8a29e;
-  font-size: 20px;
-  pointer-events: none;
-}
+.location-tab:hover { border-color: var(--primary); }
+.location-tab.active { border-color: var(--primary); background: #ffedd5; color: var(--primary); }
+.location-tab .material-symbols-outlined { font-size: 16px; }
 
-.location-search input {
+.location-meetup-list { position: relative; }
+.location-meetup-list input {
   width: 100%;
   padding: 12px 12px 12px 40px;
   border-radius: 12px;
@@ -1502,11 +1829,58 @@ onMounted(async () => {
   font-family: 'Inter', sans-serif;
   outline: none;
   transition: border-color 0.2s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='%23a8a29e'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 12px center;
 }
+.location-meetup-list input:focus { border-color: var(--primary); }
 
-.location-search input:focus {
-  border-color: var(--primary);
+.location-address-input input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e7e8e9;
+  background: var(--surface-container-low);
+  font-size: 14px;
+  color: #1c1917;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
 }
+.location-address-input input:focus { border-color: var(--primary); }
+
+.location-map-pick { display: flex; flex-direction: column; gap: 10px; }
+
+.pick-on-map-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px dashed #e7e8e9;
+  background: transparent;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pick-on-map-btn:hover { border-color: var(--primary); background: rgba(234, 88, 12, 0.05); }
+.pick-on-map-btn .material-symbols-outlined { font-size: 20px; }
+
+.location-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #dcfce7;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #15803d;
+  font-weight: 500;
+}
+.location-selected .material-symbols-outlined { font-size: 18px; }
 
 .location-dropdown {
   position: absolute;
@@ -1633,11 +2007,13 @@ onMounted(async () => {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 12px 24px 24px;
-  background: rgba(248, 249, 250, 0.8);
+  gap: 2px;
+  padding: 8px 4px max(20px, env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 24px 24px 0 0;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.06);
 }
 
 .nav-item {
@@ -1645,25 +2021,35 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6px 20px;
+  padding: 6px 4px;
   border-radius: 9999px;
   text-decoration: none;
-  color: #787170;
+  color: #59413a;
   transition: all 0.2s;
+  min-width: 0;
+  flex: 1;
+  max-width: 72px;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.nav-item.active {
-  background: #ffedd5;
+.nav-item:hover {
+  background: #f3f4f5;
   color: #ea580c;
-  transform: scale(0.95);
 }
 
-.nav-item:hover:not(.active) {
-  color: #ea580c;
+.nav-item-active {
+  background: #ea580c !important;
+  color: #ffffff !important;
+  padding: 6px 8px;
 }
 
-.nav-item span:first-child {
+.nav-item-active:hover {
+  background: #c2410c !important;
+}
+
+.nav-item .material-symbols-outlined {
   font-size: 24px;
+  transition: all 0.2s;
 }
 
 .nav-item span:last-child {
@@ -1672,7 +2058,285 @@ onMounted(async () => {
   margin-top: 2px;
 }
 
-.filled {
-  font-variation-settings: 'FILL' 1;
+/* ============================================
+   Event Detail Modal
+   ============================================ */
+
+.event-detail-modal {
+  width: 90%;
+  max-width: 420px;
+  max-height: 85dvh;
+  border-radius: 24px;
+  background: var(--surface-container-lowest);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+}
+
+.event-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--outline-variant, #e0e0e0);
+  position: relative;
+}
+
+.event-detail-emoji {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff7ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.event-detail-title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.event-detail-title-area h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1c1917;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.event-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+  color: #787170;
+}
+
+.event-detail-meta .material-symbols-outlined {
+  font-size: 16px;
+  color: #a8a29e;
+}
+
+.event-detail-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #787170;
+  transition: background 0.2s;
+}
+
+.event-detail-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.event-detail-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.event-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.event-detail-tag {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: var(--surface-container-high, #f5f5f5);
+  color: var(--on-surface-variant, #44403c);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.event-detail-tag.quiet {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.event-detail-tag.level {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.event-detail-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #44403c;
+  margin: 0;
+}
+
+.event-detail-participants h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1c1917;
+  margin: 0 0 12px;
+}
+
+.event-detail-avatars {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.event-detail-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.event-detail-avatar-more {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-container-high, #f5f5f5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #787170;
+}
+
+.event-detail-count {
+  font-size: 13px;
+  color: #787170;
+}
+
+.event-detail-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 2px solid var(--primary, #ea580c);
+  background: white;
+  color: var(--primary, #ea580c);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.event-detail-action:hover {
+  background: rgba(234, 88, 12, 0.05);
+}
+
+.event-detail-action.joined {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.event-detail-action.joined:hover {
+  background: #dcfce7;
+}
+
+/* Dark mode */
+.map-light.dark .event-detail-modal {
+  background: #1e1e1e;
+}
+
+.map-light.dark .event-detail-header {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.map-light.dark .event-detail-emoji {
+  background: rgba(234, 88, 12, 0.15);
+}
+
+.map-light.dark .event-detail-title-area h2 {
+  color: #f0f1f2;
+}
+
+.map-light.dark .event-detail-close {
+  color: #a8a29e;
+}
+
+.map-light.dark .event-detail-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.map-light.dark .event-detail-body {
+  /* inherit */
+}
+
+.map-light.dark .event-detail-tag {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d0d0d0;
+}
+
+.map-light.dark .event-detail-tag.quiet {
+  background: rgba(254, 243, 199, 0.15);
+  color: #fbbf24;
+}
+
+.map-light.dark .event-detail-tag.level {
+  background: rgba(237, 233, 254, 0.15);
+  color: #a78bfa;
+}
+
+.map-light.dark .event-detail-desc {
+  color: #c0c0c0;
+}
+
+.map-light.dark .event-detail-participants h4 {
+  color: #f0f1f2;
+}
+
+.map-light.dark .event-detail-avatar {
+  border-color: #1e1e1e;
+}
+
+.map-light.dark .event-detail-avatar-more {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a8a29e;
+}
+
+.map-light.dark .event-detail-count {
+  color: #a8a29e;
+}
+
+.map-light.dark .event-detail-action {
+  border-color: rgba(234, 88, 12, 0.6);
+  background: transparent;
+  color: #f97316;
+}
+
+.map-light.dark .event-detail-action:hover {
+  background: rgba(234, 88, 12, 0.1);
+}
+
+.map-light.dark .event-detail-action.joined {
+  border-color: rgba(34, 197, 94, 0.5);
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+}
+
+.map-light.dark .event-detail-action.joined:hover {
+  background: rgba(34, 197, 94, 0.15);
 }
 </style>
