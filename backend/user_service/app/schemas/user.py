@@ -19,6 +19,7 @@ class UserProfileUpdateRequest(BaseModel):
     bio: str | None = None
     preferences: dict | None = None
     city: str | None = Field(None, max_length=100)
+    avatar_url: str | None = Field(None, max_length=512)
 
 
 class UserContactUpdateRequest(BaseModel):
