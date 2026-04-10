@@ -333,7 +333,11 @@ async def handle_auth_validate_token(msg):
 
         await msg.respond(json.dumps({
             "ok": True,
-            "data": {"user_id": user_id, "is_active": True}
+            "data": {
+                "user_id": user_id,
+                "is_active": True,
+                "role": user.role or "user"
+            }
         }).encode())
 
     except ExpiredSignatureError:
