@@ -1,0 +1,56 @@
+services:
+  user_service:
+    volumes:
+      - ${PROJECT_ROOT}:${APP_HOME}
+    command: >
+      sh -lc "python -m uvicorn backend.user_service.app.main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload"
+
+  notification_service:
+    volumes:
+      - ${PROJECT_ROOT}:${APP_HOME}
+    command: >
+      sh -lc "python -m uvicorn backend.notification_service.app.main:app
+      --host 0.0.0.0
+      --port 8001
+      --reload"
+
+  event_service:
+    volumes:
+      - ${PROJECT_ROOT}:${APP_HOME}
+    command: >
+      sh -lc "python -m uvicorn backend.event_service.app.main:app
+      --host 0.0.0.0
+      --port 8002
+      --reload"
+
+  admin_service:
+    volumes:
+      - ${PROJECT_ROOT}:${APP_HOME}
+    command: >
+      sh -lc "python -m uvicorn backend.admin_service.app.main:app
+      --host 0.0.0.0
+      --port 8003
+      --reload"
+
+  media_service:
+    volumes:
+      - ${PROJECT_ROOT}:${APP_HOME}
+    command: >
+      sh -lc "python -m uvicorn backend.media_service.app.main:app
+      --host 0.0.0.0
+      --port 8006
+      --reload"
+
+  frontend:
+    working_dir: ${APP_HOME}/frontend/authorization
+    volumes:
+      - ${PROJECT_ROOT}/frontend/authorization:${APP_HOME}/frontend/authorization
+      - s2s_frontend_node_modules:${APP_HOME}/frontend/authorization/node_modules
+    command: >
+      sh -lc "npm ci && npm run dev -- --host 0.0.0.0 --port 3000"
+
+volumes:
+  s2s_frontend_node_modules:

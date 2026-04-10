@@ -2,7 +2,7 @@
 
 from nats.aio.client import Client as NATS
 
-from app.core.config import settings
+from backend.notification_service.app.core.config import settings
 
 
 class NATSClient:

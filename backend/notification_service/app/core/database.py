@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
 
-from app.core.config import settings
+from backend.notification_service.app.core.config import settings
 
 # Create async engine
 engine = create_async_engine(
@@ -23,11 +23,19 @@ AsyncSessionLocal = async_sessionmaker(
 # Declarative base for models
 Base = declarative_base()
 
+# Import models here to register them with Base
+from backend.notification_service.app.models.notification import Notification  # noqa: E402, F401
+
 
 async def init_db():
     """Initialize database tables."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as e:
+        print(f"Warning: Could not initialize database: {e}")
+        # Don't fail startup if database initialization fails
+        pass
 
 
 async def get_db() -> AsyncSession:
