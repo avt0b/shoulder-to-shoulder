@@ -1923,148 +1923,190 @@ const addPlaceMarkers = () => {
 // 🎯 Ивенты — режим ниндзя
 // ============================================
 
-// Загрузка ивентов с бэка (events + my_spot из places)
+// Загрузка ивентов из localStorage (локальные данные)
 async function fetchEvents() {
   const allEvents = []
 
-  // 1. Загружаем обычные ивенты
+  // 1. Пробуем загрузить из localStorage
   try {
-    const token = authStore.token || localStorage.getItem('token') || ''
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-    const url = eventsApi('/events')
-    if (config.isDebug) console.log('🎯 fetchEvents URL:', url)
+    const stored = localStorage.getItem('shoulder_events')
+    if (stored) {
+      const localEvents = JSON.parse(stored)
+      if (config.isDebug) console.log('📦 Загружено из localStorage событий:', localEvents.length)
 
-    const res = await fetch(url, { headers })
-    const data = await res.json()
-
-    if (config.isDebug) console.log('📦 fetchEvents ответ:', JSON.stringify(data, null, 2))
-
-    let rawEvents = []
-    if (Array.isArray(data)) {
-      rawEvents = data
-    } else if (data.events && Array.isArray(data.events)) {
-      rawEvents = data.events
-    } else if (data.event && typeof data.event === 'object') {
-      rawEvents = [data.event]
-    }
-
-    if (config.isDebug) console.log('🎯 сырых ивентов:', rawEvents.length)
-
-    // Собираем уникальные spot_id
-    const spotIds = [...new Set(rawEvents.map(e => e.spot_id).filter(Boolean))]
-    if (config.isDebug) console.log('🎯 уникальных spot_id:', spotIds.length)
-
-    // Загружаем координаты мест по spot_id
-    const spotCoords = {}
-    const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {}
-    for (const spotId of spotIds) {
-      try {
-        const placeRes = await fetch(placesApi(`/places/${spotId}`), {
-          headers: authHeader
-        })
-        const placeData = await placeRes.json()
-        const place = placeData.place || placeData
-        if (place && typeof place.lat === 'number' && typeof (place.lon || place.lng) === 'number') {
-          spotCoords[spotId] = {
-            lat: place.lat,
-            lng: place.lon || place.lng,
-            emoji: place.emoji || '📍',
-            name: place.name || '',
-            address: place.address || ''
-          }
-        }
-      } catch (e) {
-        if (config.isDebug) console.warn(`🎯 Не удалось загрузить место #${spotId}:`, e)
-      }
-    }
-
-    if (config.isDebug) console.log('🎯 загружено координат:', Object.keys(spotCoords).length)
-
-    // Маппинг ивентов с подстановкой координат
-    const mappedEvents = rawEvents
-      .filter(e => e && e.id && e.spot_id && spotCoords[e.spot_id])
-      .map(e => {
-        const coords = spotCoords[e.spot_id]
+      // Преобразуем локальные события в формат для карты
+      const mappedLocalEvents = localEvents.map(e => {
+        const eventType = e.type || e.activityType || 'other'
         return {
           id: `evt_${e.id}`,
-          spot_id: e.spot_id,
-          name: e.title || e.name,
+          spot_id: e.spot_id || e.spotId || null,
+          name: e.name || e.title || 'Без названия',
           description: e.description || '',
-          lat: coords.lat,
-          lng: coords.lng,
-          emoji: coords.emoji || '📍',
-          time: e.start_time ? new Date(e.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '',
-          date: e.start_time ? new Date(e.start_time).toISOString().split('T')[0] : '',
+          lat: e.lat || e.placeLat || 0,
+          lng: e.lng || e.placeLng || 0,
+          emoji: e.emoji || '📍',
+          time: e.time || (e.start_time ? new Date(e.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''),
+          date: e.date || (e.start_time ? new Date(e.start_time).toISOString().split('T')[0] : ''),
           level: e.level || 'Любой',
-          type: e.type || e.activity_type || '',
-          participants: e.participant_count || e.participants || 0,
-          maxParticipants: e.max_participants || e.maxParticipants || 0,
-          organizer: e.organizer || e.organizer_name || '',
-          quietCompanion: e.quiet_companion || e.quietCompanion || false,
-          address: coords.address || '',
+          type: eventType,
+          participants: e.participants || e.attendees || 0,
+          maxParticipants: e.maxParticipants || e.max_participants || 0,
+          organizer: e.organizer || e.organizerName || '',
+          quietCompanion: e.quietCompanion || e.quiet_companion || false,
+          address: e.address || e.placeAddress || '',
           status: e.status || '',
-          source: 'event'
+          source: 'local',
+          isJoined: e.isJoined || false
         }
       })
 
-    allEvents.push(...mappedEvents)
-    if (config.isDebug) console.log('🎯 Загружено ивентов с координатами:', mappedEvents.length)
+      allEvents.push(...mappedLocalEvents)
+      if (config.isDebug) console.log('✅ Загружено локальных ивентов:', mappedLocalEvents.length)
+    }
   } catch (e) {
-    if (config.isDebug) console.warn('fetchEvents: events API недоступен', e)
+    if (config.isDebug) console.warn('⚠️ Ошибка загрузки из localStorage:', e)
   }
 
-  // 2. Загружаем места с category='my_spot' из places API
-  try {
-    const url = placesApi('/places')
-    if (config.isDebug) console.log('🎯 fetchMySpots URL:', url)
+  // 2. Если локальных данных нет, пробуем загрузить с сервера
+  if (allEvents.length === 0) {
+    try {
+      const token = authStore.token || localStorage.getItem('token') || ''
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+      const url = eventsApi('/events')
+      if (config.isDebug) console.log('🎯 fetchEvents URL (сервер):', url)
 
-    const res = await fetch(url)
-    const data = await res.json()
+      const res = await fetch(url, { headers })
+      const data = await res.json()
 
-    if (config.isDebug) console.log('📦 fetchMySpots ответ:', JSON.stringify(data, null, 2))
+      if (config.isDebug) console.log('📦 fetchEvents ответ (сервер):', JSON.stringify(data, null, 2))
 
-    let rawPlaces = []
-    if (Array.isArray(data)) {
-      rawPlaces = data
-    } else if (data.places && Array.isArray(data.places)) {
-      rawPlaces = data.places
-    } else if (data.place && typeof data.place === 'object') {
-      rawPlaces = [data.place]
+      let rawEvents = []
+      if (Array.isArray(data)) {
+        rawEvents = data
+      } else if (data.events && Array.isArray(data.events)) {
+        rawEvents = data.events
+      } else if (data.event && typeof data.event === 'object') {
+        rawEvents = [data.event]
+      }
+
+      if (config.isDebug) console.log('🎯 сырых ивентов (сервер):', rawEvents.length)
+
+      // Собираем уникальные spot_id
+      const spotIds = [...new Set(rawEvents.map(e => e.spot_id).filter(Boolean))]
+      if (config.isDebug) console.log('🎯 уникальных spot_id:', spotIds.length)
+
+      // Загружаем координаты мест по spot_id
+      const spotCoords = {}
+      const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {}
+      for (const spotId of spotIds) {
+        try {
+          const placeRes = await fetch(placesApi(`/places/${spotId}`), {
+            headers: authHeader
+          })
+          const placeData = await placeRes.json()
+          const place = placeData.place || placeData
+          if (place && typeof place.lat === 'number' && typeof (place.lon || place.lng) === 'number') {
+            spotCoords[spotId] = {
+              lat: place.lat,
+              lng: place.lon || place.lng,
+              emoji: place.emoji || '📍',
+              name: place.name || '',
+              address: place.address || ''
+            }
+          }
+        } catch (e) {
+          if (config.isDebug) console.warn(`🎯 Не удалось загрузить место #${spotId}:`, e)
+        }
+      }
+
+      if (config.isDebug) console.log('🎯 загружено координат:', Object.keys(spotCoords).length)
+
+      // Маппинг ивентов с подстановкой координат
+      const mappedEvents = rawEvents
+        .filter(e => e && e.id && e.spot_id && spotCoords[e.spot_id])
+        .map(e => {
+          const coords = spotCoords[e.spot_id]
+          return {
+            id: `evt_${e.id}`,
+            spot_id: e.spot_id,
+            name: e.title || e.name,
+            description: e.description || '',
+            lat: coords.lat,
+            lng: coords.lng,
+            emoji: coords.emoji || '📍',
+            time: e.start_time ? new Date(e.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '',
+            date: e.start_time ? new Date(e.start_time).toISOString().split('T')[0] : '',
+            level: e.level || 'Любой',
+            type: e.type || e.activity_type || '',
+            participants: e.participant_count || e.participants || 0,
+            maxParticipants: e.max_participants || e.maxParticipants || 0,
+            organizer: e.organizer || e.organizer_name || '',
+            quietCompanion: e.quiet_companion || e.quietCompanion || false,
+            address: coords.address || '',
+            status: e.status || '',
+            source: 'event'
+          }
+        })
+
+      allEvents.push(...mappedEvents)
+      if (config.isDebug) console.log('🎯 Загружено ивентов с координатами:', mappedEvents.length)
+    } catch (e) {
+      if (config.isDebug) console.warn('fetchEvents: events API недоступен', e)
     }
 
-    // Фильтруем только my_spot
-    const mySpots = rawPlaces
-      .filter(p => p && p.category === 'my_spot' && p.id && p.name && typeof p.lat === 'number' && typeof (p.lon || p.lng) === 'number')
-      .map(p => ({
-        id: `spot_${p.id}`,
-        spot_id: p.id,
-        name: p.name,
-        description: p.description || '',
-        lat: p.lat,
-        lng: p.lon || p.lng || 0,
-        emoji: p.emoji || '📍',
-        time: '',
-        date: '',
-        level: p.activity_type === 'running' ? 'Новичок' : p.activity_type === 'strength' ? 'Средний' : 'Любой',
-        type: p.activity_type || 'other',
-        participants: 0,
-        maxParticipants: 0,
-        organizer: '',
-        quietCompanion: false,
-        address: p.address || '',
-        status: '',
-        source: 'my_spot'
-      }))
+    // 3. Загружаем места с category='my_spot' из places API
+    try {
+      const url = placesApi('/places')
+      if (config.isDebug) console.log('🎯 fetchMySpots URL:', url)
 
-    allEvents.push(...mySpots)
-    if (config.isDebug) console.log('🎯 Загружено my_spot:', mySpots.length)
-  } catch (e) {
-    if (config.isDebug) console.warn('fetchMySpots: places API недоступен', e)
+      const res = await fetch(url)
+      const data = await res.json()
+
+      if (config.isDebug) console.log('📦 fetchMySpots ответ:', JSON.stringify(data, null, 2))
+
+      let rawPlaces = []
+      if (Array.isArray(data)) {
+        rawPlaces = data
+      } else if (data.places && Array.isArray(data.places)) {
+        rawPlaces = data.places
+      } else if (data.place && typeof data.place === 'object') {
+        rawPlaces = [data.place]
+      }
+
+      // Фильтруем только my_spot
+      const mySpots = rawPlaces
+        .filter(p => p && p.category === 'my_spot' && p.id && p.name && typeof p.lat === 'number' && typeof (p.lon || p.lng) === 'number')
+        .map(p => ({
+          id: `spot_${p.id}`,
+          spot_id: p.id,
+          name: p.name,
+          description: p.description || '',
+          lat: p.lat,
+          lng: p.lon || p.lng || 0,
+          emoji: p.emoji || '📍',
+          time: '',
+          date: '',
+          level: p.activity_type === 'running' ? 'Новичок' : p.activity_type === 'strength' ? 'Средний' : 'Любой',
+          type: p.activity_type || 'other',
+          participants: 0,
+          maxParticipants: 0,
+          organizer: '',
+          quietCompanion: false,
+          address: p.address || '',
+          status: '',
+          source: 'my_spot'
+        }))
+
+      allEvents.push(...mySpots)
+      if (config.isDebug) console.log('🎯 Загружено my_spot:', mySpots.length)
+    } catch (e) {
+      if (config.isDebug) console.warn('fetchMySpots: places API недоступен', e)
+    }
   }
 
   // Если ничего не загрузилось — используем моковые данные
   if (allEvents.length === 0) {
-    if (config.isDebug) console.warn('fetchEvents: API недоступен, использую моковые данные')
+    if (config.isDebug) console.warn('fetchEvents: API и localStorage недоступны, использую моковые данные')
     events.value = [
       {
         id: 101, name: 'Утренняя пробежка',
@@ -2099,7 +2141,7 @@ async function fetchEvents() {
     ]
   } else {
     events.value = allEvents
-    if (config.isDebug) console.log('🎯 Всего ивентов (events + my_spot):', events.value.length)
+    if (config.isDebug) console.log('🎯 Всего ивентов:', events.value.length)
   }
 }
 
@@ -2294,9 +2336,9 @@ async function submitCreatePlace() {
     emoji: createPlaceForm.value.emoji,
     category: createPlaceForm.value.category,
     activity_type: createPlaceForm.value.activity_type,
-    noise_level: createPlaceForm.value.noise_level,
-    light_availability: createPlaceForm.value.light_availability,
-    conveniences_availability: createPlaceForm.value.conveniences_availability,
+    noise_level: createPlaceForm.value.noise_level >= 5,
+    light_availability: createPlaceForm.value.light_availability >= 5,
+    conveniences_availability: createPlaceForm.value.conveniences_availability >= 5,
     is_anonymous: createPlaceForm.value.is_anonymous
   }
 

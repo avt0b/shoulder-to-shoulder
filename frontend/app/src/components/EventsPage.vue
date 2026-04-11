@@ -6,7 +6,7 @@
         <button class="back-btn" @click="$emit('close')">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
-        <span class="page-title">Ивенты</span>
+        <span class="page-title">Встречи</span>
       </div>
       <button class="icon-button" @click="openCreateModal">
         <span class="material-symbols-outlined">add</span>
@@ -361,7 +361,7 @@
       </router-link>
       <router-link to="/events" class="nav-item nav-item-active">
         <span class="material-symbols-outlined" data-filled="true">event</span>
-        <span>Ивенты</span>
+        <span>Встречи</span>
       </router-link>
       <router-link to="/profile" class="nav-item">
         <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
@@ -804,14 +804,18 @@ async function fetchAllEvents() {
     if (data.events && data.events.length > 0) {
       // Загружаем места для маппинга spot_id → полное info
       const placesMap = new Map()
+      let placesList = []
       try {
         const placesRes = await fetch(placesApi('/places'), { headers })
         const placesData = await placesRes.json()
         const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
-        ;(placesData.places || []).forEach(p => {
+        placesList = placesData.places || []
+        placesList.forEach(p => {
           const noiseLevelNum = typeof p.noise_level === 'number' ? p.noise_level : 0
           const noiseLevel = noiseLevelNum <= 3 ? 'quiet' : noiseLevelNum <= 6 ? 'moderate' : 'loud'
-          placesMap.set(String(p.id), {
+          // Ключ мапы — UUID формат (конвертируем из integer если нужно)
+          const placeUuid = toUuid(p.id) || String(p.id)
+          placesMap.set(placeUuid, {
             name: p.name,
             address: p.address || '',
             emoji: p.emoji || '📍',
@@ -843,11 +847,18 @@ async function fetchAllEvents() {
         if (config.isDebug) console.warn('Failed to load my meetups:', e)
       }
 
-      // Собираем массив мест для поиска по названию
-      const placesList = placesData.places || []
+      // Загружаем локально созданные события из localStorage
+      const localEvents = loadFromLocalStorage() || []
+      const localEventsMap = new Map()
+      localEvents.forEach(le => {
+        // Локальные события имеют числовой id (Date.now())
+        if (typeof le.id === 'number') {
+          localEventsMap.set(String(le.id), le)
+        }
+      })
 
       // Маппим бэковые events → внутренний формат
-      allEvents.value = data.events.map(ev => {
+      const backendEvents = data.events.map(ev => {
         let place = placesMap.get(String(ev.spot_id))
 
         // Если место не найдено по spot_id — пробуем найти по совпадению названия
@@ -892,8 +903,10 @@ async function fetchAllEvents() {
         }
       })
 
+      // Объединяем: локальные + бэковые (локальные первыми)
+      allEvents.value = [...localEvents, ...backendEvents]
       saveToLocalStorage(allEvents.value)
-      if (config.isDebug) console.log('📅 Загружено events с бэка:', allEvents.value.length)
+      if (config.isDebug) console.log('📅 Загружено events: бэк=' + backendEvents.length + ', локальные=' + localEvents.length)
       return allEvents.value
     }
   } catch (e) {
@@ -935,7 +948,8 @@ async function joinEvent(eventId) {
       // Хост уже участник — это не ошибка, а инфо
       if (res.status === 400 && detail === 'Host is already a participant by default') {
         if (config.isDebug) console.log('ℹ️ Вы организатор — уже являетесь участником')
-        event.isJoined = true
+        const event = allEvents.value.find(e => e.id === eventId)
+        if (event) event.isJoined = true
         syncMyMeetups()
         return { status: 'host' }
       }
@@ -957,7 +971,8 @@ async function joinEvent(eventId) {
       // Уже записан
       if (res.status === 409) {
         if (config.isDebug) console.log('ℹ️ Вы уже записаны на это мероприятие')
-        event.isJoined = true
+        const event = allEvents.value.find(e => e.id === eventId)
+        if (event) event.isJoined = true
         syncMyMeetups()
         return { status: 'already_joined' }
       }
@@ -978,7 +993,7 @@ async function joinEvent(eventId) {
     const event = allEvents.value.find(e => e.id === eventId)
     if (event) {
       event.isJoined = true
-      event.participants = data.participants || event.participants
+      event.participants = data.participant_count || event.participants
     }
 
     // Синхронизация: сохраняем мои встречи в общий ключ
@@ -1026,7 +1041,7 @@ async function leaveEvent(eventId, userId = 1) {
     const event = allEvents.value.find(e => e.id === eventId)
     if (event) {
       event.isJoined = false
-      event.participants = data.participants || event.participants
+      event.participants = data.participant_count || event.participants
     }
     syncMyMeetups()
     return data
@@ -1095,13 +1110,71 @@ async function checkinEvent(eventId) {
   }
 }
 
+// Конвертирует places id (integer или UUID) в UUID-строку для spot_id
+function toUuid(id) {
+  if (!id) return null
+  const str = String(id)
+  // Уже UUID
+  if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str)) {
+    return str
+  }
+  // Integer → UUID формат 00000000-0000-0000-0000-000000000XXX
+  const num = parseInt(str, 10)
+  if (!isNaN(num)) {
+    return String(num).padStart(36, '0').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5')
+  }
+  return null
+}
+
 // Создать мероприятие — бэк (places + events) + localStorage fallback
 async function submitEventToBackend(eventData) {
-  try {
-    // Используем реальный id места из places, или null если место произвольное
-    const spotId = eventData.meetupId ? String(eventData.meetupId) : null
+  // Локальный мок — создаётся ВСЕГДА для отображения на устройстве
+  const localEventObj = {
+    id: Date.now(),
+    name: eventData.name,
+    emoji: typeEmoji[eventData.type] || '📍',
+    date: eventData.date,
+    time: eventData.time,
+    dateDisplay: formatDateDisplay(eventData.date),
+    locationShort: eventData.locationShort,
+    location: eventData.location,
+    description: eventData.description,
+    level: eventData.level || 'Открыто',
+    type: eventData.type,
+    quietCompanion: eventData.quietCompanion,
+    anonymous: eventData.anonymous,
+    participants: 1,
+    maxParticipants: eventData.maxParticipants,
+    isJoined: true,
+    avatars: [],
+    moreCount: 0,
+    // Доп. поля для маршрута и места
+    placeLat: eventData.customLat || null,
+    placeLng: eventData.customLng || null,
+    placeAddress: eventData.customAddress || eventData.location || '',
+    spot_id: eventData.meetupId ? toUuid(eventData.meetupId) : null,
+    host_id: null,
+    status: 'pending',
+    placeLit: eventData.placeLit || false,
+    placeLockers: eventData.placeLockers || false,
+    placeBenches: eventData.placeBenches || false,
+    placeAnonymous: eventData.placeAnonymous || false,
+  }
 
-    // Создаём event
+  // Сразу добавляем локально — событие видно мгновенно
+  allEvents.value.unshift(localEventObj)
+  saveToLocalStorage(allEvents.value)
+  syncMyMeetups()
+
+  // Пытаемся создать на бэке (фоновая операция)
+  try {
+    const spotId = localEventObj.spot_id
+    const token = localStorage.getItem('token')
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+
     const eventPayload = {
       spot_id: spotId,
       title: eventData.name,
@@ -1109,58 +1182,32 @@ async function submitEventToBackend(eventData) {
       max_participants: eventData.maxParticipants,
       duration_minutes: 60,
       start_time: eventData.startTime,
-      photo_url: 'TEST',
+      photo_url: null,
       anonymous: eventData.anonymous
     }
 
     if (config.isDebug) {
-      console.log('📅 Создаём event:', JSON.stringify(eventPayload, null, 2))
-      console.log('📅 spot_id type:', typeof spotId, '| value:', spotId)
-      console.log('📅 start_time:', eventData.startTime)
+      console.log('📅 Создаём event на бэке:', JSON.stringify(eventPayload, null, 2))
+      console.log('📅 spot_id:', spotId)
     }
 
     const res = await fetch(eventsApi('/events'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(eventPayload)
     })
-    const data = await res.json()
-    if (data.event) {
-      allEvents.value.unshift(data.event)
+
+    if (res.ok) {
+      const data = await res.json()
+      if (config.isDebug) console.log('✅ Event создан на бэке:', data.id)
+    } else {
+      if (config.isDebug) console.warn('⚠️ Бэк вернул ошибку, но событие сохранено локально')
     }
-    saveToLocalStorage(allEvents.value)
-    syncMyMeetups()
-    return data.event
   } catch (e) {
-    if (config.isDebug) console.warn('submitEventToBackend: API недоступен, сохраняем локально', e)
-
-    // LocalStorage fallback
-    const newEventObj = {
-      id: Date.now(),
-      name: eventData.name,
-      emoji: typeEmoji[eventData.type] || '🏋️',
-      date: eventData.date,
-      time: eventData.time,
-      dateDisplay: formatDateDisplay(eventData.date),
-      locationShort: eventData.locationShort,
-      location: eventData.location,
-      description: eventData.description,
-      level: 'Открыто',
-      type: eventData.type,
-      quietCompanion: eventData.quietCompanion,
-      anonymous: eventData.anonymous,
-      participants: 1,
-      maxParticipants: eventData.maxParticipants,
-      isJoined: true,
-      avatars: ['https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'],
-      moreCount: 0
-    }
-
-    allEvents.value.unshift(newEventObj)
-    saveToLocalStorage(allEvents.value)
-    syncMyMeetups()
-    return newEventObj
+    if (config.isDebug) console.warn('⚠️ Бэк недоступен, событие сохранено только локально', e)
   }
+
+  return localEventObj
 }
 
 // Открыть модалку
@@ -1238,11 +1285,11 @@ function openMapForPick() {
   router.push('/')
 }
 
-// Перейти к ивенту на карте с маршрутом
+// Перейти к встрече на карте с маршрутом
 function navigateToEvent(event) {
   if (!event.placeLat || !event.placeLng) return
 
-  // Сохраняем данные ивента для маршрута
+  // Сохраняем данные встречи для маршрута
   try {
     localStorage.setItem('shoulder_event_route', JSON.stringify({
       name: event.name,
@@ -1251,7 +1298,7 @@ function navigateToEvent(event) {
       lng: event.placeLng,
       emoji: event.emoji || '📍',
     }))
-    if (config.isDebug) console.log('🗺 Маршрут к ивенту сохранён:', event.name)
+    if (config.isDebug) console.log('🗺 Маршрут к встрече сохранён:', event.name)
   } catch (e) {
     if (config.isDebug) console.warn('Failed to save event route:', e)
   }
