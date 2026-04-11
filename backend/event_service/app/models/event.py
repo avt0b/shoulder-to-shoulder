@@ -17,7 +17,7 @@ class Event(Base):
     __tablename__ = "events"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     host_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    spot_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    spot_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     title = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     max_participants = Column(Integer, default=10, nullable=False)

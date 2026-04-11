@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 class EventCreateRequest(BaseModel):
-    spot_id: UUID
+    spot_id: UUID | None = None
     title: str = Field(..., min_length=3, max_length=100)
     description: str | None = None
     max_participants: int = Field(default=10, ge=2, le=50)
@@ -19,7 +19,7 @@ class EventCreateRequest(BaseModel):
 class EventResponse(BaseModel):
     id: UUID
     host_id: UUID
-    spot_id: UUID
+    spot_id: UUID | None = None
     title: str
     description: str | None
     max_participants: int
@@ -50,7 +50,7 @@ class EventUpdateRequest(BaseModel):
 class EventListItem(BaseModel):
     id: UUID
     host_id: UUID
-    spot_id: UUID
+    spot_id: UUID | None = None
     title: str
     description: str | None
     max_participants: int
@@ -69,7 +69,6 @@ class EventListResponse(BaseModel):
     offset: int
 
 
-
 class EventListFilters(BaseModel):
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
@@ -83,7 +82,7 @@ class EventListFilters(BaseModel):
 class EventDetailResponse(BaseModel):
     id: UUID
     host_id: UUID
-    spot_id: UUID
+    spot_id: UUID | None = None
     title: str
     description: str | None
     max_participants: int
