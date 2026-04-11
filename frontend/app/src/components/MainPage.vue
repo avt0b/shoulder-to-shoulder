@@ -102,14 +102,19 @@
               </div>
               <div class="join-section">
                 <span class="join-count">{{ meetup.participants }}/{{ meetup.maxParticipants }} участников</span>
-                <button
-                  class="join-btn"
-                  :class="{ 'join-btn-joined': meetup.isJoined }"
-                  @click.stop="meetup.isJoined ? handleLeaveMeetup(meetup.id) : handleJoinMeetup(meetup.id)"
-                >
-                  <span class="material-symbols-outlined">{{ meetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
-                  <span>{{ meetup.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
-                </button>
+                <template v-if="meetup.source !== 'my_spot'">
+                  <button
+                    v-if="!((meetup.host_id || meetup.organizer_id || meetup.user_id || meetup.creator_id) && currentUserId && (meetup.host_id || meetup.organizer_id || meetup.user_id || meetup.creator_id) === currentUserId)"
+                    class="join-btn"
+                    :class="{ 'join-btn-joined': meetup.isJoined }"
+                    @click.stop="meetup.isJoined ? handleLeaveMeetup(meetup.id) : handleJoinMeetup(meetup.id)"
+                  >
+                    <span class="material-symbols-outlined">{{ meetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
+                    <span>{{ meetup.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
+                  </button>
+                  <span v-else class="host-badge">🏠 Организатор</span>
+                </template>
+                <span v-else class="host-badge">🏠 Организатор</span>
               </div>
             </div>
           </div>
@@ -305,7 +310,7 @@
                   :key="meetup.id"
                   class="location-option"
                   :class="{ 'location-option-selected': form.meetupId === meetup.id }"
-                  @mousedown="selectMeetup(meetup)"
+                  @click.stop="selectMeetup(meetup)"
                 >
                   <span class="location-option-emoji">{{ meetup.emoji }}</span>
                   <div class="location-option-info">
@@ -317,6 +322,33 @@
               <div v-if="form.meetupId" class="location-selected">
                 <span class="material-symbols-outlined">check_circle</span>
                 <span>{{ selectedMeetupName }}</span>
+              </div>
+              <!-- Карточка характеристик места -->
+              <div v-if="form.meetupId" class="place-features-card">
+                <div class="place-feature-row" v-if="form.placeActivityType">
+                  <span class="place-feature-label">🏃 Активность:</span>
+                  <span class="place-feature-value">{{ mainActivityTypeLabels[form.placeActivityType] || form.placeActivityType }}</span>
+                </div>
+                <div class="place-feature-row" v-if="form.placeNoiseLevel">
+                  <span class="place-feature-label">🔊 Шум:</span>
+                  <span class="place-feature-value">{{ mainNoiseLevelLabels[form.placeNoiseLevel] || form.placeNoiseLevel }}</span>
+                </div>
+                <div class="place-feature-row" v-if="form.placeLit">
+                  <span class="place-feature-label">💡 Освещение:</span>
+                  <span class="place-feature-value">Есть</span>
+                </div>
+                <div class="place-feature-row" v-if="form.placeLockers">
+                  <span class="place-feature-label">🚿 Раздевалки:</span>
+                  <span class="place-feature-value">Есть</span>
+                </div>
+                <div class="place-feature-row" v-if="form.placeBenches">
+                  <span class="place-feature-label">🪑 Скамейки:</span>
+                  <span class="place-feature-value">Есть</span>
+                </div>
+                <div class="place-feature-row" v-if="form.placeAnonymous">
+                  <span class="place-feature-label">🤫 Анонимное:</span>
+                  <span class="place-feature-value">Да</span>
+                </div>
               </div>
             </div>
 
@@ -393,14 +425,25 @@
           </div>
 
           <!-- Кнопка действия -->
-          <button
-            class="meetup-detail-action"
-            :class="{ joined: selectedMeetup.isJoined }"
-            @click="selectedMeetup.isJoined ? handleLeaveMeetup(selectedMeetup.id) : handleJoinMeetup(selectedMeetup.id)"
-          >
-            <span class="material-symbols-outlined">{{ selectedMeetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
-            <span>{{ selectedMeetup.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
-          </button>
+          <template v-if="selectedMeetup.source !== 'my_spot'">
+            <button
+              v-if="!((selectedMeetup.host_id || selectedMeetup.organizer_id || selectedMeetup.user_id || selectedMeetup.creator_id) && currentUserId && (selectedMeetup.host_id || selectedMeetup.organizer_id || selectedMeetup.user_id || selectedMeetup.creator_id) === currentUserId)"
+              class="meetup-detail-action"
+              :class="{ joined: selectedMeetup.isJoined }"
+              @click="selectedMeetup.isJoined ? handleLeaveMeetup(selectedMeetup.id) : handleJoinMeetup(selectedMeetup.id)"
+            >
+              <span class="material-symbols-outlined">{{ selectedMeetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
+              <span>{{ selectedMeetup.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
+            </button>
+            <div v-else class="meetup-detail-host-badge">
+              <span class="material-symbols-outlined">home</span>
+              <span>Вы организатор этого мероприятия</span>
+            </div>
+          </template>
+          <div v-else class="meetup-detail-host-badge">
+            <span class="material-symbols-outlined">home</span>
+            <span>Вы организатор этого мероприятия</span>
+          </div>
         </div>
       </div>
     </div>
@@ -414,14 +457,16 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, placesApi, eventsApi } from '../config'
 import { navigationStore } from '../stores/navigation'
+import { authStore } from '../stores/auth'
 import MapLight from './MapLight.vue'
 
 const router = useRouter()
+const route = useRoute()
 const mapRef = ref(null)
 const showMapLight = ref(false)
 let map = null
@@ -558,22 +603,32 @@ async function fetchMeetups() {
   try {
     const res = await fetch(placesApi('/places'))
     const data = await res.json()
-    
+
     // Маппим ответ бэкенда → внутренний формат
     const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
-    
+
     meetups.value = (data.places || [])
       .filter(p => p.id && p.name && typeof p.lat === 'number' && typeof p.lon === 'number')
-      .map(p => ({
-        id: p.id,
-        name: p.name,
-        address: p.address || '',
-        lat: p.lat,
-        lng: p.lon,
-        emoji: p.emoji || '📍',
-        activityType: validActivities.includes(p.activity_type) ? p.activity_type : 'other',
-      }))
-      
+      .map(p => {
+        const noiseLevelNum = typeof p.noise_level === 'number' ? p.noise_level : 0
+        const noiseLevel = noiseLevelNum <= 3 ? 'quiet' : noiseLevelNum <= 6 ? 'moderate' : 'loud'
+
+        return {
+          id: p.id,
+          name: p.name,
+          address: p.address || '',
+          lat: p.lat,
+          lng: p.lon,
+          emoji: p.emoji || '📍',
+          activityType: validActivities.includes(p.activity_type) ? p.activity_type : 'other',
+          noiseLevel,
+          lit: p.light_availability >= 5,
+          lockers: p.conveniences_availability === true,
+          benches: p.conveniences_availability === true,
+          anonymous: p.is_anonymous === true,
+        }
+      })
+
     if (config.isDebug) console.log('📍 fetchMeetups: загружено мест:', meetups.value.length)
   } catch (e) {
     if (config.isDebug) console.warn('fetchMeetups: API недоступен, использую fallback', e)
@@ -594,6 +649,20 @@ const selectedMeetupName = computed(() => {
   const m = meetups.value.find(p => p.id === form.value.meetupId)
   return m ? `${m.emoji} ${m.name} — ${m.address}` : ''
 })
+
+// Словари для отображения характеристик места
+const mainActivityTypeLabels = {
+  running: '🏃 Бег',
+  strength: '💪 Силовая',
+  yoga: '🧘 Йога',
+  workout: '🤸 Воркаут',
+  other: '📍 Другое'
+}
+const mainNoiseLevelLabels = {
+  quiet: 'Тихое',
+  moderate: 'Умеренный',
+  loud: 'Шумное'
+}
 
 // ============================================
 // 📝 Форма создания встречи
@@ -636,7 +705,14 @@ const form = ref({
   meetupId: null,
   customAddress: '',
   customLat: null,
-  customLng: null
+  customLng: null,
+  // Поля из выбранного места (places)
+  placeActivityType: null,
+  placeNoiseLevel: null,
+  placeLit: null,
+  placeLockers: null,
+  placeBenches: null,
+  placeAnonymous: null
 })
 
 const isFormValid = computed(() => {
@@ -649,12 +725,20 @@ const isFormValid = computed(() => {
 })
 
 function selectMeetup(meetup) {
+  if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
   form.value.meetupId = meetup.id
   form.value.customAddress = ''
   form.value.customLat = null
   form.value.customLng = null
   locationQuery.value = meetup.name
   showLocationDropdown.value = false
+  // Заполняем поля из места
+  form.value.placeActivityType = meetup.activityType || null
+  form.value.placeNoiseLevel = meetup.noiseLevel || null
+  form.value.placeLit = meetup.lit || false
+  form.value.placeLockers = meetup.lockers || false
+  form.value.placeBenches = meetup.benches || false
+  form.value.placeAnonymous = meetup.anonymous || false
 }
 
 function hideLocationDropdownDelayed() {
@@ -700,7 +784,13 @@ function resetForm() {
     meetupId: null,
     customAddress: '',
     customLat: null,
-    customLng: null
+    customLng: null,
+    placeActivityType: null,
+    placeNoiseLevel: null,
+    placeLit: null,
+    placeLockers: null,
+    placeBenches: null,
+    placeAnonymous: null
   }
   locationQuery.value = ''
   locationMode.value = 'meetup'
@@ -760,42 +850,8 @@ function saveToLocalStorage(events) {
 // Создать мероприятие — бэк (places + events) + localStorage fallback
 async function submitEventToBackend(eventData) {
   try {
-    let spotId = null
-
-    // Если место из базы — используем его ID
-    if (eventData.meetupId) {
-      spotId = eventData.meetupId
-    } else {
-      // Своё место — создаём через places service
-      const placePayload = {
-        name: eventData.locationShort,
-        description: eventData.description || '',
-        lat: eventData.customLat,
-        lon: eventData.customLng,
-        address: eventData.customAddress || eventData.locationShort,
-        rating: 0,
-        emoji: '📍',
-        category: 'my_spot',
-        image: '',
-        gallery: [],
-        is_anonymous: eventData.anonymous,
-        activity_type: eventData.type,
-        noise_level: 0,
-        light_availability: 0,
-        conveniences_availability: false
-      }
-
-      if (config.isDebug) console.log('📍 Создаём место:', placePayload)
-
-      const placeRes = await fetch(placesApi('/places/create'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(placePayload)
-      })
-      const placeData = await placeRes.json()
-      spotId = placeData.place?.id || placeData.id
-      if (config.isDebug) console.log('✅ Место создано, spot_id:', spotId)
-    }
+    // Используем реальный id места из places, или null если место произвольное
+    const spotId = eventData.meetupId ? String(eventData.meetupId) : null
 
     // Создаём event
     const eventPayload = {
@@ -805,17 +861,37 @@ async function submitEventToBackend(eventData) {
       max_participants: eventData.maxParticipants,
       duration_minutes: 60,
       start_time: eventData.startTime,
-      photo_url: null,
+      photo_url: 'TEST',
       anonymous: eventData.anonymous
     }
 
-    if (config.isDebug) console.log('📅 Создаём event:', eventPayload)
+    if (config.isDebug) {
+      console.log('📅 Создаём event:', JSON.stringify(eventPayload, null, 2))
+      console.log('📅 spot_id type:', typeof spotId, '| value:', spotId)
+      console.log('📅 start_time:', eventData.startTime)
+    }
 
+    const eventHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authStore.token || localStorage.getItem('token') || ''}`
+    }
     const res = await fetch(eventsApi('/events'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: eventHeaders,
       body: JSON.stringify(eventPayload)
     })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      if (config.isDebug) {
+        console.error('❌ Event creation failed!')
+        console.error('Status:', res.status, res.statusText)
+        console.error('Sent payload:', JSON.stringify(eventPayload, null, 2))
+        console.error('Response:', errorText)
+      }
+      throw new Error(`Event creation failed: ${res.status} ${errorText}`)
+    }
+
     const data = await res.json()
     if (data.event) {
       myMeetups.value.unshift(data.event)
@@ -861,7 +937,7 @@ function submitEvent() {
 
   if (locationMode.value === 'meetup' && form.value.meetupId) {
     const m = meetups.value.find(p => p.id === form.value.meetupId)
-    locationShort = m?.name || ''
+    locationShort = m?.address || ''
     location = m ? `${m.name}, ${m.address}` : ''
   } else if (locationMode.value === 'address') {
     locationShort = form.value.customAddress
@@ -891,7 +967,14 @@ function submitEvent() {
     anonymous: form.value.quietCompanion, // quietCompanion → anonymous
     level: form.value.level,
     maxParticipants: form.value.maxParticipants,
-    user_id: 1
+    user_id: 1,
+    // Поля из места (places)
+    placeActivityType: form.value.placeActivityType,
+    placeNoiseLevel: form.value.placeNoiseLevel,
+    placeLit: form.value.placeLit,
+    placeLockers: form.value.placeLockers,
+    placeBenches: form.value.placeBenches,
+    placeAnonymous: form.value.placeAnonymous
   }
 
   submitEventToBackend(eventData)
@@ -907,13 +990,85 @@ function submitEvent() {
 // POST /api/v1/events/{event_id}/cancel  (не DELETE!)
 // POST /api/v1/events/{event_id}/checkin
 
-async function handleJoinMeetup(meetupId, userId = 1) {
+async function handleJoinMeetup(meetupId) {
+  // Проверяем не является ли пользователь организатором
+  const meetup = myMeetups.value.find(m => m.id === meetupId)
+  if (!meetup) {
+    if (config.isDebug) console.warn('⚠️ Мероприятие не найдено')
+    return { status: 'not_found' }
+  }
+  
+  // Проверяем по host_id / organizer_id / user_id
+  const hostId = meetup.host_id || meetup.organizer_id || meetup.user_id || meetup.creator_id
+  if (hostId && currentUserId.value && hostId === currentUserId.value) {
+    if (config.isDebug) console.log('ℹ️ Вы организатор (host_id=' + hostId + ') — уже являетесь участником')
+    alert('Вы уже являетесь организатором этого мероприятия')
+    return { status: 'host' }
+  }
+  // Проверяем по source === 'my_spot'
+  if (meetup.source === 'my_spot') {
+    if (config.isDebug) console.log('ℹ️ Это ваше место — уже являетесь участником')
+    alert('Вы уже являетесь организатором этого мероприятия')
+    return { status: 'host' }
+  }
+
+  const token = authStore.token || localStorage.getItem('token')
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/join`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token || ''}`
+      }
+      // Бэк НЕ принимает body — user_id берётся из токена
     })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      let errorData = null
+      try { errorData = JSON.parse(errorText) } catch {}
+      const detail = errorData?.detail || ''
+
+      // Хост уже участник — это не ошибка, а инфо
+      if (res.status === 400 && detail === 'Host is already a participant by default') {
+        if (config.isDebug) console.log('ℹ️ Вы организатор — уже являетесь участником')
+        const idx = myMeetups.value.findIndex(m => m.id === meetupId)
+        if (idx !== -1) {
+          myMeetups.value[idx] = { ...myMeetups.value[idx], isJoined: true }
+        }
+        if (selectedMeetup.value && selectedMeetup.value.id === meetupId) {
+          selectedMeetup.value.isJoined = true
+        }
+        syncMyMeetupsLocal()
+        return { status: 'host' }
+      }
+
+      if (res.status === 400 && detail === 'Event is not open for joining') {
+        if (config.isDebug) console.warn('⚠️ Мероприятие уже не открыто для записи')
+        alert('Это мероприятие больше не открыто для записи')
+        return { status: 'closed' }
+      }
+
+      if (res.status === 400 && detail === 'Event is full') {
+        if (config.isDebug) console.warn('⚠️ Мероприятие заполнено')
+        alert('Это мероприятие уже заполнено')
+        return { status: 'full' }
+      }
+
+      if (res.status === 409) {
+        if (config.isDebug) console.log('ℹ️ Вы уже записаны на это мероприятие')
+        const idx = myMeetups.value.findIndex(m => m.id === meetupId)
+        if (idx !== -1) myMeetups.value[idx] = { ...myMeetups.value[idx], isJoined: true }
+        if (selectedMeetup.value && selectedMeetup.value.id === meetupId) {
+          selectedMeetup.value.isJoined = true
+        }
+        syncMyMeetupsLocal()
+        return { status: 'already_joined' }
+      }
+
+      throw new Error(`join failed: ${res.status} — ${detail}`)
+    }
+
     const data = await res.json()
 
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
@@ -942,12 +1097,16 @@ async function handleJoinMeetup(meetupId, userId = 1) {
   }
 }
 
-async function handleLeaveMeetup(meetupId, userId = 1) {
+async function handleLeaveMeetup(meetupId) {
+  const token = authStore.token || localStorage.getItem('token')
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/cancel`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token || ''}`
+      }
+      // Бэк НЕ принимает body — user_id берётся из токена
     })
     const data = await res.json()
 
@@ -978,12 +1137,16 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
 }
 
 // Checkin на мероприятие (новый эндпоинт из Swagger)
-async function handleCheckinMeetup(meetupId, userId = 1) {
+async function handleCheckinMeetup(meetupId) {
+  const token = authStore.token || localStorage.getItem('token')
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/checkin`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token || ''}`
+      }
+      // Бэк НЕ принимает body — user_id берётся из токена
     })
     const data = await res.json()
     return data
@@ -1132,10 +1295,37 @@ function syncMyMeetupsLocal() {
   }
 }
 
+// Текущий user_id (загружается с API)
+const currentUserId = ref(null)
+
+async function loadCurrentUserId() {
+  // Сначала из authStore
+  if (authStore.user?.id) {
+    currentUserId.value = authStore.user.id
+    return
+  }
+  // Запрос к /users/me
+  try {
+    const token = authStore.token || localStorage.getItem('token')
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
+    const res = await fetch(`${config.userApiURL}/users/me`, { headers })
+    if (res.ok) {
+      const data = await res.json()
+      currentUserId.value = data.id || data.user_id
+      if (config.isDebug) console.log('🔑 User ID:', currentUserId.value)
+    }
+  } catch (e) {
+    if (config.isDebug) console.warn('loadCurrentUserId: ошибка', e)
+  }
+}
+
 // ============================================
 
 onMounted(async () => {
   await nextTick()
+
+  // Загружаем user_id
+  await loadCurrentUserId()
 
   // Экспортируем функцию для MapLight
   window.__setMapPickMode = null
@@ -1143,6 +1333,23 @@ onMounted(async () => {
 
   // Загружаем meetups
   await fetchMeetups()
+
+  // Проверяем: пришёл ли пользователь для маршрута к ивенту
+  const eventRouteData = localStorage.getItem('shoulder_event_route')
+  if (route.query.event_route || eventRouteData) {
+    if (config.isDebug) console.log('🗺 Открытие маршрута к ивенту')
+    // Открываем MapLight
+    showMapLight.value = true
+    // После монтирования — открываем форму маршрута
+    await nextTick()
+    setTimeout(() => {
+      const eventData = eventRouteData ? JSON.parse(eventRouteData) : null
+      if (eventData && window.__openEventRoute) {
+        window.__openEventRoute(eventData)
+        localStorage.removeItem('shoulder_event_route')
+      }
+    }, 500)
+  }
 
   // Проверяем пришёл ли пользователь с EventsPage для выбора точки
   const eventSource = localStorage.getItem('shoulder_pending_event_source')
@@ -1963,6 +2170,35 @@ function clearMiniRoute() {
   font-weight: 500;
 }
 
+/* Бейдж организатора */
+.host-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ea580c;
+  background: #fef3f0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.meetup-detail-host-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ea580c;
+  background: #fef3f0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.meetup-detail-host-badge .material-symbols-outlined {
+  font-size: 18px;
+}
+
 /* My Meetups — Ваши мероприятия */
 .my-meetups-section {
   display: flex;
@@ -2779,6 +3015,44 @@ function clearMiniRoute() {
 
 .location-selected .material-symbols-outlined {
   font-size: 18px;
+}
+
+/* Карточка характеристик места */
+.place-features-card {
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.place-feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.place-feature-label {
+  color: #64748b;
+  font-weight: 500;
+}
+.place-feature-value {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* Dark mode для карточки места */
+.dark-theme .place-features-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+.dark-theme .place-feature-label {
+  color: #94a3b8;
+}
+.dark-theme .place-feature-value {
+  color: #f1f5f9;
 }
 
 .location-dropdown {
