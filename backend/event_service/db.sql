@@ -1,7 +1,7 @@
 CREATE TABLE events (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     host_id             UUID NOT NULL,
-    spot_id             UUID NOT NULL,
+    spot_id             UUID,
     title               VARCHAR(100) NOT NULL,
     description         TEXT,
     max_participants    INTEGER DEFAULT 10 NOT NULL,
