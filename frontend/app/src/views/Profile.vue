@@ -6,7 +6,10 @@
         <div class="avatar-small">
           <img :src="profile.avatar_url || defaultAvatar" alt="Аватар" />
         </div>
-        <h1 class="brand-title">{{ profile.display_name || 'Имя Фамилия' }}</h1>
+        <div class="top-nav-user">
+          <h1 class="brand-title">{{ profile.display_name || 'Имя Фамилия' }}</h1>
+          <span class="user-login">{{ profile.login || '' }}</span>
+        </div>
       </div>
       <div class="top-nav-right">
         <button class="icon-btn" aria-label="Настройки" @click="showSettings = true">
@@ -409,7 +412,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router'
 import { authApi, toProxyUrl } from '../api/index'
-import { authStore } from '../stores/auth'
+import { authStore, logout } from '../stores/auth'
 import defaultAvatar from '../assets/default-avatar.svg'
 
 const router = useRouter();
@@ -470,8 +473,16 @@ const toggleTheme = async () => {
 };
 
 const handleLogout = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('app_visited');
+  // Закрываем все модальные окна
+  showSettings.value = false;
+  showEditProfile.value = false;
+  showAbout.value = false;
+  showPrivacy.value = false;
+
+  // Очищаем состояние и localStorage через auth store
+  logout();
+
+  // Редирект на страницу входа
   router.push('/login');
 };
 
@@ -985,10 +996,28 @@ onMounted(async () => {
   object-fit: cover;
 }
 
+.top-nav-user {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
 .brand-title {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.user-login {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 
 .top-nav-right {
