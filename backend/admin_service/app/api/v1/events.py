@@ -37,7 +37,7 @@ async def get_event(
     return event
 
 
-@router.patch("/{event_id}", response_model=AdminEventResponse)
+@router.post("/{event_id}", response_model=AdminEventResponse)
 async def update_event(
     event_id: UUID,
     data: AdminEventUpdateRequest,

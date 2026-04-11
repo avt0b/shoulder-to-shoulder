@@ -12,7 +12,6 @@ class PoolRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    # --- ЧТЕНИЕ ПУЛА (для всех) ---
     async def get_open_requests(self, city: str | None = None, limit: int = 20) -> list[dict]:
         """Возвращает список активных заявок из пула."""
         stmt = (
@@ -55,16 +54,13 @@ class PoolRepository:
             for row in result.all()
         ]
 
-    # --- СОЗДАНИЕ ЗАЯВКИ ---
     async def create_request(self, user_id: UUID, data: dict) -> WorkoutRequest:
         req = WorkoutRequest(user_id=user_id, **data, status=RequestStatus.OPEN)
         self.db.add(req)
         await self.db.flush()
         return req
 
-    # --- ОТКЛИК НА ЗАЯВКУ ---
     async def create_response(self, request_id: UUID, responder_id: UUID, message: str | None) -> RequestResponse:
-        # Проверка: не откликается ли автор на свою же заявку
         req = await self.db.get(WorkoutRequest, request_id)
         if req and req.user_id == responder_id:
             raise ValueError("Cannot respond to your own request")
@@ -74,7 +70,6 @@ class PoolRepository:
         await self.db.flush()
         return resp
 
-    # --- УПРАВЛЕНИЕ ДЛЯ АВТОРА ---
     async def get_my_incoming_responses(self, user_id: UUID) -> list[dict]:
         """Автор видит, кто откликнулся на ЕГО заявки."""
         stmt = (

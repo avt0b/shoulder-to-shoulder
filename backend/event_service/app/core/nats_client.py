@@ -8,6 +8,8 @@ from sqlalchemy import select, update, delete, func
 from backend.event_service.app.core.database import AsyncSessionLocal
 from backend.event_service.app.models.event import Event
 from backend.event_service.app.models.participant import EventParticipant
+from backend.event_service.app.repositories.event_repository import EventRepository
+from nats.aio.msg import Msg
 
 logger = logging.getLogger(__name__)
 nc = NATS()
@@ -66,54 +68,46 @@ async def request_nats(subject: str, payload: dict, timeout: float = 3.0) -> dic
         raise RuntimeError("Auth service unavailable")
 
 
-async def handle_admin_event_list(msg):
-    data = json.loads(msg.data.decode())
+async def handle_admin_event_list(msg: Msg):
+    """Отвечает на запрос админки: список ивентов."""
     try:
-        limit = min(data.get("limit", 50), 100)
-        offset = data.get("offset", 0)
-        status_filter = data.get("status")
-        host_id = data.get("host_id")
-        spot_id = data.get("spot_id")
+        payload = json.loads(msg.data.decode()) if msg.data else {}
+        limit = payload.get("limit", 20)
+        offset = payload.get("offset", 0)
+        status = payload.get("status")
+        search = payload.get("search")
 
         async with AsyncSessionLocal() as db:
-            stmt = select(Event)
-            if status_filter:
-                stmt = stmt.where(Event.status == status_filter)
-            if host_id:
-                stmt = stmt.where(Event.host_id == UUID(host_id))
-            if spot_id:
-                stmt = stmt.where(Event.spot_id == UUID(spot_id))
-            stmt = stmt.order_by(Event.created_at.desc()).offset(offset).limit(limit)
+            repo = EventRepository(db)
+            events, total = await repo.list_events(
+                limit=limit, offset=offset)
 
-            result = await db.execute(stmt)
-            events = result.scalars().all()
-
-            events_serializable = []
-            for e in events:
-                count_stmt = select(func.count()).select_from(EventParticipant).where(
-                    EventParticipant.event_id == e.id,
-                    EventParticipant.status != "cancelled"
-                )
-                count_result = await db.execute(count_stmt)
-                events_serializable.append({
+            events_data = [
+                {
                     "id": str(e.id),
-                    "host_id": str(e.host_id),
-                    "spot_id": str(e.spot_id),
                     "title": e.title,
-                    "description": e.description,
-                    "max_participants": e.max_participants,
-                    "duration_minutes": e.duration_minutes,
+                    "host_id": str(e.host_id),
                     "status": e.status,
                     "start_time": e.start_time.isoformat(),
-                    "photo_url": e.photo_url,
-                    "created_at": e.created_at.isoformat() if e.created_at else None,
-                    "participant_count": count_result.scalar()
-                })
+                    "anonymous": getattr(e, "anonymous", False),
+                    "participant_count": e.participant_count if hasattr(e, "participant_count") else 0,
+                }
+                for e in events
+            ]
 
-            await msg.respond(json.dumps({"ok": True, "data": events_serializable}).encode())
+        response = {
+            "ok": True,
+            "data": {
+                "events": events_data,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+            }
+        }
+        await msg.respond(json.dumps(response).encode())
 
     except Exception as e:
-        logger.exception("Admin list events failed")
+        logger.exception("Error in handle_admin_event_list")
         await msg.respond(json.dumps({"ok": False, "error": str(e)}).encode())
 
 
@@ -229,9 +223,9 @@ async def handle_admin_event_update(msg):
         await msg.respond(json.dumps({"ok": False, "error": str(e)}).encode())
 
 
-async def setup_admin_event_subscribers(nats):
-    nats.nc.subscribe("admin.event.list", cb=handle_admin_event_list)
-    nats.nc.subscribe("admin.event.get", cb=handle_admin_event_get)
-    nats.nc.subscribe("admin.event.delete", cb=handle_admin_event_delete)
-    nats.nc.subscribe("admin.event.update", cb=handle_admin_event_update)
+async def setup_admin_event_subscribers():
+    await nc.subscribe("admin.event.list", cb=handle_admin_event_list)
+    await nc.subscribe("admin.event.get", cb=handle_admin_event_get)
+    await nc.subscribe("admin.event.delete", cb=handle_admin_event_delete)
+    await nc.subscribe("admin.event.update", cb=handle_admin_event_update)
     logger.info("Admin event subscribers registered")
