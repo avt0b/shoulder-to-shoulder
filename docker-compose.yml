@@ -163,7 +163,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: ${DATABASE_URL}
       NATS_URL: ${NATS_URL}
-    # Not exposed publicly
+    ports:
+      - "${EVENT_SERVICE_PORT}:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -190,6 +191,8 @@ services:
       NATS_URL: ${NATS_URL}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
       EVENT_SERVICE_URL: ${EVENT_SERVICE_URL}
+    ports:
+      - "${ADMIN_SERVICE_PORT}:8003"
     # Not exposed publicly
     depends_on:
       nats:
