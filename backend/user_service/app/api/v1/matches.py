@@ -74,16 +74,16 @@ async def my_incoming_responses(
     return await service.repo.get_my_incoming_responses(UUID(user_id))
 
 
-@router.patch("/responses/{response_id}")
-async def decide_on_response(
-        response_id: UUID,
-        accept: bool = Query(...),
-        user_id: UUID = Depends(get_current_user_id),
-        service: PoolService = Depends(get_pool_service),
-):
-    """✅ Принять или отклонить отклик (только для автора заявки)."""
-    # Тут можно добавить проверку: действительно ли текущий юзер - автор заявки
-    success = await service.handle_response(response_id, user_id, accept)
-    if not success:
-        raise HTTPException(404, detail="Response not found")
-    return {"status": "accepted" if accept else "declined"}
+# @router.post("/responses/{response_id}")
+# async def decide_on_response(
+#         response_id: UUID,
+#         accept: bool = Query(...),
+#         user_id: UUID = Depends(get_current_user_id),
+#         service: PoolService = Depends(get_pool_service),
+# ):
+#     """✅ Принять или отклонить отклик (только для автора заявки)."""
+#     # Тут можно добавить проверку: действительно ли текущий юзер - автор заявки
+#     success = await service.handle_response(response_id, user_id, accept)
+#     if not success:
+#         raise HTTPException(404, detail="Response not found")
+#     return {"status": "accepted" if accept else "declined"}
