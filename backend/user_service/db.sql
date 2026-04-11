@@ -51,6 +51,34 @@ CREATE TABLE badges (
     UNIQUE(user_id, badge_type)
 );
 
+CREATE TABLE workout_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    city VARCHAR(100) NOT NULL,
+    preferred_time TIMESTAMPTZ NOT NULL,
+    duration_minutes INT DEFAULT 60,
+    fitness_level VARCHAR(50),
+    description TEXT,
+    status VARCHAR(20) DEFAULT 'open',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE request_responses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    request_id UUID NOT NULL REFERENCES workout_requests(id),
+    responder_id UUID NOT NULL REFERENCES users(id),
+    message TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_responses_request ON request_responses(request_id);
+
+CREATE INDEX idx_match_requests_receiver ON match_requests(receiver_id, status);
+CREATE INDEX idx_match_requests_city_time ON match_requests(city, preferred_time);
+
+CREATE INDEX idx_match_requests_receiver ON match_requests(receiver_id, status);
+CREATE INDEX idx_match_requests_city_time ON match_requests(city, preferred_time);
+
 CREATE INDEX idx_users_phone_number ON users(phone_number);
 CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 CREATE INDEX idx_users_role ON users(role);
@@ -62,3 +90,9 @@ CREATE INDEX idx_ratings_reliability ON user_ratings(reliability_score DESC);
 CREATE INDEX idx_user_profiles_city ON user_profiles(city);
 
 ALTER TABLE user_profiles ADD COLUMN theme VARCHAR(10) DEFAULT 'light' NOT NULL;
+
+ALTER TABLE workout_requests
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+
+ALTER TABLE workout_requests
+ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
