@@ -52,6 +52,8 @@ services:
     container_name: s2s_nats
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
+    ports:
+      - "${NATS_PORT}:4222"
     # Not exposed publicly
     networks:
       - s2s_network
