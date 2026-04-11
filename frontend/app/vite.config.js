@@ -34,6 +34,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/events/, '/api/v1'),
       },
+      '/api/media': {
+        target: 'http://localhost:8006',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/media/, '/api/v1/media'),
+      },
       // MinIO не доступен из браузера (системный прокси), проксируем через Vite
       '/minio-upload': {
         target: 'http://localhost:9000',

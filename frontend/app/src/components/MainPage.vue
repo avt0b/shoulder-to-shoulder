@@ -847,13 +847,78 @@ function saveToLocalStorage(events) {
   }
 }
 
+// Конвертирует places id (integer или UUID) в UUID-строку для spot_id
+function toUuid(id) {
+  if (!id) return null
+  const str = String(id)
+  if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str)) return str
+  const num = parseInt(str, 10)
+  if (!isNaN(num)) {
+    return String(num).padStart(36, '0').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5')
+  }
+  return null
+}
+
+// Форматирование даты для отображения
+function formatDateDisplay(dateStr) {
+  if (!dateStr) return ''
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const eventDate = new Date(dateStr)
+  eventDate.setHours(0, 0, 0, 0)
+  if (eventDate.getTime() === today.getTime()) return 'Сегодня'
+  if (eventDate.getTime() === tomorrow.getTime()) return 'Завтра'
+  const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  return `${eventDate.getDate()} ${months[eventDate.getMonth()]}`
+}
+
 // Создать мероприятие — бэк (places + events) + localStorage fallback
 async function submitEventToBackend(eventData) {
-  try {
-    // Используем реальный id места из places, или null если место произвольное
-    const spotId = eventData.meetupId ? String(eventData.meetupId) : null
+  // Локальный мок — создаётся ВСЕГДА для отображения на устройстве
+  const newEventObj = {
+    id: Date.now(),
+    name: eventData.name,
+    emoji: typeEmoji[eventData.type] || '📍',
+    date: eventData.date,
+    time: eventData.time,
+    dateDisplay: formatDateDisplay(eventData.date),
+    locationShort: eventData.locationShort,
+    location: eventData.location,
+    description: eventData.description,
+    level: eventData.level || 'Открыто',
+    type: eventData.type,
+    quietCompanion: eventData.quietCompanion,
+    anonymous: eventData.anonymous,
+    participants: 1,
+    maxParticipants: eventData.maxParticipants,
+    isJoined: true,
+    avatars: [],
+    moreCount: 0,
+    // Доп. поля для маршрута и места
+    placeLat: eventData.customLat || null,
+    placeLng: eventData.customLng || null,
+    placeAddress: eventData.customAddress || eventData.location || '',
+    spot_id: eventData.meetupId ? toUuid(eventData.meetupId) : null,
+    host_id: null,
+    status: 'pending',
+    placeLit: eventData.placeLit || false,
+    placeLockers: eventData.placeLockers || false,
+    placeBenches: eventData.placeBenches || false,
+    placeAnonymous: eventData.placeAnonymous || false,
+  }
 
-    // Создаём event
+  // Сразу добавляем локально — событие видно мгновенно
+  myMeetups.value.unshift(newEventObj)
+  const allStored = loadFromLocalStorage() || []
+  allStored.unshift(newEventObj)
+  saveToLocalStorage(allStored)
+  syncMyMeetupsLocal()
+
+  // Пытаемся создать на бэке (фоновая операция)
+  try {
+    const spotId = newEventObj.spot_id
     const eventPayload = {
       spot_id: spotId,
       title: eventData.name,
@@ -861,14 +926,13 @@ async function submitEventToBackend(eventData) {
       max_participants: eventData.maxParticipants,
       duration_minutes: 60,
       start_time: eventData.startTime,
-      photo_url: 'TEST',
+      photo_url: null,
       anonymous: eventData.anonymous
     }
 
     if (config.isDebug) {
-      console.log('📅 Создаём event:', JSON.stringify(eventPayload, null, 2))
-      console.log('📅 spot_id type:', typeof spotId, '| value:', spotId)
-      console.log('📅 start_time:', eventData.startTime)
+      console.log('📅 Создаём event на бэке:', JSON.stringify(eventPayload, null, 2))
+      console.log('📅 spot_id:', spotId)
     }
 
     const eventHeaders = {
@@ -881,52 +945,17 @@ async function submitEventToBackend(eventData) {
       body: JSON.stringify(eventPayload)
     })
 
-    if (!res.ok) {
-      const errorText = await res.text()
-      if (config.isDebug) {
-        console.error('❌ Event creation failed!')
-        console.error('Status:', res.status, res.statusText)
-        console.error('Sent payload:', JSON.stringify(eventPayload, null, 2))
-        console.error('Response:', errorText)
-      }
-      throw new Error(`Event creation failed: ${res.status} ${errorText}`)
+    if (res.ok) {
+      const data = await res.json()
+      if (config.isDebug) console.log('✅ Event создан на бэке:', data.id)
+    } else {
+      if (config.isDebug) console.warn('⚠️ Бэк вернул ошибку, но событие сохранено локально')
     }
-
-    const data = await res.json()
-    if (data.event) {
-      myMeetups.value.unshift(data.event)
-    }
-    const allStored = loadFromLocalStorage() || []
-    allStored.unshift(data.event)
-    saveToLocalStorage(allStored)
-    return data.event
   } catch (e) {
-    if (config.isDebug) console.warn('submitEventToBackend: API недоступен, localStorage', e)
-
-    const newEventObj = {
-      id: Date.now(),
-      name: eventData.name,
-      emoji: typeEmoji[eventData.type] || '🏋️',
-      date: eventData.date,
-      time: eventData.time,
-      locationShort: eventData.locationShort,
-      location: eventData.location,
-      description: eventData.description,
-      level: eventData.level,
-      type: eventData.type,
-      quietCompanion: eventData.quietCompanion,
-      anonymous: eventData.anonymous,
-      participants: 1,
-      maxParticipants: eventData.maxParticipants,
-      isJoined: true,
-      avatars: ['https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'],
-      moreCount: 0
-    }
-
-    myMeetups.value.unshift(newEventObj)
-    syncMyMeetupsLocal()
-    return newEventObj
+    if (config.isDebug) console.warn('⚠️ Бэк недоступен, событие сохранено только локально', e)
   }
+
+  return newEventObj
 }
 
 function submitEvent() {
