@@ -5,18 +5,20 @@ from datetime import datetime
 
 class AdminEventResponse(BaseModel):
     id: str
-    host_id: str
-    spot_id: str
     title: str
-    description: str | None
-    max_participants: int
-    duration_minutes: int
+    host_id: str
     status: str
     start_time: datetime
-    photo_url: str | None
-    created_at: datetime | None
-    updated_at: datetime | None
-    participant_count: int
+
+    spot_id: str | None = None
+    description: str | None = None
+    max_participants: int | None = None
+    duration_minutes: int | None = None
+    photo_url: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    anonymous: bool = False
+    participant_count: int = 0
 
 
 class AdminEventListResponse(BaseModel):
