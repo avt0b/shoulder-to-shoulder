@@ -1,5 +1,5 @@
 <template>
-  <div class="map-light" :class="{ dark: isDarkMode || isNinjaMode }">
+  <div class="map-light">
     <!-- Map Canvas -->
     <main class="map-canvas">
       <div ref="mapRef" class="leaflet-map"></div>
@@ -146,6 +146,9 @@
       <button class="control-btn control-btn-primary" @click="useMyLocation" title="Моё местоположение">
         <span class="material-symbols-outlined filled">my_location</span>
       </button>
+      <button class="control-btn control-btn-create" @click="openCreatePlaceForm" title="Создать место">
+        <span class="material-symbols-outlined">add_location</span>
+      </button>
     </div>
 
     <!-- FAB Quick Start — скрывается при открытой форме маршрута -->
@@ -287,6 +290,237 @@
       </a>
     </nav>
 
+    <!-- Create Place Modal -->
+    <transition name="create-place-fade">
+      <div class="create-place-modal-overlay" v-if="showCreatePlaceForm && createPlaceMode === 'search'" @click="closeCreatePlaceForm">
+        <div class="create-place-sheet" @click.stop>
+          <!-- Header with gradient -->
+          <div class="sheet-header">
+            <div class="sheet-header-bg">
+              <div class="sheet-icon-float">{{ createPlaceForm.emoji }}</div>
+            </div>
+            <button class="sheet-close" @click="closeCreatePlaceForm">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+
+          <div class="sheet-body">
+            <form class="create-place-form" @submit.prevent="submitCreatePlace">
+              <!-- Section: Basic Info -->
+              <div class="form-section">
+                <h3 class="section-title">
+                  <span class="material-symbols-outlined section-icon">info</span>
+                  Основная информация
+                </h3>
+
+                <!-- Name -->
+                <div class="input-field">
+                  <input v-model="createPlaceForm.name" type="text" placeholder=" " required />
+                  <label>Название места *</label>
+                  <div class="input-icon">📍</div>
+                </div>
+
+                <!-- Description -->
+                <div class="input-field input-field-textarea">
+                  <textarea v-model="createPlaceForm.description" placeholder=" " rows="2"></textarea>
+                  <label>Описание (необязательно)</label>
+                </div>
+              </div>
+
+              <!-- Section: Icon & Category -->
+              <div class="form-section">
+                <h3 class="section-title">
+                  <span class="material-symbols-outlined section-icon">palette</span>
+                  Визуал
+                </h3>
+
+                <!-- Emoji Picker -->
+                <div class="emoji-scroll">
+                  <button
+                    v-for="emoji in placeEmojis"
+                    :key="emoji"
+                    type="button"
+                    class="emoji-chip"
+                    :class="{ active: createPlaceForm.emoji === emoji }"
+                    @click="createPlaceForm.emoji = emoji"
+                  >
+                    {{ emoji }}
+                  </button>
+                </div>
+
+                <!-- Category -->
+                <div class="category-grid">
+                  <button
+                    v-for="cat in placeCategories"
+                    :key="cat.key"
+                    type="button"
+                    class="category-chip"
+                    :class="{ active: createPlaceForm.category === cat.key }"
+                    @click="createPlaceForm.category = cat.key; createPlaceForm.emoji = cat.emoji"
+                  >
+                    <span class="cat-emoji">{{ cat.emoji }}</span>
+                    <span>{{ cat.label }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Section: Activity Type -->
+              <div class="form-section">
+                <h3 class="section-title">
+                  <span class="material-symbols-outlined section-icon">sports</span>
+                  Активность
+                </h3>
+
+                <div class="activity-chips">
+                  <button
+                    v-for="act in activityTypes"
+                    :key="act.key"
+                    type="button"
+                    class="activity-chip"
+                    :class="{ active: createPlaceForm.activity_type === act.key }"
+                    @click="createPlaceForm.activity_type = act.key"
+                  >
+                    <span>{{ act.emoji }}</span>
+                    <span>{{ act.label }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Section: Location -->
+              <div class="form-section">
+                <h3 class="section-title">
+                  <span class="material-symbols-outlined section-icon">location_on</span>
+                  Расположение
+                </h3>
+
+                <!-- Address -->
+                <div class="input-field input-with-btn">
+                  <input v-model="createPlaceForm.address" type="text" placeholder=" " required />
+                  <label>Адрес *</label>
+                  <button type="button" class="pick-address-btn" @click="startPickModeForPlace">
+                    <span class="material-symbols-outlined">my_location</span>
+                  </button>
+                </div>
+
+                <!-- Coordinates -->
+                <transition name="coords-fade">
+                  <div class="coords-chip" v-if="createPlaceForm.lat && createPlaceForm.lon">
+                    <span class="material-symbols-outlined filled">check_circle</span>
+                    <span>{{ createPlaceForm.lat.toFixed(5) }}, {{ createPlaceForm.lon.toFixed(5) }}</span>
+                  </div>
+                </transition>
+              </div>
+
+              <!-- Section: Characteristics -->
+              <div class="form-section">
+                <h3 class="section-title">
+                  <span class="material-symbols-outlined section-icon">tune</span>
+                  Характеристики
+                </h3>
+
+                <!-- Noise -->
+                <div class="slider-field">
+                  <div class="slider-header">
+                    <span class="slider-label">🔊 Уровень шума</span>
+                    <span class="slider-value">{{ createPlaceForm.noise_level }}/10</span>
+                  </div>
+                  <input v-model.number="createPlaceForm.noise_level" type="range" min="0" max="10" class="slider-noise" />
+                  <div class="slider-track-bg">
+                    <div class="slider-fill slider-fill-noise" :style="{ width: (createPlaceForm.noise_level * 10) + '%' }"></div>
+                  </div>
+                  <div class="slider-labels">
+                    <span>🤫 Тихо</span>
+                    <span>🔊 Шумно</span>
+                  </div>
+                </div>
+
+                <!-- Light -->
+                <div class="slider-field">
+                  <div class="slider-header">
+                    <span class="slider-label">💡 Освещённость</span>
+                    <span class="slider-value">{{ createPlaceForm.light_availability }}/10</span>
+                  </div>
+                  <input v-model.number="createPlaceForm.light_availability" type="range" min="0" max="10" class="slider-light" />
+                  <div class="slider-track-bg">
+                    <div class="slider-fill slider-fill-light" :style="{ width: (createPlaceForm.light_availability * 10) + '%' }"></div>
+                  </div>
+                  <div class="slider-labels">
+                    <span>🌑 Темно</span>
+                    <span>☀️ Светло</span>
+                  </div>
+                </div>
+
+                <!-- Conveniences -->
+                <div class="slider-field">
+                  <div class="slider-header">
+                    <span class="slider-label">🚿 Удобства</span>
+                    <span class="slider-value">{{ createPlaceForm.conveniences_availability }}/10</span>
+                  </div>
+                  <input v-model.number="createPlaceForm.conveniences_availability" type="range" min="0" max="10" class="slider-conv" />
+                  <div class="slider-track-bg">
+                    <div class="slider-fill slider-fill-conv" :style="{ width: (createPlaceForm.conveniences_availability * 10) + '%' }"></div>
+                  </div>
+                  <div class="slider-labels">
+                    <span>❌ Нет</span>
+                    <span>✅ Всё есть</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Section: Privacy -->
+              <div class="form-section">
+                <label class="toggle-field">
+                  <div class="toggle-info">
+                    <span class="toggle-label">🤫 Анонимное место</span>
+                    <span class="toggle-desc">Скрыть от других пользователей</span>
+                  </div>
+                  <div class="toggle-switch" :class="{ active: createPlaceForm.is_anonymous }">
+                    <input type="checkbox" v-model="createPlaceForm.is_anonymous" />
+                    <span class="toggle-slider"></span>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Submit Button -->
+              <button type="submit" class="submit-place-btn" :disabled="!isCreatePlaceFormValid">
+                <span class="material-symbols-outlined filled">add_location_alt</span>
+                <span>Создать место</span>
+              </button>
+
+              <!-- Spacer -->
+              <div class="bottom-spacer"></div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Pick Point Overlay для выбора координат места -->
+    <transition name="pick-overlay-fade">
+      <div v-if="createPlaceMode === 'map'" class="pick-overlay">
+        <div class="pick-pin">
+          <svg viewBox="0 0 36 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 34 18 34s18-20.5 18-34C36 8.06 27.94 0 18 0z" fill="#22c55e"/>
+            <circle cx="18" cy="18" r="8" fill="white"/>
+            <circle cx="18" cy="18" r="4" fill="#22c55e"/>
+          </svg>
+        </div>
+        <div class="pick-hint">
+          <span class="pick-hint-text">📍 Переместите карту для выбора места</span>
+        </div>
+        <div class="pick-actions">
+          <button class="pick-cancel-btn" @click="cancelPickModeForPlace">
+            <span class="material-symbols-outlined">close</span>
+            <span>Отмена</span>
+          </button>
+          <button class="pick-confirm-btn" @click="confirmPickModeForPlace">
+            <span class="material-symbols-outlined">check</span>
+            <span>Готово</span>
+          </button>
+        </div>
+      </div>
+    </transition>
+
     <!-- Pick Point Overlay — режим выбора точки на карте -->
     <transition name="pick-overlay-fade">
       <div v-if="pickMode" class="pick-overlay">
@@ -409,6 +643,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, placesApi, eventsApi } from '../config'
 import { setNavigation, updateNavPosition, updateNavRemaining, navigationStore } from '../stores/navigation'
+import { authStore } from '../stores/auth'
 
 const emit = defineEmits(['close'])
 const router = useRouter()
@@ -420,17 +655,55 @@ let isNinjaMode = ref(false)
 let isTransitioning = ref(false)
 let overlayStyle = ref({})
 
-// Theme
-const isDarkMode = ref(localStorage.getItem('theme') === 'dark')
-
 // Ивенты — маркеры на карте
 const events = ref([])
 let eventMarkers = []
 const selectedEvent = ref(null)
 
-// ============================================
-// 🔍 Фильтры
-// ============================================
+// Создание нового места
+const showCreatePlaceForm = ref(false)
+const createPlaceMode = ref('search') // 'search' | 'map'
+const createPlaceCoords = ref(null) // { lat, lng }
+
+// Создание нового места — форма
+const createPlaceForm = ref({
+  name: '',
+  description: '',
+  address: '',
+  lat: null,
+  lon: null,
+  emoji: '📍',
+  category: 'other',
+  activity_type: 'other',
+  noise_level: 5,
+  light_availability: 5,
+  conveniences_availability: 5,
+  is_anonymous: false
+})
+
+const placeEmojis = ['📍', '🏃', '🏋️', '🧘', '💪', '🎯', '⚽', '🏀', '🎾', '🏊', '🚴', '🌳', '🏟', '🏐']
+const placeCategories = [
+  { key: 'park', label: 'Парк', emoji: '🌳' },
+  { key: 'stadium', label: 'Стадион', emoji: '🏟' },
+  { key: 'gym', label: 'Спортзал', emoji: '🏋️' },
+  { key: 'playground', label: 'Площадка', emoji: '🎯' },
+  { key: 'river', label: 'Набережная', emoji: '🏊' },
+  { key: 'other', label: 'Другое', emoji: '📍' }
+]
+const activityTypes = [
+  { key: 'running', label: 'Бег', emoji: '🏃' },
+  { key: 'strength', label: 'Силовая', emoji: '🏋️' },
+  { key: 'yoga', label: 'Йога', emoji: '🧘' },
+  { key: 'workout', label: 'Воркаут', emoji: '💪' },
+  { key: 'other', label: 'Другое', emoji: '🎯' }
+]
+
+const isCreatePlaceFormValid = computed(() => {
+  return createPlaceForm.value.name.trim() &&
+         createPlaceForm.value.address.trim() &&
+         createPlaceForm.value.lat &&
+         createPlaceForm.value.lon
+})
 
 const showFilters = ref(false)
 
@@ -1194,14 +1467,6 @@ function stopNavigation() {
 
 // ============================================
 
-const activityTypes = [
-  { key: 'running', emoji: '🏃', label: 'Бег' },
-  { key: 'strength', emoji: '🏋️', label: 'Силовая' },
-  { key: 'yoga', emoji: '🧘', label: 'Йога' },
-  { key: 'workout', emoji: '💪', label: 'Воркаут' },
-  { key: 'other', emoji: '🎯', label: 'Другое' }
-]
-
 const noiseLevels = [
   { key: 'quiet', emoji: '🤫', label: 'Тихо' },
   { key: 'moderate', emoji: '😐', label: 'Средне' },
@@ -1329,10 +1594,12 @@ async function applyFilters() {
 async function fetchPlaces() {
   if (config.isDebug) console.log('🗺 fetchPlaces: запрос к API, фильтры:', JSON.stringify(filters.value))
   try {
+    const token = authStore.token || localStorage.getItem('token') || ''
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
     const url = placesApi('/places')
     if (config.isDebug) console.log('🗺 fetchPlaces URL:', url)
 
-    const res = await fetch(url)
+    const res = await fetch(url, { headers })
     const data = await res.json()
 
     if (config.isDebug) console.log('📦 fetchPlaces ответ:', JSON.stringify(data, null, 2))
@@ -1656,13 +1923,18 @@ const addPlaceMarkers = () => {
 // 🎯 Ивенты — режим ниндзя
 // ============================================
 
-// Загрузка ивентов с бэка
+// Загрузка ивентов с бэка (events + my_spot из places)
 async function fetchEvents() {
+  const allEvents = []
+
+  // 1. Загружаем обычные ивенты
   try {
+    const token = authStore.token || localStorage.getItem('token') || ''
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
     const url = eventsApi('/events')
     if (config.isDebug) console.log('🎯 fetchEvents URL:', url)
 
-    const res = await fetch(url)
+    const res = await fetch(url, { headers })
     const data = await res.json()
 
     if (config.isDebug) console.log('📦 fetchEvents ответ:', JSON.stringify(data, null, 2))
@@ -1676,31 +1948,123 @@ async function fetchEvents() {
       rawEvents = [data.event]
     }
 
-    // Маппинг ивентов
-    events.value = rawEvents
-      .filter(e => e && e.id && e.name && typeof e.lat === 'number' && typeof e.lon === 'number')
-      .map(e => ({
-        id: e.id,
-        name: e.name,
-        description: e.description || '',
-        lat: e.lat,
-        lng: e.lon,
-        emoji: e.emoji || '📍',
-        time: e.time || e.start_time || '',
-        date: e.date || e.start_date || '',
-        level: e.level || 'Любой',
-        type: e.type || e.activity_type || '',
-        participants: e.participants || 0,
-        maxParticipants: e.max_participants || e.maxParticipants || 0,
-        organizer: e.organizer || e.organizer_name || '',
-        quietCompanion: e.quiet_companion || e.quietCompanion || false,
-        address: e.address || '',
+    if (config.isDebug) console.log('🎯 сырых ивентов:', rawEvents.length)
+
+    // Собираем уникальные spot_id
+    const spotIds = [...new Set(rawEvents.map(e => e.spot_id).filter(Boolean))]
+    if (config.isDebug) console.log('🎯 уникальных spot_id:', spotIds.length)
+
+    // Загружаем координаты мест по spot_id
+    const spotCoords = {}
+    const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {}
+    for (const spotId of spotIds) {
+      try {
+        const placeRes = await fetch(placesApi(`/places/${spotId}`), {
+          headers: authHeader
+        })
+        const placeData = await placeRes.json()
+        const place = placeData.place || placeData
+        if (place && typeof place.lat === 'number' && typeof (place.lon || place.lng) === 'number') {
+          spotCoords[spotId] = {
+            lat: place.lat,
+            lng: place.lon || place.lng,
+            emoji: place.emoji || '📍',
+            name: place.name || '',
+            address: place.address || ''
+          }
+        }
+      } catch (e) {
+        if (config.isDebug) console.warn(`🎯 Не удалось загрузить место #${spotId}:`, e)
+      }
+    }
+
+    if (config.isDebug) console.log('🎯 загружено координат:', Object.keys(spotCoords).length)
+
+    // Маппинг ивентов с подстановкой координат
+    const mappedEvents = rawEvents
+      .filter(e => e && e.id && e.spot_id && spotCoords[e.spot_id])
+      .map(e => {
+        const coords = spotCoords[e.spot_id]
+        return {
+          id: `evt_${e.id}`,
+          spot_id: e.spot_id,
+          name: e.title || e.name,
+          description: e.description || '',
+          lat: coords.lat,
+          lng: coords.lng,
+          emoji: coords.emoji || '📍',
+          time: e.start_time ? new Date(e.start_time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '',
+          date: e.start_time ? new Date(e.start_time).toISOString().split('T')[0] : '',
+          level: e.level || 'Любой',
+          type: e.type || e.activity_type || '',
+          participants: e.participant_count || e.participants || 0,
+          maxParticipants: e.max_participants || e.maxParticipants || 0,
+          organizer: e.organizer || e.organizer_name || '',
+          quietCompanion: e.quiet_companion || e.quietCompanion || false,
+          address: coords.address || '',
+          status: e.status || '',
+          source: 'event'
+        }
+      })
+
+    allEvents.push(...mappedEvents)
+    if (config.isDebug) console.log('🎯 Загружено ивентов с координатами:', mappedEvents.length)
+  } catch (e) {
+    if (config.isDebug) console.warn('fetchEvents: events API недоступен', e)
+  }
+
+  // 2. Загружаем места с category='my_spot' из places API
+  try {
+    const url = placesApi('/places')
+    if (config.isDebug) console.log('🎯 fetchMySpots URL:', url)
+
+    const res = await fetch(url)
+    const data = await res.json()
+
+    if (config.isDebug) console.log('📦 fetchMySpots ответ:', JSON.stringify(data, null, 2))
+
+    let rawPlaces = []
+    if (Array.isArray(data)) {
+      rawPlaces = data
+    } else if (data.places && Array.isArray(data.places)) {
+      rawPlaces = data.places
+    } else if (data.place && typeof data.place === 'object') {
+      rawPlaces = [data.place]
+    }
+
+    // Фильтруем только my_spot
+    const mySpots = rawPlaces
+      .filter(p => p && p.category === 'my_spot' && p.id && p.name && typeof p.lat === 'number' && typeof (p.lon || p.lng) === 'number')
+      .map(p => ({
+        id: `spot_${p.id}`,
+        spot_id: p.id,
+        name: p.name,
+        description: p.description || '',
+        lat: p.lat,
+        lng: p.lon || p.lng || 0,
+        emoji: p.emoji || '📍',
+        time: '',
+        date: '',
+        level: p.activity_type === 'running' ? 'Новичок' : p.activity_type === 'strength' ? 'Средний' : 'Любой',
+        type: p.activity_type || 'other',
+        participants: 0,
+        maxParticipants: 0,
+        organizer: '',
+        quietCompanion: false,
+        address: p.address || '',
+        status: '',
+        source: 'my_spot'
       }))
 
-    if (config.isDebug) console.log('🎯 Загружено ивентов:', events.value.length)
+    allEvents.push(...mySpots)
+    if (config.isDebug) console.log('🎯 Загружено my_spot:', mySpots.length)
   } catch (e) {
-    if (config.isDebug) console.warn('fetchEvents: API недоступен, использую моковые данные', e)
-    // Fallback — моковые ивенты
+    if (config.isDebug) console.warn('fetchMySpots: places API недоступен', e)
+  }
+
+  // Если ничего не загрузилось — используем моковые данные
+  if (allEvents.length === 0) {
+    if (config.isDebug) console.warn('fetchEvents: API недоступен, использую моковые данные')
     events.value = [
       {
         id: 101, name: 'Утренняя пробежка',
@@ -1710,7 +2074,7 @@ async function fetchEvents() {
         level: 'Новичок', type: 'running',
         participants: 5, maxParticipants: 10,
         organizer: 'Алексей', quietCompanion: false,
-        address: 'Парк Победы, Орёл'
+        address: 'Парк Победы, Орёл', source: 'mock'
       },
       {
         id: 102, name: 'Йога на закате',
@@ -1720,7 +2084,7 @@ async function fetchEvents() {
         level: 'Средний', type: 'yoga',
         participants: 3, maxParticipants: 8,
         organizer: 'Мария', quietCompanion: true,
-        address: 'Набережная, Орёл'
+        address: 'Набережная, Орёл', source: 'mock'
       },
       {
         id: 103, name: 'Силовая тренировка',
@@ -1730,9 +2094,12 @@ async function fetchEvents() {
         level: 'Профи', type: 'strength',
         participants: 4, maxParticipants: 6,
         organizer: 'Дмитрий', quietCompanion: false,
-        address: 'Стадион «Центральный», Орёл'
+        address: 'Стадион «Центральный», Орёл', source: 'mock'
       }
     ]
+  } else {
+    events.value = allEvents
+    if (config.isDebug) console.log('🎯 Всего ивентов (events + my_spot):', events.value.length)
   }
 }
 
@@ -1827,6 +2194,141 @@ const removeEventMarkers = () => {
 }
 
 // ============================================
+// 📍 Создание нового места
+// ============================================
+
+function openCreatePlaceForm() {
+  showCreatePlaceForm.value = true
+  createPlaceMode.value = 'search'
+  createPlaceCoords.value = null
+}
+
+function closeCreatePlaceForm() {
+  showCreatePlaceForm.value = false
+  resetCreatePlaceForm()
+}
+
+function resetCreatePlaceForm() {
+  createPlaceForm.value = {
+    name: '',
+    description: '',
+    address: '',
+    lat: null,
+    lon: null,
+    emoji: '📍',
+    category: 'other',
+    activity_type: 'other',
+    noise_level: 5,
+    light_availability: 5,
+    conveniences_availability: 5,
+    is_anonymous: false
+  }
+  createPlaceCoords.value = null
+}
+
+function startPickModeForPlace() {
+  createPlaceMode.value = 'map'
+  prevCenter = map.getCenter()
+  showCreatePlaceForm.value = false
+  map.getContainer().style.cursor = 'crosshair'
+}
+
+async function confirmPickModeForPlace() {
+  const center = map.getCenter()
+  const lat = center.lat
+  const lng = center.lng
+
+  createPlaceCoords.value = { lat, lng }
+  createPlaceForm.value.lat = lat
+  createPlaceForm.value.lon = lng
+
+  // Reverse geocoding для адреса
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ru`,
+      { headers: { 'User-Agent': 'ShoulderToShoulder/1.0' } }
+    )
+    const data = await res.json()
+    if (data.display_name) {
+      createPlaceForm.value.address = data.display_name.split(',').slice(0, 4).join(',').trim()
+    } else {
+      createPlaceForm.value.address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    }
+  } catch (e) {
+    createPlaceForm.value.address = `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+  }
+
+  pickMode.value = null
+  createPlaceMode.value = 'search'
+  map.getContainer().style.cursor = ''
+  showCreatePlaceForm.value = true
+}
+
+function cancelPickModeForPlace() {
+  createPlaceMode.value = 'search'
+  if (prevCenter) {
+    map.setView(prevCenter, map.getZoom(), { animate: false })
+    prevCenter = null
+  }
+  map.getContainer().style.cursor = ''
+  showCreatePlaceForm.value = true
+}
+
+// Создание места через API
+async function submitCreatePlace() {
+  if (!isCreatePlaceFormValid.value) return
+
+  const token = authStore.token || localStorage.getItem('token') || ''
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  }
+
+  const payload = {
+    name: createPlaceForm.value.name,
+    description: createPlaceForm.value.description,
+    address: createPlaceForm.value.address,
+    lat: createPlaceForm.value.lat,
+    lon: createPlaceForm.value.lon,
+    rating: 0,
+    emoji: createPlaceForm.value.emoji,
+    category: createPlaceForm.value.category,
+    activity_type: createPlaceForm.value.activity_type,
+    noise_level: createPlaceForm.value.noise_level,
+    light_availability: createPlaceForm.value.light_availability,
+    conveniences_availability: createPlaceForm.value.conveniences_availability,
+    is_anonymous: createPlaceForm.value.is_anonymous
+  }
+
+  if (config.isDebug) console.log('📍 Creating place:', JSON.stringify(payload, null, 2))
+
+  try {
+    const res = await fetch(placesApi('/places/create'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      throw new Error(`Create place failed: ${res.status} ${errorText}`)
+    }
+
+    const data = await res.json()
+    if (config.isDebug) console.log('✅ Place created:', data)
+
+    // Обновляем список мест
+    await fetchPlaces()
+
+    closeCreatePlaceForm()
+    alert('✅ Место "' + createPlaceForm.value.name + '" создано!')
+  } catch (e) {
+    if (config.isDebug) console.error('❌ Create place failed:', e)
+    alert('❌ Ошибка при создании места: ' + e.message)
+  }
+}
+
+// ============================================
 
 // Перерисовка маркеров при зуме
 const onMapZoom = () => {
@@ -1849,6 +2351,23 @@ onMounted(async () => {
 
   // Экспортируем функции
   window.__setMapPickMode = setMapPickMode
+
+  // Функция открытия маршрута к ивенту
+  window.__openEventRoute = function(eventData) {
+    if (config.isDebug) console.log('🗺 __openEventRoute вызван:', eventData)
+    // Устанавливаем точку назначения
+    routeEndCoords.value = { lat: eventData.lat, lng: eventData.lng }
+    routeEndQuery.value = eventData.name
+    routeEndId.value = eventData.id || null
+    // Открываем форму маршрута
+    showRouteForm.value = true
+    // Подставляем адрес в поле "Откуда"
+    routeStartQuery.value = ''
+    // Показываем карту
+    if (map) {
+      map.setView([eventData.lat, eventData.lng], 15, { animate: true })
+    }
+  }
 
   if (mapRef.value && !map) {
     map = L.map(mapRef.value, {
@@ -2634,6 +3153,796 @@ function restoreNavigation() {
 
 .control-btn-primary:hover {
   background: #c2410c;
+}
+
+/* ============================================
+   🎨 CREATE PLACE MODAL — Beautiful Design
+   ============================================ */
+
+/* Overlay */
+.create-place-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+/* Sheet */
+.create-place-sheet {
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  background: #fafaf9;
+  border-radius: 28px 28px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.15);
+  animation: sheet-slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sheet-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Header */
+.sheet-header {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.sheet-header-bg {
+  height: 120px;
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 50%, #fb923c 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.sheet-header-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.sheet-icon-float {
+  width: 72px;
+  height: 72px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  position: relative;
+  z-index: 1;
+  transition: transform 0.3s ease;
+}
+
+.sheet-icon-float:hover {
+  transform: scale(1.05) rotate(-5deg);
+}
+
+/* Close Button */
+.sheet-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  color: #ea580c;
+  z-index: 2;
+  transition: all 0.2s;
+}
+
+.sheet-close:hover {
+  background: #fff;
+  transform: scale(1.1);
+}
+
+/* Body */
+.sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px 0;
+}
+
+/* Form */
+.create-place-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Section */
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #787170;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+.section-icon {
+  font-size: 18px;
+  color: #ea580c;
+}
+
+/* Input Fields — Floating Label */
+.input-field {
+  position: relative;
+  width: 100%;
+}
+
+.input-field input,
+.input-field textarea {
+  width: 100%;
+  padding: 16px 14px 6px;
+  border: 2px solid #e7e5e4;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 500;
+  background: #fff;
+  outline: none;
+  transition: all 0.2s;
+  font-family: 'Inter', sans-serif;
+}
+
+.input-field input:focus,
+.input-field textarea:focus {
+  border-color: #ea580c;
+  box-shadow: 0 0 0 4px rgba(234, 88, 12, 0.1);
+}
+
+.input-field label {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: #a8a29e;
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+}
+
+.input-field input:focus ~ label,
+.input-field input:not(:placeholder-shown) ~ label,
+.input-field textarea:focus ~ label,
+.input-field textarea:not(:placeholder-shown) ~ label {
+  top: 10px;
+  transform: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ea580c;
+}
+
+.input-field-textarea {
+  min-height: 80px;
+}
+
+.input-field-textarea label {
+  top: 16px;
+  transform: none;
+}
+
+/* Input with icon */
+.input-icon {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+/* Input with button */
+.input-with-btn {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-btn input {
+  flex: 1;
+}
+
+.pick-address-btn {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+  transition: all 0.2s;
+}
+
+.pick-address-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(234, 88, 12, 0.4);
+}
+
+/* Emoji Scroll */
+.emoji-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.emoji-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.emoji-chip {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: #fff;
+  border: 2px solid #e7e5e4;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.emoji-chip:hover {
+  border-color: #ea580c;
+  transform: translateY(-2px);
+}
+
+.emoji-chip.active {
+  background: linear-gradient(135deg, #fef3f0, #fff);
+  border-color: #ea580c;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.2);
+  transform: scale(1.1);
+}
+
+/* Category Grid */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.category-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px;
+  background: #fff;
+  border: 2px solid #e7e5e4;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.category-chip:hover {
+  border-color: #ea580c;
+  transform: translateY(-2px);
+}
+
+.category-chip.active {
+  background: linear-gradient(135deg, #fef3f0, #fff);
+  border-color: #ea580c;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.15);
+}
+
+.cat-emoji {
+  font-size: 24px;
+}
+
+/* Activity Chips */
+.activity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 2px solid #e7e5e4;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.activity-chip:hover {
+  border-color: #ea580c;
+}
+
+.activity-chip.active {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+}
+
+/* Coords Chip */
+.coords-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.coords-chip .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Slider Fields */
+.slider-field {
+  background: #fff;
+  border: 1px solid #e7e5e4;
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.slider-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #44403c;
+}
+
+.slider-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ea580c;
+  background: #fef3f0;
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+
+/* Custom Range Slider */
+.slider-field input[type="range"] {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  outline: none;
+}
+
+.slider-field input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border: 3px solid #ea580c;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s;
+}
+
+.slider-field input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.slider-field input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border: 3px solid #ea580c;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.slider-track-bg {
+  height: 6px;
+  background: #e7e5e4;
+  border-radius: 999px;
+  margin-top: -14px;
+  position: relative;
+  pointer-events: none;
+}
+
+.slider-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.2s;
+}
+
+.slider-fill-noise {
+  background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
+}
+
+.slider-fill-light {
+  background: linear-gradient(90deg, #787170, #fbbf24);
+}
+
+.slider-fill-conv {
+  background: linear-gradient(90deg, #a8a29e, #22c55e);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #a8a29e;
+  margin-top: 8px;
+}
+
+/* Toggle Field */
+.toggle-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border: 1px solid #e7e5e4;
+  border-radius: 16px;
+  padding: 14px;
+  cursor: pointer;
+}
+
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #44403c;
+}
+
+.toggle-desc {
+  font-size: 12px;
+  color: #a8a29e;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #d6d3d1;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active .toggle-slider {
+  background: linear-gradient(135deg, #ea580c, #f97316);
+}
+
+.toggle-switch.active .toggle-slider::before {
+  transform: translateX(24px);
+}
+
+/* Submit Button */
+.submit-place-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px;
+  background: linear-gradient(135deg, #ea580c 0%, #f97316 100%);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3);
+  font-family: 'Inter', sans-serif;
+}
+
+.submit-place-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(234, 88, 12, 0.4);
+}
+
+.submit-place-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.submit-place-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.submit-place-btn .material-symbols-outlined {
+  font-size: 22px;
+}
+
+/* Bottom Spacer */
+.bottom-spacer {
+  height: 20px;
+}
+
+/* Transitions */
+.create-place-fade-enter-active,
+.create-place-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.create-place-fade-enter-from,
+.create-place-fade-leave-to {
+  opacity: 0;
+}
+
+.coords-fade-enter-active,
+.coords-fade-leave-active {
+  transition: all 0.3s ease;
+}
+
+.coords-fade-enter-from,
+.coords-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* Кнопка создания места */
+.control-btn-create {
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 16px rgba(22, 163, 74, 0.4);
+}
+
+.control-btn-create:hover {
+  background: #15803d;
+}
+
+/* Create Place Modal */
+.create-place-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.create-place-modal .modal-content,
+.create-place-modal .create-place-modal-content {
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 24px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* Emoji Picker */
+.emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emoji-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: #f8f9fa;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.emoji-btn:hover {
+  background: #fef3f0;
+}
+
+.emoji-btn.active {
+  background: #fef3f0;
+  border-color: #ea580c;
+}
+
+/* Category Picker */
+.category-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.category-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: #f8f9fa;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-btn:hover {
+  background: #fef3f0;
+}
+
+.category-btn.active {
+  background: #fef3f0;
+  border-color: #ea580c;
+  color: #ea580c;
+}
+
+.category-emoji {
+  font-size: 20px;
+}
+
+/* Address row */
+.address-row {
+  display: flex;
+  gap: 8px;
+}
+
+.address-row input {
+  flex: 1;
+}
+
+.address-map-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  color: #ea580c;
+  transition: all 0.2s;
+}
+
+.address-map-btn:hover {
+  background: #fef3f0;
+}
+
+/* Coords display */
+.coords-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.coords-display .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* Range labels */
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #787170;
+  margin-top: 4px;
+}
+
+/* Select styling */
+.form-group select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #f8f9fa;
+  outline: none;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+}
+
+/* Textarea styling */
+.form-group textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #f8f9fa;
+  outline: none;
+  resize: vertical;
+  font-family: 'Inter', sans-serif;
 }
 
 /* FAB Quick Start */
