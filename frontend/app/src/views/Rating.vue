@@ -6,11 +6,14 @@
         <div class="avatar-small">
           <img :src="currentUser.avatar_url || defaultAvatar" alt="Аватар" />
         </div>
-        <h1 class="brand-title">Рейтинг</h1>
+        <div class="top-nav-user">
+          <h1 class="brand-title">{{ currentUser.display_name || 'Пользователь' }}</h1>
+          <span class="user-login">{{ currentUser.login || '' }}</span>
+        </div>
       </div>
       <div class="top-nav-right">
-        <button class="icon-btn" aria-label="Фильтр" @click="toggleFilter">
-          <span class="material-symbols">filter_list</span>
+        <button class="icon-btn" aria-label="Найти себя" @click="scrollToMyself">
+          <span class="material-symbols">my_location</span>
         </button>
       </div>
     </header>
@@ -47,13 +50,13 @@
         <div
           v-for="(user, index) in sortedUsers"
           :key="user.user_id"
+          :ref="user.user_id === currentUserId ? 'myCardRef' : undefined"
           class="user-card"
           :class="{
-            'user-card-first': index === 0,
-            'user-card-second': index === 1,
-            'user-card-third': index === 2,
-            'user-card-current': user.user_id === currentUserId,
+            'user-card-highlighted': user.user_id === highlightedUserId,
           }"
+          @click="user.user_id !== currentUserId && openUserProfile(user.user_id)"
+          :style="{ cursor: user.user_id !== currentUserId ? 'pointer' : 'default' }"
         >
           <!-- Medal Badge -->
           <div v-if="index < 3" class="medal-badge" :class="`medal-${index + 1}`">
@@ -73,9 +76,9 @@
                   <span class="material-symbols meta-icon">location_on</span>
                   {{ user.city }}
                 </span>
-                <span class="meta-item" v-if="user.fitness_level">
-                  <span class="material-symbols meta-icon">fitness_center</span>
-                  {{ getFitnessLevelLabel(user.fitness_level) }}
+                <span class="meta-item" v-if="user.age">
+                  <span class="material-symbols meta-icon">cake</span>
+                  {{ user.age }}
                 </span>
               </div>
             </div>
@@ -95,6 +98,84 @@
         <p>Пока нет данных для отображения</p>
       </div>
     </main>
+
+    <!-- Public Profile Modal -->
+    <div v-if="showProfileModal" class="modal-overlay" @click.self="closeProfileModal">
+      <div class="modal-content">
+        <button class="modal-close" @click="closeProfileModal">
+          <span class="material-symbols">close</span>
+        </button>
+
+        <div v-if="loadingProfile" class="profile-modal-loading">
+          <span class="material-symbols loading-icon">progress_activity</span>
+          <p>Загрузка профиля...</p>
+        </div>
+
+        <div v-else-if="viewedProfile" class="profile-modal-body">
+          <!-- Avatar -->
+          <div class="profile-modal-avatar">
+            <img :src="viewedProfile.avatar_url || defaultAvatar" alt="Аватар" />
+          </div>
+
+          <!-- Name -->
+          <h2 class="profile-modal-name">{{ viewedProfile.display_name || 'Пользователь' }}</h2>
+
+          <!-- Meta info -->
+          <div class="profile-modal-meta">
+            <span class="meta-item" v-if="viewedProfile.city">
+              <span class="material-symbols meta-icon">location_on</span>
+              {{ viewedProfile.city }}
+            </span>
+            <span class="meta-item" v-if="viewedProfile.age">
+              <span class="material-symbols meta-icon">cake</span>
+              {{ viewedProfile.age }} лет
+            </span>
+            <span class="meta-item" v-if="viewedProfile.fitness_level">
+              <span class="material-symbols meta-icon">fitness_center</span>
+              {{ getFitnessLevelLabel(viewedProfile.fitness_level) }}
+            </span>
+          </div>
+
+          <!-- Bio -->
+          <p v-if="viewedProfile.bio" class="profile-modal-bio">{{ viewedProfile.bio }}</p>
+
+          <!-- Stats -->
+          <div class="profile-modal-stats">
+            <div class="stat-item">
+              <span class="material-symbols stat-icon">verified_user</span>
+              <span class="stat-label">Надёжность</span>
+              <span class="stat-value">{{ (viewedProfile.reliability_score || 0).toFixed(1) }}%</span>
+            </div>
+            <div class="stat-item">
+              <span class="material-symbols stat-icon">favorite</span>
+              <span class="stat-label">Эмпатия</span>
+              <span class="stat-value">{{ viewedProfile.empathy_score || 0 }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="material-symbols stat-icon">event_available</span>
+              <span class="stat-label">Мероприятий</span>
+              <span class="stat-value">{{ viewedProfile.joined_events_count || 0 }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="material-symbols stat-icon">check_circle</span>
+              <span class="stat-label">Посещено</span>
+              <span class="stat-value">{{ viewedProfile.attended_events_count || 0 }}</span>
+            </div>
+          </div>
+
+          <!-- Badges -->
+          <div v-if="viewedProfile.badges && viewedProfile.badges.length > 0" class="profile-modal-badges">
+            <h3 class="badges-title">Достижения</h3>
+            <div class="badges-list">
+              <span v-for="(badge, i) in viewedProfile.badges" :key="i" class="badge-chip">
+                <span class="material-symbols badge-icon">emoji_events</span>
+                {{ badge }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
@@ -121,7 +202,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { authApi } from '../api/index'
+import { authApi, toProxyUrl } from '../api/index'
 import defaultAvatar from '../assets/default-avatar.svg'
 
 const router = useRouter();
@@ -129,12 +210,20 @@ const router = useRouter();
 const currentUser = ref({
   avatar_url: '',
   display_name: '',
+  login: '',
 });
 
 const currentUserId = ref(null);
 const users = ref([]);
 const loading = ref(true);
 const activeFilter = ref('reliability');
+const myCardRef = ref(null);
+const highlightedUserId = ref(null);
+
+// Public profile modal
+const showProfileModal = ref(false);
+const loadingProfile = ref(false);
+const viewedProfile = ref(null);
 
 const fitnessLevelLabels = {
   beginner: 'Начинающий',
@@ -185,42 +274,77 @@ function decodeToken() {
   }
 }
 
+const openUserProfile = async (userId) => {
+  if (userId === currentUserId.value) return;
+  showProfileModal.value = true;
+  loadingProfile.value = true;
+  viewedProfile.value = null;
+  try {
+    const profile = await authApi.getPublicProfile(userId);
+    // Находим рейтинг из текущего списка
+    const userInList = users.value.find(u => u.user_id === userId);
+    viewedProfile.value = {
+      ...profile,
+      empathy_score: userInList?.empathy_score ?? 0,
+      reliability_score: userInList?.reliability_score ?? 0,
+      joined_events_count: profile.joined_events_count ?? 0,
+      attended_events_count: profile.attended_events_count ?? 0,
+      avatar_url: toProxyUrl(profile.avatar_url),
+    };
+  } catch (e) {
+    console.error('Failed to load profile:', e.message);
+  } finally {
+    loadingProfile.value = false;
+  }
+};
+
+const closeProfileModal = () => {
+  showProfileModal.value = false;
+  loadingProfile.value = false;
+  viewedProfile.value = null;
+};
+
+const scrollToMyself = () => {
+  if (!currentUserId.value) return;
+  const el = Array.isArray(myCardRef.value) ? myCardRef.value[0] : myCardRef.value;
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  highlightedUserId.value = currentUserId.value;
+  setTimeout(() => {
+    highlightedUserId.value = null;
+  }, 2000);
+};
+
 const loadRating = async () => {
   loading.value = true;
   try {
-    // Load current user info
+    // Получаем ID текущего пользователя из токена
     const payload = decodeToken();
     if (payload) {
       currentUserId.value = payload.sub || payload.user_id;
     }
 
-    const data = await authApi.getProfile();
+    // Загружаем профиль текущего пользователя для отображения в шапке
+    const profileData = await authApi.getProfile();
     currentUser.value = {
-      avatar_url: data.avatar_url || '',
-      display_name: data.display_name || '',
+      avatar_url: toProxyUrl(profileData.avatar_url) || '',
+      display_name: profileData.display_name || '',
+      login: profileData.phone_number || '',
     };
 
-    // Load rating leaderboard
-    const ratingData = await authApi.getRating();
-    // Assuming the API returns a list of users with scores
-    // If it returns a single user's rating, adjust accordingly
-    if (Array.isArray(ratingData)) {
-      users.value = ratingData;
-    } else {
-      // If single user rating, create a mock list
-      users.value = [
-        {
-          user_id: currentUserId.value,
-          display_name: data.display_name,
-          avatar_url: data.avatar_url,
-          city: data.city || data.preferences?.city,
-          fitness_level: data.fitness_level,
-          reliability_score: ratingData.reliability_score || 100,
-          empathy_score: ratingData.empathy_score || 0,
-          total_events: ratingData.total_events || 0,
-          completed_events: ratingData.completed_events || 0,
-        },
-      ];
+    // Загружаем список всех пользователей с рейтингами
+    const listData = await authApi.getAllUsers();
+    if (listData && Array.isArray(listData.users)) {
+      users.value = listData.users.map(u => ({
+        ...u,
+        avatar_url: toProxyUrl(u.avatar_url),
+      }));
+    } else if (Array.isArray(listData)) {
+      users.value = listData.map(u => ({
+        ...u,
+        avatar_url: toProxyUrl(u.avatar_url),
+      }));
     }
   } catch (e) {
     console.error('Failed to load rating:', e.message);
@@ -242,7 +366,7 @@ onMounted(async () => {
   background: #f3f4f5;
   font-family: 'Inter', sans-serif;
   color: #191c1d;
-  padding-bottom: 80px;
+  padding-bottom: 72px;
 }
 
 /* ===== Top Nav ===== */
@@ -277,10 +401,28 @@ onMounted(async () => {
   object-fit: cover;
 }
 
+.top-nav-user {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
 .brand-title {
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.user-login {
+  font-size: 11px;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 
 .top-nav-right {
@@ -348,7 +490,13 @@ onMounted(async () => {
 .main-content {
   max-width: 768px;
   margin: 0 auto;
-  padding: 0 16px 32px;
+  padding: 0 12px 80px;
+}
+
+.users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ===== Loading State ===== */
@@ -357,7 +505,7 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 48px 16px;
+  padding: 48px 16px 80px;
 }
 
 .loading-icon {
@@ -383,7 +531,7 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 48px 16px;
+  padding: 48px 16px 80px;
 }
 
 .empty-icon {
@@ -397,62 +545,30 @@ onMounted(async () => {
   margin: 0;
 }
 
-/* ===== Users List ===== */
-.users-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 /* ===== User Card ===== */
 .user-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
+  padding: 12px 14px;
   background: #ffffff;
   border-radius: 16px;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.user-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-}
-
-/* First, second, third place styling */
-.user-card-first {
-  background: linear-gradient(135deg, #fff7ed, #ffedd5);
-  border: 2px solid #ea580c;
-}
-
-.user-card-second {
-  background: linear-gradient(135deg, #f3f4f5, #e7e8e9);
-  border: 2px solid #9ca3af;
-}
-
-.user-card-third {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border: 2px solid #d97706;
-}
-
-.user-card-current {
-  box-shadow: 0 0 0 2px #ea580c;
+  min-width: 0;
 }
 
 /* ===== Medal Badge ===== */
 .medal-badge {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
 .medal-badge .material-symbols {
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .medal-1 {
@@ -471,17 +587,27 @@ onMounted(async () => {
 }
 
 .rank-badge {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
   border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #f3f4f5;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #59413a;
-  flex-shrink: 0;
+}
+
+.user-card-highlighted {
+  animation: highlightPulse 0.5s ease-in-out 2;
+  box-shadow: 0 0 0 3px #ea580c, 0 0 20px rgba(234, 88, 12, 0.3);
+}
+
+@keyframes highlightPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
 }
 
 /* ===== User Info ===== */
@@ -494,12 +620,12 @@ onMounted(async () => {
 }
 
 .user-avatar {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
   border-radius: 9999px;
   overflow: hidden;
   background: #e1e3e4;
-  flex-shrink: 0;
 }
 
 .user-avatar img {
@@ -510,12 +636,13 @@ onMounted(async () => {
 
 .user-details {
   min-width: 0;
+  flex: 1;
 }
 
 .user-name {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -531,12 +658,13 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 2px;
-  font-size: 12px;
+  font-size: 11px;
   color: #9ca3af;
+  white-space: nowrap;
 }
 
 .meta-icon {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* ===== User Score ===== */
@@ -544,20 +672,30 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-width: 52px;
   flex-shrink: 0;
 }
 
 .score-value {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1;
 }
 
 .score-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: #9ca3af;
-  margin-top: 4px;
+  margin-top: 2px;
+}
+
+@media (max-width: 380px) {
+  .score-value {
+    font-size: 16px;
+  }
+  .score-label {
+    font-size: 9px;
+  }
 }
 
 .score-reliability .score-value {
@@ -682,18 +820,6 @@ onMounted(async () => {
   background: #1a1a2e;
 }
 
-.dark-theme .user-card-first {
-  background: linear-gradient(135deg, #1a1a2e, #2a1a0e);
-}
-
-.dark-theme .user-card-second {
-  background: linear-gradient(135deg, #1a1a2e, #2a2a3e);
-}
-
-.dark-theme .user-card-third {
-  background: linear-gradient(135deg, #1a1a2e, #2a2a1e);
-}
-
 .dark-theme .rank-badge {
   background: #16213e;
   color: #a0a0b0;
@@ -709,5 +835,241 @@ onMounted(async () => {
 
 .dark-theme .nav-item:hover {
   background: #16213e;
+}
+
+/* ===== Profile Modal ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.2);
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.08);
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #59413a;
+  z-index: 1;
+  transition: background 0.15s;
+}
+
+.modal-close:hover {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.modal-close .material-symbols {
+  font-size: 20px;
+}
+
+.profile-modal-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 24px;
+}
+
+.loading-icon {
+  font-size: 36px;
+  color: #ea580c;
+  animation: spin 1s linear infinite;
+}
+
+.profile-modal-body {
+  padding: 32px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-modal-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e1e3e4;
+  margin-bottom: 16px;
+}
+
+.profile-modal-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-modal-name {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  text-align: center;
+  color: #191c1d;
+}
+
+.profile-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.profile-modal-meta .meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.profile-modal-meta .meta-icon {
+  font-size: 16px;
+}
+
+.profile-modal-bio {
+  font-size: 14px;
+  color: #59413a;
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  background: #f3f4f5;
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-modal-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px;
+  background: #f3f4f5;
+  border-radius: 12px;
+}
+
+.stat-icon {
+  font-size: 24px;
+  color: #ea580c;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #191c1d;
+}
+
+.profile-modal-badges {
+  width: 100%;
+}
+
+.badges-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: #59413a;
+}
+
+.badges-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #c2410c;
+}
+
+.badge-icon {
+  font-size: 16px;
+}
+
+/* Dark theme modal */
+.dark-theme .modal-content {
+  background: #1a1a2e;
+}
+
+.dark-theme .modal-close {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.dark-theme .modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark-theme .profile-modal-name {
+  color: #e0e0e0;
+}
+
+.dark-theme .profile-modal-bio {
+  background: #16213e;
+  color: #a0a0b0;
+}
+
+.dark-theme .stat-item {
+  background: #16213e;
+}
+
+.dark-theme .stat-value {
+  color: #e0e0e0;
+}
+
+.dark-theme .badges-title {
+  color: #a0a0b0;
+}
+
+.dark-theme .badge-chip {
+  background: #2a1a0e;
+  border-color: #4a2a1e;
+  color: #ea580c;
 }
 </style>

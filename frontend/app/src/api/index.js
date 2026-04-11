@@ -353,7 +353,22 @@ export const authApi = USE_MOCK
         })
       },
       getAllUsers() {
-        return request('/users')
+        logMockCall('getAllUsers', true)
+        return delay(300).then(() => {
+          const result = {
+            users: [
+              { user_id: '1', display_name: 'Алексей', city: 'Орёл', age: 28, avatar_url: '', empathy_score: 42, reliability_score: 95.5, badges: [] },
+              { user_id: '2', display_name: 'Мария', city: 'Орёл', age: 24, avatar_url: '', empathy_score: 67, reliability_score: 88.0, badges: [] },
+              { user_id: '3', display_name: 'Дмитрий', city: 'Орёл', age: 31, avatar_url: '', empathy_score: 33, reliability_score: 72.3, badges: [] },
+            ],
+            total: 3,
+            limit: 20,
+            offset: 0,
+          }
+          logMockCall('getAllUsers', false)
+          console.log(`${LOG_PREFIX} ${LOG_COLORS.bgGreen}${LOG_COLORS.green} MOCK OK ${LOG_COLORS.reset}`, result)
+          return result
+        })
       },
       getUploadUrl({ purpose, content_type, file_size }) {
         logMockCall('getUploadUrl', true)
