@@ -1,0 +1,254 @@
+{
+  "title": "Тестовые данные для API Routes безопасных маршрутов",
+  "base_url": "http://localhost:8001/api/v1",
+  "description": "Все тесты используют координаты дорог в Орле",
+  
+  "test_cases": [
+    {
+      "name": "Простой маршрут (без анализа безопасности)",
+      "method": "GET",
+      "endpoint": "/route",
+      "request": {
+        "start_lat": 52.970164,
+        "start_lng": 36.060250,
+        "end_lat": 52.975174,
+        "end_lng": 36.062597
+      },
+      "curl": "curl 'http://localhost:8001/api/v1/route?start_lat=52.970164&start_lng=36.060250&end_lat=52.975174&end_lng=36.062597'",
+      "response_example": {
+        "ok": true,
+        "start": {"lat": 52.970164, "lng": 36.060250},
+        "end": {"lat": 52.975174, "lng": 36.062597},
+        "routes": [
+          {
+            "coordinates": [
+              {"lat": 52.970164, "lng": 36.060250},
+              {"lat": 52.975174, "lng": 36.062597}
+            ],
+            "distance_m": 582,
+            "highway_type": "residential"
+          }
+        ],
+        "count": 1
+      }
+    },
+    
+    {
+      "name": "Безопасный маршрут с анализом (с риск-скором и AI комментарием)",
+      "method": "GET",
+      "endpoint": "/route/safe",
+      "request": {
+        "start_lat": 52.970164,
+        "start_lng": 36.060250,
+        "end_lat": 52.975174,
+        "end_lng": 36.062597
+      },
+      "curl": "curl 'http://localhost:8001/api/v1/route/safe?start_lat=52.970164&start_lng=36.060250&end_lat=52.975174&end_lng=36.062597'",
+      "response_example": {
+        "ok": true,
+        "start": {"lat": 52.970164, "lng": 36.060250},
+        "end": {"lat": 52.975174, "lng": 36.062597},
+        "safest_route": {
+          "coordinates": [
+            {"lat": 52.970164, "lng": 36.060250},
+            {"lat": 52.972000, "lng": 36.061000},
+            {"lat": 52.975174, "lng": 36.062597}
+          ],
+          "distance_m": 582,
+          "risk_score": 2.5,
+          "highway_type": "residential"
+        },
+        "shortest_route": {
+          "coordinates": [
+            {"lat": 52.970164, "lng": 36.060250},
+            {"lat": 52.975174, "lng": 36.062597}
+          ],
+          "distance_m": 480,
+          "risk_score": 4.2,
+          "highway_type": "secondary"
+        },
+        "ai_comment": "Этот маршрут проходит через хорошо освещённые жилые улицы с наличием уличных фонарей. Рекомендуется пойти по этому пути, особенно в тёмное время суток.",
+        "all_routes": [
+          {
+            "coordinates": [
+              {"lat": 52.970164, "lng": 36.060250},
+              {"lat": 52.972000, "lng": 36.061000},
+              {"lat": 52.975174, "lng": 36.062597}
+            ],
+            "distance_m": 582,
+            "risk_score": 2.5,
+            "highway_type": "residential"
+          },
+          {
+            "coordinates": [
+              {"lat": 52.970164, "lng": 36.060250},
+              {"lat": 52.975174, "lng": 36.062597}
+            ],
+            "distance_m": 480,
+            "risk_score": 4.2,
+            "highway_type": "secondary"
+          },
+          {
+            "coordinates": [
+              {"lat": 52.970164, "lng": 36.060250},
+              {"lat": 52.971000, "lng": 36.059000},
+              {"lat": 52.975174, "lng": 36.062597}
+            ],
+            "distance_m": 620,
+            "risk_score": 5.1,
+            "highway_type": "footway"
+          }
+        ],
+        "count": 3
+      }
+    },
+
+    {
+      "name": "Маршрут через центр Орла",
+      "method": "GET",
+      "endpoint": "/route/safe",
+      "request": {
+        "start_lat": 52.9651,
+        "start_lng": 36.0785,
+        "end_lat": 52.9690,
+        "end_lng": 36.0820
+      },
+      "curl": "curl 'http://localhost:8001/api/v1/route/safe?start_lat=52.9651&start_lng=36.0785&end_lat=52.9690&end_lng=36.0820'",
+      "response_example": {
+        "ok": true,
+        "start": {"lat": 52.9651, "lng": 36.0785},
+        "end": {"lat": 52.9690, "lng": 36.0820},
+        "safest_route": {
+          "coordinates": [
+            {"lat": 52.9651, "lng": 36.0785},
+            {"lat": 52.9665, "lng": 36.0800},
+            {"lat": 52.9690, "lng": 36.0820}
+          ],
+          "distance_m": 320,
+          "risk_score": 1.8,
+          "highway_type": "primary"
+        },
+        "shortest_route": {
+          "coordinates": [
+            {"lat": 52.9651, "lng": 36.0785},
+            {"lat": 52.9690, "lng": 36.0820}
+          ],
+          "distance_m": 280,
+          "risk_score": 3.5,
+          "highway_type": "secondary"
+        },
+        "ai_comment": "Центральная часть города хорошо освещена и имеет активное уличное движение. Маршрут через основные улицы безопаснее. Рекомендуется избегать боковых переулков после наступления темноты.",
+        "all_routes": [
+          {
+            "coordinates": [
+              {"lat": 52.9651, "lng": 36.0785},
+              {"lat": 52.9665, "lng": 36.0800},
+              {"lat": 52.9690, "lng": 36.0820}
+            ],
+            "distance_m": 320,
+            "risk_score": 1.8,
+            "highway_type": "primary"
+          },
+          {
+            "coordinates": [
+              {"lat": 52.9651, "lng": 36.0785},
+              {"lat": 52.9690, "lng": 36.0820}
+            ],
+            "distance_m": 280,
+            "risk_score": 3.5,
+            "highway_type": "secondary"
+          }
+        ],
+        "count": 2
+      }
+    }
+  ],
+
+  "frontend_integration": {
+    "description": "Как использовать данные в фронете (Vue.js)",
+    "example_code": `
+// API клиент (src/services/api.js)
+export const getSafeRoute = (startLat, startLng, endLat, endLng) => {
+  return apiClient.get('/route/safe', {
+    params: {
+      start_lat: startLat,
+      start_lng: startLng,
+      end_lat: endLat,
+      end_lng: endLng
+    }
+  })
+};
+
+// Компонент (RouteNavigator.vue)
+const buildSafeRoute = async () => {
+  try {
+    const data = await getSafeRoute(
+      startLat.value,
+      startLng.value,
+      endPlace.value.lat,
+      endPlace.value.lng
+    );
+    
+    // Рисуем маршант на карте
+    drawRoute(data.safest_route.coordinates);
+    
+    // Показываем инфо
+    routeInfo.value = {
+      distance: data.safest_route.distance_m,
+      riskScore: data.safest_route.risk_score,
+      aiComment: data.ai_comment,
+      alternatives: data.all_routes.length
+    };
+  } catch (err) {
+    console.error('Ошибка маршрута:', err);
+  }
+};
+    `
+  },
+
+  "response_fields": {
+    "ok": "boolean - успешность запроса",
+    "start": "object {lat, lng} - начальная точка",
+    "end": "object {lat, lng} - конечная точка",
+    "safest_route": "object - маршрут с минимальным риском",
+    "shortest_route": "object - самый короткий маршрут",
+    "ai_comment": "string - AI анализ безопасности",
+    "all_routes": "array - все альтернативные маршруты",
+    "count": "number - количество маршрутов",
+    
+    "route_object": {
+      "coordinates": "array[{lat, lng}] - координаты маршрута",
+      "distance_m": "number - расстояние в метрах",
+      "risk_score": "number - оценка риска (0 = безопасно, 10+ = опасно)",
+      "highway_type": "string - тип дороги (primary, secondary, residential, footway)"
+    }
+  },
+
+  "risk_score_explanation": {
+    "0-2": "✅ Высоко безопасные районы - хорошее освещение, основные дороги",
+    "2-4": "✓ Безопасные районы - приемлемое освещение, жилые улицы",
+    "4-6": "⚠️ Средний риск - слабое освещение или менее людные улицы",
+    "6+": "❌ Высокий риск - мало переходов, нет освещения, боковые переулки"
+  },
+
+  "api_requirements": {
+    "external_services": [
+      "OpenRouteService (маршруты и дороги)",
+      "Overpass API (данные OSM - уличное освещение)",
+      "OpenRouter AI (комментарии о безопасности)"
+    ],
+    "api_keys": {
+      "OPENROUTE_SERVICE_API_KEY": "Установить в .env (backend/maps_service/.env)",
+      "OPENROUTER_API_KEY": "Установить в .env (backend/maps_service/.env)"
+    },
+    "timeout": "Запрос может занять 10-30 секунд из-за Overpass API",
+    "rate_limits": "OpenRouteService - 2500 запросов/день в free плане"
+  },
+
+  "troubleshooting": {
+    "503_service_unavailable": "Один из внешних API недоступен - проверьте интернет и API ключи",
+    "400_bad_coordinates": "Проверьте что координаты в правильном формате (lat=-90...90, lng=-180...180)",
+    "timeout_error": "Overpass API работает медленно - подождите и повторите",
+    "no_routes_found": "Маршрут не найден между этими точками - выберите пешеходный путь"
+  }
+}

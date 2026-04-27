@@ -1,62 +1,81 @@
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 
-# from src.core.config import cors_settings
-# from src.core.infrastructure.database.database import engine, get_session
-# from src.core.infrastructure.exception_handler import register_handlers
-from logger import get_logger
-# from src.modules.identity.presentation.api.router import router as account_router
+from .config import settings
+from .api.v1.endpoints import places_router, routes_router, events_router
+from .api.v1.endpoints.meetups import router as meetups_router
+from .database import Base, engine
+from .utils.nats_client import NatsRpcClient
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("Application startup: initializing")
-
-    try:
-        yield
-    finally:
-        logger.info("Application shutdown: cleaning up...")
-
-        if engine is not None:
-            try:
-                await engine.dispose()
-                logger.info("Database connections closed successfully")
-            except Exception as e:
-                logger.error(f"Failed to close database connections: {e}", exc_info=True)
-
-        logger.info("Application shutdown complete")
-
-
-app = FastAPI(title="KYOP API", description="Keep Your Own Pace Backend API", lifespan=lifespan)
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="Maps Service для Shoulder to Shoulder",
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_settings.allowed_origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-register_handlers(app)
 
-app.include_router(account_router)
+@app.on_event("startup")
+async def startup():
+    """Инициализация при запуске"""
+    # 1. Создаём таблицы БД
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("✓ Таблицы БД инициализированы")
+    
+    nats = NatsRpcClient.get_instance()
+    nats_server = getattr(settings, 'NATS_SERVER', 'nats://localhost:4222')
+    
+    if await nats.connect(nats_server):
+        logger.info("✓ NATS клиент инициализирован")
+    else:
+        logger.warning("⚠️ NATS не подключен - мероприятия не будут доступны")
 
 
-@app.get("/health", tags=["system"])
-async def health_check(db: AsyncSession = Depends(get_session)) -> dict[str, str]:
-    """
-    Checks connection to database
-    """
-    await db.execute(text("SELECT 1"))
-    return {"status": "ok"}
+@app.on_event("shutdown")
+async def shutdown():
+    nats = NatsRpcClient.get_instance()
+    await nats.disconnect()
+    
+    await engine.dispose()
+    logger.info("Сервис выключен")
 
 
-# запуск minio локально для проверки:
-# minio.exe server D:\data-for-minio --console-address ":9001" --license D:/minio.license
+@app.get("/health", tags=["health"])
+async def health_check():
+    nats = NatsRpcClient.get_instance()
+    return {
+        "status": "ok",
+        "service": "maps_service",
+        "nats_connected": nats.is_connected
+    }
+
+
+api_v1_prefix = settings.API_V1_PREFIX
+
+app.include_router(places_router, prefix=api_v1_prefix)
+app.include_router(routes_router, prefix=api_v1_prefix)
+app.include_router(meetups_router, prefix=api_v1_prefix)
+app.include_router(events_router, prefix=api_v1_prefix)
+
+
+@app.get("/")
+async def root():
+    return {
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
+    }
+
+
+# uvicorn backend.maps_service.main:app --port 8001
