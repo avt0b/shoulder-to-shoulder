@@ -18,13 +18,6 @@ ENV APP_HOME=${APP_HOME} \
 
 WORKDIR ${APP_HOME}
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    ca-certificates \
-    curl \
-    postgresql-client \
-    && rm -rf /var/lib/apt/lists/*
-
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
@@ -39,6 +32,6 @@ RUN if [ -n "${UV_SYNC_EXTRA}" ]; then pip install --no-cache-dir ${UV_SYNC_EXTR
 EXPOSE ${SERVICE_PORT}
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=5 \
-    CMD curl -fsS "http://localhost:${SERVICE_PORT}/health" || exit 1
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"SERVICE_PORT\"]}/health', timeout=5)"
 
 CMD ["sh", "-lc", "exec /opt/shoulder-to-shoulder-venv/bin/python -m uvicorn ${SERVICE_MODULE} --host 0.0.0.0 --port ${SERVICE_PORT}"]

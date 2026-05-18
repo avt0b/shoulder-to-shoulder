@@ -408,11 +408,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { config, api } from '../config'
 import { navigationStore } from '../stores/navigation'
 
+const L = window.L
 const emit = defineEmits(['expand-map', 'navigate'])
 const router = useRouter()
 const mapRef = ref(null)

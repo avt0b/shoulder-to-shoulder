@@ -330,9 +330,14 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { config, api } from '../config'
 
 const emit = defineEmits(['close', 'navigate'])
+const router = useRouter()
+const EVENT_DRAFT_KEY = 'shoulder_event_draft'
+const EVENT_LOCATION_KEY = 'shoulder_pending_event_location'
+const MAP_PICK_MODE_KEY = 'shoulder_pending_map_pick_mode'
 const activeTab = ref('all')
 const showCreateModal = ref(false)
 
@@ -920,22 +925,67 @@ function resetForm() {
 
 // Указать место на карте
 function openMapForPick() {
-  closeModal()
+  try {
+    localStorage.setItem(EVENT_DRAFT_KEY, JSON.stringify({
+      form: form.value,
+      locationMode: locationMode.value,
+      locationQuery: locationQuery.value
+    }))
+    localStorage.setItem(MAP_PICK_MODE_KEY, 'event')
+  } catch (e) {
+    if (config.isDebug) console.warn('Failed to save event draft before map pick:', e)
+  }
+
+  showCreateModal.value = false
+  showLocationDropdown.value = false
+  if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
+  router.push('/map')
   // Сначала переходим на main, потом раскрываем карту
-  emit('navigate', 'main')
-  setTimeout(() => {
-    if (window.__triggerMapExpand) {
-      window.__triggerMapExpand()
-    }
-  }, 100)
-  setTimeout(() => {
-    if (window.__setMapPickMode) {
-      window.__setMapPickMode('event')
-    }
-  }, 600)
 }
 
 // Отправка формы
+function restoreEventDraftAfterMapPick() {
+  let draft = null
+  let selectedLocation = null
+
+  try {
+    const draftRaw = localStorage.getItem(EVENT_DRAFT_KEY)
+    if (draftRaw) draft = JSON.parse(draftRaw)
+
+    const locationRaw = localStorage.getItem(EVENT_LOCATION_KEY)
+    if (locationRaw) selectedLocation = JSON.parse(locationRaw)
+  } catch (e) {
+    if (config.isDebug) console.warn('Failed to restore event map pick state:', e)
+  }
+
+  if (!draft && !selectedLocation) return
+
+  if (draft?.form) {
+    form.value = { ...form.value, ...draft.form }
+    locationMode.value = draft.locationMode || 'map'
+    locationQuery.value = draft.locationQuery || ''
+  }
+
+  if (selectedLocation) {
+    const { lat, lng, address } = selectedLocation
+    form.value.meetupId = null
+    form.value.customLat = lat
+    form.value.customLng = lng
+    form.value.customAddress = address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    locationMode.value = 'map'
+    locationQuery.value = ''
+  }
+
+  showCreateModal.value = true
+
+  try {
+    localStorage.removeItem(EVENT_DRAFT_KEY)
+    localStorage.removeItem(EVENT_LOCATION_KEY)
+  } catch (e) {
+    if (config.isDebug) console.warn('Failed to clear event map pick state:', e)
+  }
+}
+
 function submitEvent() {
   if (!isFormValid.value) return
 
@@ -980,6 +1030,7 @@ function submitEvent() {
 onMounted(async () => {
   await fetchAllEvents()
   await fetchMeetups()
+  restoreEventDraftAfterMapPick()
 })
 </script>
 

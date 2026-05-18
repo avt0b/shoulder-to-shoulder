@@ -62,7 +62,11 @@ export async function login(credentials) {
   try {
     const data = await authApi.login(credentials)
     authStore.token = data.access_token
-    authStore.user = data.user
+    authStore.user = data.user || {
+      display_name: credentials.phone_number,
+      phone_number: credentials.phone_number,
+    }
+    data.user = authStore.user
     authStore.isAuthenticated = true
     saveToStorage()
     console.log(`${LOG_PREFIX} ✅ Вход успешен:`, data.user.display_name || data.user.login)
@@ -84,7 +88,12 @@ export async function register(data) {
     const result = await authApi.register(data)
     if (result.access_token) {
       authStore.token = result.access_token
-      authStore.user = result.user
+      authStore.user = result.user || {
+        display_name: data.display_name,
+        phone_number: data.phone_number,
+        email: data.email || null,
+      }
+      result.user = authStore.user
       authStore.isAuthenticated = true
       saveToStorage()
       console.log(`${LOG_PREFIX} ✅ Регистрация успешна:`, result.user.display_name)
