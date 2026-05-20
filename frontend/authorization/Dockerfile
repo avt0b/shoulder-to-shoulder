@@ -26,17 +26,18 @@ FROM node:20-alpine
 
 ARG APP_HOME=/shoulder-to-shoulder
 
-ENV APP_HOME=${APP_HOME}
+ENV APP_HOME=${APP_HOME} \
+    NODE_ENV=production
 
 WORKDIR ${APP_HOME}/frontend/authorization
 
-RUN apk add --no-cache curl && npm install -g serve
-
+COPY --from=builder ${APP_HOME}/frontend/authorization/package*.json ./
+COPY --from=builder ${APP_HOME}/frontend/authorization/node_modules ./node_modules
 COPY --from=builder ${APP_HOME}/frontend/authorization/dist ./dist
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=5 \
-    CMD curl -fsS http://localhost:3000/ || exit 1
+    CMD node -e "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["serve", "-s", "dist", "-l", "3000"]
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]

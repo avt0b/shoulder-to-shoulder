@@ -1,30 +1,52 @@
 name: shoulder-to-shoulder
 
+x-backend-build: &backend-build
+  context: .
+  dockerfile: ./Dockerfile
+
 x-backend-common: &backend-common
   restart: unless-stopped
-  env_file:
-    - ./.env
   networks:
     - s2s_network
+  environment: &backend-env
+    APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
+    ENVIRONMENT: ${ENVIRONMENT:-development}
+    API_V1_STR: ${API_V1_STR:-/api/v1}
+    SECRET_KEY: ${SECRET_KEY:-super-secret-key-change-in-production-please-use-64-characters-minimum-please}
+    JWT_SECRET: ${JWT_SECRET:-super-secret-key-change-in-production-please-use-64-characters-minimum-please}
+    ALGORITHM: ${ALGORITHM:-HS256}
+    ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+    REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+    DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db}
+    REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    NATS_URL: ${NATS_URL:-nats://nats:4222}
+    USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user_service:8000}
+    NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification_service:8001}
+    EVENT_SERVICE_URL: ${EVENT_SERVICE_URL:-http://event_service:8002}
+    ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin_service:8003}
+    MEDIA_SERVICE_URL: ${MEDIA_SERVICE_URL:-http://media_service:8006}
+    GATEWAY_URL: ${GATEWAY_URL:-http://gateway:8080}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
 services:
   postgres:
     image: postgres:16-alpine
     container_name: s2s_postgres
     restart: unless-stopped
-    env_file:
-      - ./.env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      TZ: ${TZ}
-    # Not exposed publicly
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-shoulder_to_shoulder_db}
+      TZ: ${TZ:-Europe/Moscow}
     volumes:
-      - ${PROJECT_ROOT}/.docker/postgres:/var/lib/postgresql/data
-      - ${PROJECT_ROOT}/ops/postgres/init:/docker-entrypoint-initdb.d:ro
+      - postgres_data:/var/lib/postgresql/data
+      - ./ops/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -36,9 +58,8 @@ services:
     container_name: s2s_redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    # Not exposed publicly
     volumes:
-      - ${PROJECT_ROOT}/.docker/redis:/data
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -52,7 +73,6 @@ services:
     container_name: s2s_nats
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
-    # Not exposed publicly
     networks:
       - s2s_network
 
@@ -60,18 +80,19 @@ services:
     image: minio/minio:RELEASE.2025-02-28T09-55-16Z
     container_name: s2s_minio
     restart: unless-stopped
-    env_file:
-      - ./.env
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      TZ: ${TZ}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      TZ: ${TZ:-Europe/Moscow}
     command: server /data --console-address ":9001"
-    # Not exposed publicly
     volumes:
-      - ${PROJECT_ROOT}/.docker/minio:/data
+      - minio_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/minio/health/live || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:9000/minio/health/live || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -82,27 +103,18 @@ services:
     <<: *backend-common
     container_name: s2s_user_service
     build:
-      context: .
-      dockerfile: ./backend/user_service/Dockerfile
+      <<: *backend-build
       args:
-        APP_HOME: ${APP_HOME}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
         SERVICE_MODULE: backend.user_service.app.main:app
         SERVICE_PORT: 8000
     environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      PROJECT_NAME: ${USER_SERVICE_PROJECT_NAME}
-      API_V1_STR: ${API_V1_STR}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
-      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      NATS_URL: ${NATS_URL}
-      FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL}
-      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
+      <<: *backend-env
+      PROJECT_NAME: ${USER_SERVICE_PROJECT_NAME:-User Service}
+      FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL:-admin@example.com}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-admin123}
     ports:
-      - "${USER_SERVICE_PORT}:8000"
+      - "${USER_SERVICE_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,27 +127,17 @@ services:
     <<: *backend-common
     container_name: s2s_notification_service
     build:
-      context: .
-      dockerfile: ./backend/notification_service/Dockerfile
+      <<: *backend-build
       args:
-        APP_HOME: ${APP_HOME}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
         SERVICE_MODULE: backend.notification_service.app.main:app
         SERVICE_PORT: 8001
     environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      PROJECT_NAME: ${NOTIFICATION_SERVICE_PROJECT_NAME}
-      API_V1_STR: ${API_V1_STR}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      NATS_URL: ${NATS_URL}
-      USER_SERVICE_URL: ${USER_SERVICE_URL}
-      GATEWAY_URL: ${GATEWAY_URL}
-      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS}
-      LOG_LEVEL: ${LOG_LEVEL}
+      <<: *backend-env
+      PROJECT_NAME: ${NOTIFICATION_SERVICE_PROJECT_NAME:-Notification Service}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-10}
     ports:
-      - "${NOTIFICATION_SERVICE_PORT}:8001"
+      - "${NOTIFICATION_SERVICE_PORT:-8001}:8001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,26 +145,23 @@ services:
         condition: service_healthy
       nats:
         condition: service_started
+      user_service:
+        condition: service_started
 
   event_service:
     <<: *backend-common
     container_name: s2s_event_service
     build:
-      context: .
-      dockerfile: ./backend/event_service/Dockerfile
+      <<: *backend-build
       args:
-        APP_HOME: ${APP_HOME}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
         SERVICE_MODULE: backend.event_service.app.main:app
         SERVICE_PORT: 8002
     environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      PROJECT_NAME: ${EVENT_SERVICE_PROJECT_NAME}
-      API_V1_STR: ${API_V1_STR}
-      SECRET_KEY: ${SECRET_KEY}
-      DATABASE_URL: ${DATABASE_URL}
-      NATS_URL: ${NATS_URL}
+      <<: *backend-env
+      PROJECT_NAME: ${EVENT_SERVICE_PROJECT_NAME:-Event Service}
     ports:
-      - "${EVENT_SERVICE_PORT}:8002"
+      - "${EVENT_SERVICE_PORT:-8002}:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -173,25 +172,16 @@ services:
     <<: *backend-common
     container_name: s2s_admin_service
     build:
-      context: .
-      dockerfile: ./backend/admin_service/Dockerfile
+      <<: *backend-build
       args:
-        APP_HOME: ${APP_HOME}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
         SERVICE_MODULE: backend.admin_service.app.main:app
         SERVICE_PORT: 8003
     environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      PROJECT_NAME: ${ADMIN_SERVICE_PROJECT_NAME}
-      API_V1_STR: ${API_V1_STR}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
-      NATS_URL: ${NATS_URL}
-      USER_SERVICE_URL: ${USER_SERVICE_URL}
-      EVENT_SERVICE_URL: ${EVENT_SERVICE_URL}
+      <<: *backend-env
+      PROJECT_NAME: ${ADMIN_SERVICE_PROJECT_NAME:-Admin Service}
     ports:
-      - "${ADMIN_SERVICE_PORT}:8003"
-    # Not exposed publicly
+      - "${ADMIN_SERVICE_PORT:-8003}:8003"
     depends_on:
       nats:
         condition: service_started
@@ -200,34 +190,57 @@ services:
       event_service:
         condition: service_started
 
+  gateway:
+    <<: *backend-common
+    container_name: s2s_gateway
+    build:
+      <<: *backend-build
+      args:
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
+        SERVICE_MODULE: backend.gateway.main:app
+        SERVICE_PORT: 8080
+    environment:
+      <<: *backend-env
+      APP_NAME: ${GATEWAY_PROJECT_NAME:-Gateway Service}
+      API_V1_PREFIX: ${API_V1_STR:-/api/v1}
+      DEBUG: ${GATEWAY_DEBUG:-false}
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    depends_on:
+      user_service:
+        condition: service_started
+      notification_service:
+        condition: service_started
+      event_service:
+        condition: service_started
+      admin_service:
+        condition: service_started
+      media_service:
+        condition: service_started
+
   media_service:
     <<: *backend-common
     container_name: s2s_media_service
     build:
-      context: .
-      dockerfile: ./backend/media_service/Dockerfile
+      <<: *backend-build
       args:
-        APP_HOME: ${APP_HOME}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
         SERVICE_MODULE: backend.media_service.app.main:app
         SERVICE_PORT: 8006
-        UV_SYNC_EXTRA: boto3 botocore
     environment:
-      ENVIRONMENT: ${ENVIRONMENT}
-      PROJECT_NAME: ${MEDIA_SERVICE_PROJECT_NAME}
-      API_V1_STR: ${API_V1_STR}
-      DATABASE_URL: ${DATABASE_URL}
-      NATS_URL: ${NATS_URL}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      AWS_S3_BUCKET: ${MEDIA_BUCKET}
-      AWS_S3_REGION: ${AWS_S3_REGION}
-      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL}
-      AWS_PUBLIC_URL: ${AWS_PUBLIC_URL}
-      MAX_FILE_SIZE: ${MAX_FILE_SIZE}
-      ALLOWED_CONTENT_TYPES_STR: ${ALLOWED_CONTENT_TYPES_STR}
-      ALLOWED_PURPOSES_STR: ${ALLOWED_PURPOSES_STR}
+      <<: *backend-env
+      PROJECT_NAME: ${MEDIA_SERVICE_PROJECT_NAME:-Media Service}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      AWS_S3_BUCKET: ${MEDIA_BUCKET:-dev-media}
+      AWS_S3_REGION: ${AWS_S3_REGION:-us-east-1}
+      AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:-http://minio:9000}
+      AWS_PUBLIC_URL: ${AWS_PUBLIC_URL:-http://localhost:8006}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      ALLOWED_CONTENT_TYPES_STR: ${ALLOWED_CONTENT_TYPES_STR:-image/jpeg,image/png,image/webp}
+      ALLOWED_PURPOSES_STR: ${ALLOWED_PURPOSES_STR:-avatar,event,spot,badge}
     ports:
-      - "${MEDIA_SERVICE_PORT}:8006"
+      - "${MEDIA_SERVICE_PORT:-8006}:8006"
     depends_on:
       postgres:
         condition: service_healthy
@@ -241,16 +254,17 @@ services:
     restart: unless-stopped
     build:
       context: .
-      dockerfile: ./frontend/authorization/Dockerfile
+      dockerfile: ./frontend/app/Dockerfile
       args:
-        APP_HOME: ${APP_HOME}
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-        VITE_APP_ENV: ${VITE_APP_ENV}
-        VITE_DEBUG: ${VITE_DEBUG}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api/v1}
+        VITE_OSRM_BASE_URL: ${VITE_OSRM_BASE_URL:-https://router.project-osrm.org}
+        VITE_APP_ENV: ${VITE_APP_ENV:-development}
+        VITE_DEBUG: ${VITE_DEBUG:-true}
     ports:
-      - "${FRONTEND_PORT}:3000"
+      - "${FRONTEND_PORT:-3000}:3000"
     depends_on:
-      user_service:
+      gateway:
         condition: service_started
     networks:
       - s2s_network
@@ -261,29 +275,35 @@ services:
     profiles:
       - maps
     build:
-      context: .
-      dockerfile: ./backend/maps_service/Dockerfile
+      <<: *backend-build
       args:
-        APP_HOME: ${APP_HOME}
+        APP_HOME: ${APP_HOME:-/shoulder-to-shoulder}
         SERVICE_MODULE: backend.maps_service.main:app
         SERVICE_PORT: 8004
         UV_SYNC_EXTRA: loguru
     environment:
-      APP_PORT: ${MAPS_SERVICE_PORT}
-      PORT: ${MAPS_SERVICE_PORT}
-      POSTGRES_URL: ${DATABASE_URL}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      <<: *backend-env
+      APP_PORT: ${MAPS_SERVICE_PORT:-8004}
+      PORT: ${MAPS_SERVICE_PORT:-8004}
+      POSTGRES_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/shoulder_to_shoulder_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB}
-      ALLOWED_ORIGINS: ${MAPS_ALLOWED_ORIGINS}
-      TZ: ${TZ}
-    # Not exposed publicly
+      POSTGRES_DB: ${POSTGRES_DB:-shoulder_to_shoulder_db}
+      ALLOWED_ORIGINS: ${MAPS_ALLOWED_ORIGINS:-["http://localhost:3000"]}
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${MAPS_SERVICE_PORT:-8004}:8004"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
 
 networks:
   s2s_network:

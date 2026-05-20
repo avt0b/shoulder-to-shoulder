@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Gateway Service"
     app_version: str = "1.0.0"
-    environment: Literal["dev", "prod"] = "dev"
+    environment: Literal["dev", "prod", "development", "production"] = "development"
     debug: bool = True
     
     api_v1_prefix: str = "/api/v1"

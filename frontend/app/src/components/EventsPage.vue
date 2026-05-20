@@ -330,9 +330,14 @@
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { config, api } from '../config'
 
 const emit = defineEmits(['close', 'navigate'])
+const router = useRouter()
+const EVENT_DRAFT_KEY = 'shoulder_event_draft'
+const EVENT_LOCATION_KEY = 'shoulder_pending_event_location'
+const MAP_PICK_MODE_KEY = 'shoulder_pending_map_pick_mode'
 const activeTab = ref('all')
 const showCreateModal = ref(false)
 
@@ -681,6 +686,84 @@ const filteredEvents = computed(() => {
 // ============================================
 
 const STORAGE_KEY = 'shoulder_events'
+const DEFAULT_SPOT_ID = '00000000-0000-4000-8000-000000000001'
+
+function authHeaders() {
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  }
+}
+
+function isUuid(value) {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function buildStartTime(date, time) {
+  return new Date(`${date}T${time || '00:00'}:00`).toISOString()
+}
+
+function parseEventDescription(description) {
+  if (!description) return {}
+  try {
+    const parsed = JSON.parse(description)
+    return parsed && typeof parsed === 'object' ? parsed : { text: description }
+  } catch {
+    return { text: description }
+  }
+}
+
+function mapApiEvent(apiEvent) {
+  const meta = parseEventDescription(apiEvent.description)
+  const start = new Date(apiEvent.start_time)
+  const date = Number.isNaN(start.getTime()) ? '' : start.toISOString().split('T')[0]
+  const time = Number.isNaN(start.getTime()) ? '' : start.toTimeString().slice(0, 5)
+  const type = meta.type || 'other'
+
+  return {
+    id: apiEvent.id,
+    name: apiEvent.title,
+    emoji: typeEmoji[type] || '📍',
+    date,
+    time,
+    dateDisplay: formatDateDisplay(date),
+    locationShort: meta.locationShort || meta.location || 'Место не указано',
+    location: meta.location || meta.locationShort || 'Место не указано',
+    description: meta.text || '',
+    level: meta.level || 'Открыто',
+    type,
+    quietCompanion: meta.quietCompanion === true,
+    participants: apiEvent.participant_count ?? 1,
+    maxParticipants: apiEvent.max_participants,
+    isJoined: false,
+    avatars: [],
+    moreCount: 0
+  }
+}
+
+function buildApiEventPayload(eventData) {
+  return {
+    spot_id: isUuid(eventData.meetupId) ? eventData.meetupId : DEFAULT_SPOT_ID,
+    title: eventData.name,
+    description: JSON.stringify({
+      text: eventData.description || '',
+      locationShort: eventData.locationShort,
+      location: eventData.location,
+      type: eventData.type,
+      quietCompanion: eventData.quietCompanion,
+      level: eventData.level,
+      customLat: eventData.customLat,
+      customLng: eventData.customLng,
+      customAddress: eventData.customAddress
+    }),
+    max_participants: eventData.maxParticipants,
+    duration_minutes: 60,
+    start_time: buildStartTime(eventData.date, eventData.time),
+    photo_url: null,
+    anonymous: eventData.quietCompanion === true
+  }
+}
 
 function loadFromLocalStorage() {
   try {
@@ -705,14 +788,18 @@ function saveToLocalStorage(events) {
 // Получить все мероприятия
 async function fetchAllEvents() {
   try {
-    // Пока нет GET эндпоинта в Swagger — используем localStorage/mocks
-    // Когда бэк добавит GET /api/v1/events — раскомментировать:
-    // const res = await fetch(api('/events'))
-    // const data = await res.json()
-    // allEvents.value = data.events || []
-    // return data.events
+    const res = await fetch(api('/events?limit=100&offset=0'))
+    if (!res.ok) throw new Error(`GET /events failed: ${res.status}`)
 
-    // Пробуем localStorage
+    const data = await res.json()
+    const events = Array.isArray(data.events) ? data.events.map(mapApiEvent) : []
+
+    if (events.length > 0) {
+      allEvents.value = events
+      saveToLocalStorage(events)
+      return events
+    }
+
     const stored = loadFromLocalStorage()
     if (stored && stored.length > 0) {
       allEvents.value = stored
@@ -842,14 +929,18 @@ async function submitEventToBackend(eventData) {
   try {
     const res = await fetch(api('/events'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(eventData)
+      headers: authHeaders(),
+      body: JSON.stringify(buildApiEventPayload(eventData))
     })
+    if (!res.ok) throw new Error(`POST /events failed: ${res.status}`)
+
     const data = await res.json()
-    allEvents.value.unshift(data.event)
+    const createdEvent = mapApiEvent(data)
+
+    allEvents.value.unshift(createdEvent)
     saveToLocalStorage(allEvents.value)
     syncMyMeetups()
-    return data.event
+    return createdEvent
   } catch (e) {
     if (config.isDebug) console.warn('submitEventToBackend: API недоступен, сохраняем локально')
 
@@ -920,22 +1011,67 @@ function resetForm() {
 
 // Указать место на карте
 function openMapForPick() {
-  closeModal()
+  try {
+    localStorage.setItem(EVENT_DRAFT_KEY, JSON.stringify({
+      form: form.value,
+      locationMode: locationMode.value,
+      locationQuery: locationQuery.value
+    }))
+    localStorage.setItem(MAP_PICK_MODE_KEY, 'event')
+  } catch (e) {
+    if (config.isDebug) console.warn('Failed to save event draft before map pick:', e)
+  }
+
+  showCreateModal.value = false
+  showLocationDropdown.value = false
+  if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
+  router.push('/map')
   // Сначала переходим на main, потом раскрываем карту
-  emit('navigate', 'main')
-  setTimeout(() => {
-    if (window.__triggerMapExpand) {
-      window.__triggerMapExpand()
-    }
-  }, 100)
-  setTimeout(() => {
-    if (window.__setMapPickMode) {
-      window.__setMapPickMode('event')
-    }
-  }, 600)
 }
 
 // Отправка формы
+function restoreEventDraftAfterMapPick() {
+  let draft = null
+  let selectedLocation = null
+
+  try {
+    const draftRaw = localStorage.getItem(EVENT_DRAFT_KEY)
+    if (draftRaw) draft = JSON.parse(draftRaw)
+
+    const locationRaw = localStorage.getItem(EVENT_LOCATION_KEY)
+    if (locationRaw) selectedLocation = JSON.parse(locationRaw)
+  } catch (e) {
+    if (config.isDebug) console.warn('Failed to restore event map pick state:', e)
+  }
+
+  if (!draft && !selectedLocation) return
+
+  if (draft?.form) {
+    form.value = { ...form.value, ...draft.form }
+    locationMode.value = draft.locationMode || 'map'
+    locationQuery.value = draft.locationQuery || ''
+  }
+
+  if (selectedLocation) {
+    const { lat, lng, address } = selectedLocation
+    form.value.meetupId = null
+    form.value.customLat = lat
+    form.value.customLng = lng
+    form.value.customAddress = address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    locationMode.value = 'map'
+    locationQuery.value = ''
+  }
+
+  showCreateModal.value = true
+
+  try {
+    localStorage.removeItem(EVENT_DRAFT_KEY)
+    localStorage.removeItem(EVENT_LOCATION_KEY)
+  } catch (e) {
+    if (config.isDebug) console.warn('Failed to clear event map pick state:', e)
+  }
+}
+
 function submitEvent() {
   if (!isFormValid.value) return
 
@@ -980,6 +1116,7 @@ function submitEvent() {
 onMounted(async () => {
   await fetchAllEvents()
   await fetchMeetups()
+  restoreEventDraftAfterMapPick()
 })
 </script>
 

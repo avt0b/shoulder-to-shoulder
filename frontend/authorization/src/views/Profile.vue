@@ -105,22 +105,22 @@
 
     <!-- Bottom Navigation -->
     <nav class="bottom-nav">
-      <button class="nav-item">
+      <router-link to="/map" class="nav-item">
         <span class="material-symbols">map</span>
         <span class="nav-label">Map</span>
-      </button>
-      <button class="nav-item">
+      </router-link>
+      <router-link to="/groups" class="nav-item">
         <span class="material-symbols">group</span>
         <span class="nav-label">Groups</span>
-      </button>
-      <button class="nav-item">
+      </router-link>
+      <router-link to="/routes" class="nav-item">
         <span class="material-symbols">directions_run</span>
         <span class="nav-label">Routes</span>
-      </button>
-      <button class="nav-item nav-item-active">
+      </router-link>
+      <router-link to="/profile" class="nav-item nav-item-active">
         <span class="material-symbols" :data-filled="true">person</span>
         <span class="nav-label">Profile</span>
-      </button>
+      </router-link>
     </nav>
 
     <!-- Edit Modal -->
@@ -1499,6 +1499,7 @@ onMounted(async () => {
   cursor: pointer;
   transition: background 0.15s;
   min-width: 56px;
+  text-decoration: none;
 }
 
 .nav-item:hover {

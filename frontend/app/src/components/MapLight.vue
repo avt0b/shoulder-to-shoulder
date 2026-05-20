@@ -409,11 +409,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import { config, api } from '../config'
 import { setNavigation, updateNavPosition, updateNavRemaining, navigationStore } from '../stores/navigation'
 
+const L = window.L
 const emit = defineEmits(['close', 'navigate'])
 const router = useRouter()
 const mapRef = ref(null)
@@ -495,6 +494,7 @@ let geoSearchTimer = null
 
 // Режим выбора точки на карте
 const pickMode = ref(null) // 'start' | 'end' | 'event' | null
+const MAP_PICK_MODE_KEY = 'shoulder_pending_map_pick_mode'
 let prevCenter = null
 
 // Линия маршрута на карте
@@ -665,6 +665,10 @@ function cancelPickMode() {
   }
   map.getContainer().style.cursor = ''
   // Возвращаем форму (кроме режима event)
+  if (wasEvent) {
+    router.push('/events')
+    return
+  }
   if (!wasEvent) {
     showRouteForm.value = true
   }
@@ -729,7 +733,9 @@ async function confirmPickMode() {
     } catch (e) {
       if (config.isDebug) console.warn('Failed to save event location:', e)
     }
-    emit('close')
+    pickMode.value = null
+    map.getContainer().style.cursor = ''
+    router.push('/events')
     return
   }
 
@@ -1668,6 +1674,16 @@ onMounted(async () => {
     }
 
     setTimeout(() => map.invalidateSize(), 100)
+
+    try {
+      const pendingPickMode = localStorage.getItem(MAP_PICK_MODE_KEY)
+      if (pendingPickMode) {
+        localStorage.removeItem(MAP_PICK_MODE_KEY)
+        setMapPickMode(pendingPickMode)
+      }
+    } catch (e) {
+      if (config.isDebug) console.warn('Failed to restore pending map pick mode:', e)
+    }
   }
 })
 
