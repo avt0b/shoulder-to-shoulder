@@ -813,10 +813,11 @@ async function submitEventToBackend(eventData) {
 
     const res = await fetch(eventsApi('/events'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) },
       body: JSON.stringify(eventPayload)
     })
     const data = await res.json()
+
     if (data.event) {
       myMeetups.value.unshift(data.event)
     }
@@ -911,9 +912,10 @@ async function handleJoinMeetup(meetupId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/join`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) },
       body: JSON.stringify({ user_id: userId })
     })
+
     const data = await res.json()
 
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
@@ -946,9 +948,10 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/cancel`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) },
       body: JSON.stringify({ user_id: userId })
     })
+
     const data = await res.json()
 
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
@@ -982,9 +985,10 @@ async function handleCheckinMeetup(meetupId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/checkin`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) },
       body: JSON.stringify({ user_id: userId })
     })
+
     const data = await res.json()
     return data
   } catch (e) {

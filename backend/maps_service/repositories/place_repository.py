@@ -3,6 +3,8 @@ from sqlalchemy.future import select
 from sqlalchemy import and_
 from typing import List, Optional
 from math import radians, sin, cos, sqrt, atan2
+from uuid import UUID
+
 
 from ..models.db_models import Place
 
@@ -16,7 +18,7 @@ class PlaceRepository:
         result = await self.session.execute(stmt)
         return result.scalars().all()
     
-    async def get_by_id(self, place_id: int) -> Optional[Place]:
+    async def get_by_id(self, place_id: UUID) -> Optional[Place]:
         stmt = select(Place).where(Place.id == place_id)
         result = await self.session.execute(stmt)
         return result.scalars().first()

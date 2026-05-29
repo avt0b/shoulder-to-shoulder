@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Enum, Text, Index, JSON, Table, ForeignKey, CheckConstraint
+import uuid
+
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Enum, Text, Index, JSON, Table, ForeignKey, CheckConstraint, UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -16,7 +18,7 @@ from ..database import Base
 class Place(Base):
     __tablename__ = "places"
     
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True, server_default="nextval('places_id_seq'::regclass)")
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
     lat = Column(Float, nullable=False)

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
-
+from uuid import UUID
 
 class PlaceCreate(BaseModel):
     name: str = Field(..., min_length=1)
@@ -24,7 +24,7 @@ class PlaceCreate(BaseModel):
 class PlaceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
-    id: int
+    id: UUID
     name: str
     description: Optional[str]
     lat: float
