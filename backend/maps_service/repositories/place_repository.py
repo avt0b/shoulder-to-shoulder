@@ -35,7 +35,7 @@ class PlaceRepository:
         
         nearby = []
         for place in all_places:
-            distance = self._haversine(lat, lon, place.latitude, place.longitude)
+            distance = self._haversine(lat, lon, place.lat, place.lon)
             if distance <= radius_m / 1000:
                 nearby.append((place, distance * 1000))
         
