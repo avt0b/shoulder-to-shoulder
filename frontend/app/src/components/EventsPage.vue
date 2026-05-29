@@ -6,7 +6,7 @@
         <button class="back-btn" @click="$emit('close')">
           <span class="material-symbols-outlined">arrow_back</span>
         </button>
-        <span class="page-title">Встречи</span>
+        <span class="page-title">Ивенты</span>
       </div>
       <button class="icon-button" @click="openCreateModal">
         <span class="material-symbols-outlined">add</span>
@@ -79,14 +79,6 @@
             <div class="event-actions">
               <span class="participants-count">{{ event.participants }}/{{ event.maxParticipants }}</span>
               <button
-                class="action-btn route-btn"
-                v-if="event.placeLat && event.placeLng"
-                @click.stop="navigateToEvent(event)"
-              >
-                <span class="material-symbols-outlined">navigation</span>
-                <span>Маршрут</span>
-              </button>
-              <button
                 class="action-btn"
                 :class="{ 'action-btn-joined': event.isJoined }"
                 @click.stop="event.isJoined ? leaveEvent(event.id) : joinEvent(event.id)"
@@ -152,16 +144,6 @@
               <span>{{ selectedEvent.participants }}/{{ selectedEvent.maxParticipants }} записано</span>
             </div>
           </div>
-
-          <!-- Кнопка маршрута -->
-          <button
-            v-if="selectedEvent.placeLat && selectedEvent.placeLng"
-            class="event-detail-action route-action"
-            @click="navigateToEvent(selectedEvent)"
-          >
-            <span class="material-symbols-outlined">navigation</span>
-            <span>Проложить маршрут</span>
-          </button>
 
           <!-- Кнопка действия -->
           <button
@@ -285,7 +267,7 @@
             <div v-if="locationMode === 'meetup'" class="location-meetup-list">
               <input v-model="locationQuery" type="text" placeholder="Поиск места..." @input="showLocationDropdown = true" @focus="showLocationDropdown = true" @blur="hideLocationDropdownDelayed" />
               <div class="location-dropdown" v-if="showLocationDropdown && filteredMeetups.length > 0">
-                <div v-for="meetup in filteredMeetups" :key="meetup.id" class="location-option" :class="{ 'location-option-selected': form.meetupId === meetup.id }" @click.stop="selectMeetup(meetup)">
+                <div v-for="meetup in filteredMeetups" :key="meetup.id" class="location-option" :class="{ 'location-option-selected': form.meetupId === meetup.id }" @mousedown="selectMeetup(meetup)">
                   <span class="location-option-emoji">{{ meetup.emoji }}</span>
                   <div class="location-option-info">
                     <span class="location-option-name">{{ meetup.name }}</span>
@@ -296,33 +278,6 @@
               <div v-if="form.meetupId" class="location-selected">
                 <span class="material-symbols-outlined">check_circle</span>
                 <span>{{ selectedMeetupName }}</span>
-              </div>
-              <!-- Карточка характеристик места -->
-              <div v-if="form.meetupId" class="place-features-card">
-                <div class="place-feature-row" v-if="form.placeActivityType">
-                  <span class="place-feature-label">🏃 Активность:</span>
-                  <span class="place-feature-value">{{ activityTypeLabels[form.placeActivityType] || form.placeActivityType }}</span>
-                </div>
-                <div class="place-feature-row" v-if="form.placeNoiseLevel">
-                  <span class="place-feature-label">🔊 Шум:</span>
-                  <span class="place-feature-value">{{ noiseLevelLabels[form.placeNoiseLevel] || form.placeNoiseLevel }}</span>
-                </div>
-                <div class="place-feature-row" v-if="form.placeLit">
-                  <span class="place-feature-label">💡 Освещение:</span>
-                  <span class="place-feature-value">Есть</span>
-                </div>
-                <div class="place-feature-row" v-if="form.placeLockers">
-                  <span class="place-feature-label">🚿 Раздевалки:</span>
-                  <span class="place-feature-value">Есть</span>
-                </div>
-                <div class="place-feature-row" v-if="form.placeBenches">
-                  <span class="place-feature-label">🪑 Скамейки:</span>
-                  <span class="place-feature-value">Есть</span>
-                </div>
-                <div class="place-feature-row" v-if="form.placeAnonymous">
-                  <span class="place-feature-label">🤫 Анонимное:</span>
-                  <span class="place-feature-value">Да</span>
-                </div>
               </div>
             </div>
 
@@ -361,7 +316,7 @@
       </router-link>
       <router-link to="/events" class="nav-item nav-item-active">
         <span class="material-symbols-outlined" data-filled="true">event</span>
-        <span>Встречи</span>
+        <span>Ивенты</span>
       </router-link>
       <router-link to="/profile" class="nav-item">
         <span class="material-symbols-outlined" :data-filled="$route.path === '/profile'">person</span>
@@ -379,7 +334,6 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { config, placesApi, eventsApi } from '../config'
-import { authStore } from '../stores/auth'
 
 const emit = defineEmits(['close', 'navigate'])
 const router = useRouter()
@@ -582,28 +536,18 @@ async function fetchMeetups() {
     const data = await res.json()
     
     const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
-
+    
     meetups.value = (data.places || [])
       .filter(p => p.id && p.name && typeof p.lat === 'number' && typeof p.lon === 'number')
-      .map(p => {
-        const noiseLevelNum = typeof p.noise_level === 'number' ? p.noise_level : 0
-        const noiseLevel = noiseLevelNum <= 3 ? 'quiet' : noiseLevelNum <= 6 ? 'moderate' : 'loud'
-
-        return {
-          id: p.id,
-          name: p.name,
-          address: p.address || '',
-          lat: p.lat,
-          lng: p.lon,
-          emoji: p.emoji || '📍',
-          activityType: validActivities.includes(p.activity_type) ? p.activity_type : 'other',
-          noiseLevel,
-          lit: p.light_availability >= 5,
-          lockers: p.conveniences_availability === true,
-          benches: p.conveniences_availability === true,
-          anonymous: p.is_anonymous === true,
-        }
-      })
+      .map(p => ({
+        id: p.id,
+        name: p.name,
+        address: p.address || '',
+        lat: p.lat,
+        lng: p.lon,
+        emoji: p.emoji || '📍',
+        activityType: validActivities.includes(p.activity_type) ? p.activity_type : 'other',
+      }))
       
     if (config.isDebug) console.log('📍 EventsPage fetchMeetups: загружено мест:', meetups.value.length)
   } catch (e) {
@@ -632,20 +576,12 @@ const selectedMeetupName = computed(() => {
 })
 
 function selectMeetup(meetup) {
-  if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
   form.value.meetupId = meetup.id
   form.value.customAddress = ''
   form.value.customLat = null
   form.value.customLng = null
   locationQuery.value = meetup.name
   showLocationDropdown.value = false
-  // Заполняем поля из места
-  form.value.placeActivityType = meetup.activityType || null
-  form.value.placeNoiseLevel = meetup.noiseLevel || null
-  form.value.placeLit = meetup.lit || false
-  form.value.placeLockers = meetup.lockers || false
-  form.value.placeBenches = meetup.benches || false
-  form.value.placeAnonymous = meetup.anonymous || false
 }
 
 function hideLocationDropdownDelayed() {
@@ -658,20 +594,6 @@ const levels = [
   { key: 'Средний', emoji: '⚡', label: 'Средний' },
   { key: 'Профи', emoji: '🔥', label: 'Профи' }
 ]
-
-// Словари для отображения характеристик места
-const activityTypeLabels = {
-  running: '🏃 Бег',
-  strength: '💪 Силовая',
-  yoga: '🧘 Йога',
-  workout: '🤸 Воркаут',
-  other: '📍 Другое'
-}
-const noiseLevelLabels = {
-  quiet: 'Тихое',
-  moderate: 'Умеренный',
-  loud: 'Шумное'
-}
 
 // Форма нового мероприятия
 const form = ref({
@@ -686,14 +608,7 @@ const form = ref({
   meetupId: null,
   customAddress: '',
   customLat: null,
-  customLng: null,
-  // Поля из выбранного места (places)
-  placeActivityType: null,
-  placeNoiseLevel: null,
-  placeLit: null,
-  placeLockers: null,
-  placeBenches: null,
-  placeAnonymous: null
+  customLng: null
 })
 
 // Валидация
@@ -796,117 +711,55 @@ function saveToLocalStorage(events) {
 async function fetchAllEvents() {
   try {
     // Пробуем бэк
-    const token = authStore.token || localStorage.getItem('token') || ''
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {}
-    const res = await fetch(eventsApi('/events?limit=50&offset=0'), { headers })
+    const res = await fetch(eventsApi('/events?limit=50&offset=0'))
     const data = await res.json()
 
     if (data.events && data.events.length > 0) {
-      // Загружаем места для маппинга spot_id → полное info
+      // Загружаем места для маппинга spot_id → название
       const placesMap = new Map()
-      let placesList = []
       try {
-        const placesRes = await fetch(placesApi('/places'), { headers })
+        const placesRes = await fetch(placesApi('/places'))
         const placesData = await placesRes.json()
-        const validActivities = ['running', 'strength', 'yoga', 'workout', 'other']
-        placesList = placesData.places || []
-        placesList.forEach(p => {
-          const noiseLevelNum = typeof p.noise_level === 'number' ? p.noise_level : 0
-          const noiseLevel = noiseLevelNum <= 3 ? 'quiet' : noiseLevelNum <= 6 ? 'moderate' : 'loud'
-          // Ключ мапы — UUID формат (конвертируем из integer если нужно)
-          const placeUuid = toUuid(p.id) || String(p.id)
-          placesMap.set(placeUuid, {
-            name: p.name,
-            address: p.address || '',
-            emoji: p.emoji || '📍',
-            lat: p.lat,
-            lng: p.lon,
-            activityType: validActivities.includes(p.activity_type) ? p.activity_type : 'other',
-            noiseLevel,
-            lit: p.light_availability >= 5,
-            lockers: p.conveniences_availability === true,
-            benches: p.conveniences_availability === true,
-            anonymous: p.is_anonymous === true,
-          })
-        })
+        ;(placesData.places || []).forEach(p => placesMap.set(p.id, {
+          name: p.name,
+          address: p.address || '',
+          emoji: p.emoji || '📍'
+        }))
       } catch (e) {
-        if (config.isDebug) console.warn('fetchPlaces для events не удалось', e)
+        if (config.isDebug) console.warn('fetchPlaces для events не удалось')
       }
-
-      // Загружаем «мои встречи» из localStorage чтобы восстановить isJoined
-      const MY_MEETUPS_KEY = 'shoulder_my_meetups'
-      let myMeetupIds = new Set()
-      try {
-        const stored = localStorage.getItem(MY_MEETUPS_KEY)
-        if (stored) {
-          const myMeetups = JSON.parse(stored)
-          myMeetupIds = new Set(myMeetups.filter(m => m.isJoined).map(m => String(m.id)))
-          if (config.isDebug) console.log('📋 Восстановлено isJoined для', myMeetupIds.size, 'встреч')
-        }
-      } catch (e) {
-        if (config.isDebug) console.warn('Failed to load my meetups:', e)
-      }
-
-      // Загружаем локально созданные события из localStorage
-      const localEvents = loadFromLocalStorage() || []
-      const localEventsMap = new Map()
-      localEvents.forEach(le => {
-        // Локальные события имеют числовой id (Date.now())
-        if (typeof le.id === 'number') {
-          localEventsMap.set(String(le.id), le)
-        }
-      })
 
       // Маппим бэковые events → внутренний формат
-      const backendEvents = data.events.map(ev => {
-        let place = placesMap.get(String(ev.spot_id))
-
-        // Если место не найдено по spot_id — пробуем найти по совпадению названия
-        if (!place) {
-          place = placesList.find(p =>
-            p.name && ev.title && p.name.toLowerCase().includes(ev.title.toLowerCase())
-          ) || null
-        }
-
+      allEvents.value = data.events.map(ev => {
+        const place = placesMap.get(ev.spot_id) || { name: ev.spot_id, address: '', emoji: '📍' }
         const startDate = new Date(ev.start_time)
-        const eventKey = String(ev.id)
-
         return {
           id: ev.id,
           name: ev.title,
-          emoji: place?.emoji || '📍',
+          emoji: place.emoji,
           date: startDate.toISOString().split('T')[0],
           time: startDate.toTimeString().slice(0, 5),
           dateDisplay: formatDateDisplay(startDate.toISOString().split('T')[0]),
-          locationShort: place ? place.address : (ev.spot_id || ''),
-          location: place ? `${place.name}, ${place.address}` : '',
+          locationShort: place.name,
+          location: `${place.name}, ${place.address}`,
           description: ev.description || '',
           level: 'Открыто',
-          type: place?.activityType || '',
+          type: '',
           quietCompanion: false,
           anonymous: ev.anonymous,
           participants: ev.participant_count || 0,
           maxParticipants: ev.max_participants,
-          isJoined: myMeetupIds.has(eventKey),
+          isJoined: false,
           avatars: [],
           moreCount: 0,
           spot_id: ev.spot_id,
           host_id: ev.host_id,
-          status: ev.status,
-          placeLat: place?.lat || null,
-          placeLng: place?.lng || null,
-          placeAddress: place?.address || '',
-          placeLit: place?.lit || false,
-          placeLockers: place?.lockers || false,
-          placeBenches: place?.benches || false,
-          placeAnonymous: place?.anonymous || false,
+          status: ev.status
         }
       })
 
-      // Объединяем: локальные + бэковые (локальные первыми)
-      allEvents.value = [...localEvents, ...backendEvents]
       saveToLocalStorage(allEvents.value)
-      if (config.isDebug) console.log('📅 Загружено events: бэк=' + backendEvents.length + ', локальные=' + localEvents.length)
+      if (config.isDebug) console.log('📅 Загружено events с бэка:', allEvents.value.length)
       return allEvents.value
     }
   } catch (e) {
@@ -924,89 +777,31 @@ async function fetchAllEvents() {
 }
 
 // Записаться на мероприятие
-async function joinEvent(eventId) {
-  const token = localStorage.getItem('token')
-  if (config.isDebug) console.log('🔑 joinEvent: token present?', !!token)
-
+async function joinEvent(eventId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${eventId}/join`), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || ''}`
-      }
-      // Бак НЕ принимает body — user_id берётся из токена
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
     })
-
-    if (!res.ok) {
-      const errorText = await res.text()
-      let errorData = null
-      try { errorData = JSON.parse(errorText) } catch {}
-
-      const detail = errorData?.detail || ''
-
-      // Хост уже участник — это не ошибка, а инфо
-      if (res.status === 400 && detail === 'Host is already a participant by default') {
-        if (config.isDebug) console.log('ℹ️ Вы организатор — уже являетесь участником')
-        const event = allEvents.value.find(e => e.id === eventId)
-        if (event) event.isJoined = true
-        syncMyMeetups()
-        return { status: 'host' }
-      }
-
-      // Мероприятие уже не открыто для записи
-      if (res.status === 400 && detail === 'Event is not open for joining') {
-        if (config.isDebug) console.warn('⚠️ Мероприятие уже не открыто для записи (статус не pending)')
-        alert('Это мероприятие больше не открыто для записи')
-        return { status: 'closed' }
-      }
-
-      // Мероприятие заполнено
-      if (res.status === 400 && detail === 'Event is full') {
-        if (config.isDebug) console.warn('⚠️ Мероприятие заполнено')
-        alert('Это мероприятие уже заполнено')
-        return { status: 'full' }
-      }
-
-      // Уже записан
-      if (res.status === 409) {
-        if (config.isDebug) console.log('ℹ️ Вы уже записаны на это мероприятие')
-        const event = allEvents.value.find(e => e.id === eventId)
-        if (event) event.isJoined = true
-        syncMyMeetups()
-        return { status: 'already_joined' }
-      }
-
-      if (config.isDebug) {
-        console.error('❌ joinEvent failed!')
-        console.error('Status:', res.status, res.statusText)
-        console.error('URL:', eventsApi(`/events/${eventId}/join`))
-        console.error('Token present:', !!token)
-        console.error('Response:', errorText)
-      }
-      throw new Error(`joinEvent failed: ${res.status} — ${detail}`)
-    }
-
     const data = await res.json()
-
-    // Обновляем событие в списке всех
     const event = allEvents.value.find(e => e.id === eventId)
     if (event) {
       event.isJoined = true
-      event.participants = data.participant_count || event.participants
+      event.participants = data.participants
     }
-
     // Синхронизация: сохраняем мои встречи в общий ключ
     syncMyMeetups()
     return data
   } catch (e) {
-    if (config.isDebug) console.warn(`joinEvent: API недоступен`, e)
+    if (config.isDebug) console.warn(`joinEvent: API недоступен`)
     const event = allEvents.value.find(e => e.id === eventId)
     if (event && event.participants < event.maxParticipants) {
       event.isJoined = true
       event.participants++
       saveToLocalStorage(allEvents.value)
     }
+    // Синхронизация: сохраняем мои встречи в общий ключ
     syncMyMeetups()
     return null
   }
@@ -1014,43 +809,26 @@ async function joinEvent(eventId) {
 
 // Отписаться от мероприятия
 async function leaveEvent(eventId, userId = 1) {
-  const token = localStorage.getItem('token')
-  if (config.isDebug) console.log('🔑 leaveEvent: token present?', !!token)
-
   try {
     const res = await fetch(eventsApi(`/events/${eventId}/cancel`), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || ''}`
-      }
-      // Бэк НЕ принимает body — user_id берётся из токена
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
     })
-
-    if (!res.ok) {
-      const errorText = await res.text()
-      if (config.isDebug) {
-        console.error('❌ leaveEvent failed!')
-        console.error('Status:', res.status, res.statusText)
-        console.error('Response:', errorText)
-      }
-      throw new Error(`leaveEvent failed: ${res.status}`)
-    }
-
     const data = await res.json()
     const event = allEvents.value.find(e => e.id === eventId)
     if (event) {
       event.isJoined = false
-      event.participants = data.participant_count || event.participants
+      event.participants = data.participants
     }
     syncMyMeetups()
     return data
   } catch (e) {
-    if (config.isDebug) console.warn(`leaveEvent: API недоступен`, e)
+    if (config.isDebug) console.warn(`leaveEvent: API недоступен`)
     const event = allEvents.value.find(e => e.id === eventId)
     if (event) {
       event.isJoined = false
-      event.participants = Math.max(0, event.participants - 1)
+      event.participants--
       saveToLocalStorage(allEvents.value)
     }
     syncMyMeetups()
@@ -1091,16 +869,12 @@ function syncMyMeetups() {
 }
 
 // Checkin на мероприятие (новый эндпоинт)
-async function checkinEvent(eventId) {
-  const token = localStorage.getItem('token')
+async function checkinEvent(eventId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${eventId}/checkin`), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token || ''}`
-      }
-      // Бэк НЕ принимает body — user_id берётся из токена
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId })
     })
     const data = await res.json()
     return data
@@ -1110,71 +884,47 @@ async function checkinEvent(eventId) {
   }
 }
 
-// Конвертирует places id (integer или UUID) в UUID-строку для spot_id
-function toUuid(id) {
-  if (!id) return null
-  const str = String(id)
-  // Уже UUID
-  if (/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str)) {
-    return str
-  }
-  // Integer → UUID формат 00000000-0000-0000-0000-000000000XXX
-  const num = parseInt(str, 10)
-  if (!isNaN(num)) {
-    return String(num).padStart(36, '0').replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, '$1-$2-$3-$4-$5')
-  }
-  return null
-}
-
 // Создать мероприятие — бэк (places + events) + localStorage fallback
 async function submitEventToBackend(eventData) {
-  // Локальный мок — создаётся ВСЕГДА для отображения на устройстве
-  const localEventObj = {
-    id: Date.now(),
-    name: eventData.name,
-    emoji: typeEmoji[eventData.type] || '📍',
-    date: eventData.date,
-    time: eventData.time,
-    dateDisplay: formatDateDisplay(eventData.date),
-    locationShort: eventData.locationShort,
-    location: eventData.location,
-    description: eventData.description,
-    level: eventData.level || 'Открыто',
-    type: eventData.type,
-    quietCompanion: eventData.quietCompanion,
-    anonymous: eventData.anonymous,
-    participants: 1,
-    maxParticipants: eventData.maxParticipants,
-    isJoined: true,
-    avatars: [],
-    moreCount: 0,
-    // Доп. поля для маршрута и места
-    placeLat: eventData.customLat || null,
-    placeLng: eventData.customLng || null,
-    placeAddress: eventData.customAddress || eventData.location || '',
-    spot_id: eventData.meetupId ? toUuid(eventData.meetupId) : null,
-    host_id: null,
-    status: 'pending',
-    placeLit: eventData.placeLit || false,
-    placeLockers: eventData.placeLockers || false,
-    placeBenches: eventData.placeBenches || false,
-    placeAnonymous: eventData.placeAnonymous || false,
-  }
-
-  // Сразу добавляем локально — событие видно мгновенно
-  allEvents.value.unshift(localEventObj)
-  saveToLocalStorage(allEvents.value)
-  syncMyMeetups()
-
-  // Пытаемся создать на бэке (фоновая операция)
   try {
-    const spotId = localEventObj.spot_id
-    const token = localStorage.getItem('token')
-    const headers = {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    let spotId = null
+
+    // Если место из базы — используем его ID
+    if (eventData.meetupId) {
+      spotId = eventData.meetupId
+    } else {
+      // Своё место — создаём через places service
+      const placePayload = {
+        name: eventData.locationShort,
+        description: eventData.description || '',
+        lat: eventData.customLat,
+        lon: eventData.customLng,
+        address: eventData.customAddress || eventData.locationShort,
+        rating: 0,
+        emoji: '📍',
+        category: 'my_spot',
+        image: '',
+        gallery: [],
+        is_anonymous: eventData.anonymous,
+        activity_type: eventData.type,
+        noise_level: 0,
+        light_availability: 0,
+        conveniences_availability: false
+      }
+
+      if (config.isDebug) console.log('📍 Создаём место:', placePayload)
+
+      const placeRes = await fetch(placesApi('/places/create'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(placePayload)
+      })
+      const placeData = await placeRes.json()
+      spotId = placeData.place?.id || placeData.id
+      if (config.isDebug) console.log('✅ Место создано, spot_id:', spotId)
     }
 
+    // Создаём event
     const eventPayload = {
       spot_id: spotId,
       title: eventData.name,
@@ -1186,47 +936,58 @@ async function submitEventToBackend(eventData) {
       anonymous: eventData.anonymous
     }
 
-    if (config.isDebug) {
-      console.log('📅 Создаём event на бэке:', JSON.stringify(eventPayload, null, 2))
-      console.log('📅 spot_id:', spotId)
-    }
+    if (config.isDebug) console.log('📅 Создаём event:', eventPayload)
 
     const res = await fetch(eventsApi('/events'), {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(eventPayload)
     })
-
-    if (res.ok) {
-      const data = await res.json()
-      if (config.isDebug) console.log('✅ Event создан на бэке:', data.id)
-    } else {
-      if (config.isDebug) console.warn('⚠️ Бэк вернул ошибку, но событие сохранено локально')
+    const data = await res.json()
+    if (data.event) {
+      allEvents.value.unshift(data.event)
     }
+    saveToLocalStorage(allEvents.value)
+    syncMyMeetups()
+    return data.event
   } catch (e) {
-    if (config.isDebug) console.warn('⚠️ Бэк недоступен, событие сохранено только локально', e)
-  }
+    if (config.isDebug) console.warn('submitEventToBackend: API недоступен, сохраняем локально', e)
 
-  return localEventObj
+    // LocalStorage fallback
+    const newEventObj = {
+      id: Date.now(),
+      name: eventData.name,
+      emoji: typeEmoji[eventData.type] || '🏋️',
+      date: eventData.date,
+      time: eventData.time,
+      dateDisplay: formatDateDisplay(eventData.date),
+      locationShort: eventData.locationShort,
+      location: eventData.location,
+      description: eventData.description,
+      level: 'Открыто',
+      type: eventData.type,
+      quietCompanion: eventData.quietCompanion,
+      anonymous: eventData.anonymous,
+      participants: 1,
+      maxParticipants: eventData.maxParticipants,
+      isJoined: true,
+      avatars: ['https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'],
+      moreCount: 0
+    }
+
+    allEvents.value.unshift(newEventObj)
+    saveToLocalStorage(allEvents.value)
+    syncMyMeetups()
+    return newEventObj
+  }
 }
 
 // Открыть модалку
 function openCreateModal() {
   showCreateModal.value = true
-  // Проверяем есть ли черновик
-  const draftForm = localStorage.getItem('shoulder_event_draft_form')
-  const draftLocationMode = localStorage.getItem('shoulder_event_draft_locationMode')
-  if (draftForm) {
-    // Восстанавливаем черновик
-    form.value = { ...form.value, ...JSON.parse(draftForm) }
-    if (draftLocationMode) locationMode.value = draftLocationMode
-    if (config.isDebug) console.log('📋 Черновик восстановлен при открытии модалки')
-  } else {
-    // Новая форма
-    locationMode.value = 'meetup'
-    const today = new Date()
-    form.value.date = today.toISOString().split('T')[0]
-  }
+  locationMode.value = 'meetup'
+  const today = new Date()
+  form.value.date = today.toISOString().split('T')[0]
   // Обновляем список мест при открытии модалки
   fetchMeetups()
 }
@@ -1235,7 +996,6 @@ function openCreateModal() {
 function closeModal() {
   showCreateModal.value = false
   if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
-  // НЕ сбрасываем черновик — он может понадобиться при возврате с карты
   resetForm()
 }
 
@@ -1253,61 +1013,24 @@ function resetForm() {
     meetupId: null,
     customAddress: '',
     customLat: null,
-    customLng: null,
-    placeActivityType: null,
-    placeNoiseLevel: null,
-    placeLit: null,
-    placeLockers: null,
-    placeBenches: null,
-    placeAnonymous: null
+    customLng: null
   }
   locationQuery.value = ''
   locationMode.value = 'meetup'
   showLocationDropdown.value = false
-  // НЕ очищаем черновик здесь — он нужен при возврате с карты
-  // Черновик очищается только при успешной отправке или явной очистке
 }
 
 // Указать место на карте
 function openMapForPick() {
-  // Сохраняем СОСТОЯНИЕ ФОРМЫ перед уходом на карту (ДО closeModal!)
+  // Сохраняем что мы пришли с EventsPage — чтобы MainPage знал что это режим event
   try {
-    const draft = { ...form.value }
     localStorage.setItem('shoulder_pending_event_source', 'events_page')
-    localStorage.setItem('shoulder_event_draft_form', JSON.stringify(draft))
-    localStorage.setItem('shoulder_event_draft_locationMode', locationMode.value)
-    if (config.isDebug) console.log('📋 Форма сохранена перед уходом на карту:', draft)
   } catch (e) {
-    if (config.isDebug) console.warn('Failed to save form state:', e)
+    if (config.isDebug) console.warn('Failed to save event source:', e)
   }
   closeModal()
   // Переходим на MainPage — там MapLight раскроется
   router.push('/')
-}
-
-// Перейти к встрече на карте с маршрутом
-function navigateToEvent(event) {
-  if (!event.placeLat || !event.placeLng) return
-
-  // Сохраняем данные встречи для маршрута
-  try {
-    localStorage.setItem('shoulder_event_route', JSON.stringify({
-      name: event.name,
-      address: event.placeAddress || event.location,
-      lat: event.placeLat,
-      lng: event.placeLng,
-      emoji: event.emoji || '📍',
-    }))
-    if (config.isDebug) console.log('🗺 Маршрут к встрече сохранён:', event.name)
-  } catch (e) {
-    if (config.isDebug) console.warn('Failed to save event route:', e)
-  }
-
-  // Закрываем модалку если открыта
-  if (selectedEvent.value) closeEventDetail()
-
-  // Переходим на MainPage с открытой картой
-  router.push({ path: '/', query: { event_route: '1' } })
 }
 
 // Отправка формы
@@ -1319,7 +1042,7 @@ function submitEvent() {
 
   if (locationMode.value === 'meetup' && form.value.meetupId) {
     const m = meetups.value.find(p => p.id === form.value.meetupId)
-    locationShort = m?.address || ''
+    locationShort = m?.name || ''
     location = m ? `${m.name}, ${m.address}` : ''
   } else if (locationMode.value === 'address') {
     locationShort = form.value.customAddress
@@ -1349,40 +1072,17 @@ function submitEvent() {
     anonymous: form.value.quietCompanion,
     level: form.value.level,
     maxParticipants: form.value.maxParticipants,
-    user_id: 1,
-    // Поля из места (places)
-    placeActivityType: form.value.placeActivityType,
-    placeNoiseLevel: form.value.placeNoiseLevel,
-    placeLit: form.value.placeLit,
-    placeLockers: form.value.placeLockers,
-    placeBenches: form.value.placeBenches,
-    placeAnonymous: form.value.placeAnonymous
+    user_id: 1
   }
 
   submitEventToBackend(eventData)
   syncMyMeetups()
-  // Очищаем черновик после успешной отправки
-  localStorage.removeItem('shoulder_event_draft_form')
-  localStorage.removeItem('shoulder_event_draft_locationMode')
   closeModal()
 }
 
 onMounted(async () => {
   await fetchAllEvents()
   await fetchMeetups()
-
-  // Восстанавливаем черновик формы (если пользователь вернулся с карты)
-  try {
-    const draftForm = localStorage.getItem('shoulder_event_draft_form')
-    const draftLocationMode = localStorage.getItem('shoulder_event_draft_locationMode')
-    if (draftForm) {
-      form.value = { ...form.value, ...JSON.parse(draftForm) }
-      if (draftLocationMode) locationMode.value = draftLocationMode
-      if (config.isDebug) console.log('📋 Черновик формы восстановлен:', form.value)
-    }
-  } catch (e) {
-    if (config.isDebug) console.warn('EventsPage: draft restore error:', e)
-  }
 
   // Проверяем есть ли координаты от MapLight (через MainPage)
   try {
@@ -1396,11 +1096,6 @@ onMounted(async () => {
       form.value.meetupId = null
       locationMode.value = 'map'
       delete window.__eventsPageLocationReady
-      // Очищаем черновик — координаты уже в форме
-      localStorage.removeItem('shoulder_event_draft_form')
-      localStorage.removeItem('shoulder_event_draft_locationMode')
-      // Открываем форму создания встречи
-      showCreateModal.value = true
       return
     }
 
@@ -1415,11 +1110,6 @@ onMounted(async () => {
       form.value.customAddress = address
       form.value.meetupId = null
       locationMode.value = 'map'
-      // Очищаем черновик
-      localStorage.removeItem('shoulder_event_draft_form')
-      localStorage.removeItem('shoulder_event_draft_locationMode')
-      // Открываем форму создания встречи
-      showCreateModal.value = true
     }
   } catch (e) {
     if (config.isDebug) console.warn('EventsPage: location restore error:', e)
@@ -1808,15 +1498,6 @@ onMounted(async () => {
 .action-btn:hover {
   background: #ea580c;
   transform: scale(1.05);
-}
-
-/* Кнопка маршрута */
-.action-btn.route-btn {
-  background: #16a34a;
-  color: #fff;
-}
-.action-btn.route-btn:hover {
-  background: #15803d;
 }
 
 .action-btn .material-symbols-outlined {
@@ -2335,43 +2016,6 @@ onMounted(async () => {
 }
 .location-selected .material-symbols-outlined { font-size: 18px; }
 
-/* Карточка характеристик места */
-.place-features-card {
-  margin-top: 8px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.place-feature-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-}
-.place-feature-label {
-  color: #64748b;
-  font-weight: 500;
-}
-.place-feature-value {
-  color: #1e293b;
-  font-weight: 600;
-}
-
-.map-light.dark .place-features-card {
-  background: #1e293b;
-  border-color: #334155;
-}
-.map-light.dark .place-feature-label {
-  color: #94a3b8;
-}
-.map-light.dark .place-feature-value {
-  color: #f1f5f9;
-}
-
 .location-dropdown {
   position: absolute;
   top: 100%;
@@ -2724,21 +2368,11 @@ onMounted(async () => {
   border: 2px solid var(--primary, #ea580c);
   background: white;
   color: var(--primary, #ea580c);
+  font-size: 15px;
   font-weight: 600;
-  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-/* Кнопка маршрута в модалке */
-.event-detail-action.route-action {
-  border-color: #16a34a;
-  color: #16a34a;
-  margin-bottom: 8px;
-}
-.event-detail-action.route-action:hover {
-  background: #16a34a;
-  color: #fff;
+  margin-top: 8px;
 }
 
 .event-detail-action:hover {

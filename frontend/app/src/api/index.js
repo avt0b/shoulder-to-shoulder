@@ -448,9 +448,7 @@ export const authApi = USE_MOCK
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         })
         const data = await response.json()
