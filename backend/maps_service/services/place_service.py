@@ -26,7 +26,7 @@ class PlaceService:
         result = []
         
         for place in places:
-            distance = self._calculate_distance(lat, lon, place.latitude, place.longitude)
+            distance = self._calculate_distance(lat, lon, place.lat, place.lon)
             place_dict = PlaceResponse.model_validate(place).model_dump()
             place_dict["distance"] = int(distance * 1000)
             result.append(place_dict)

@@ -38,6 +38,7 @@ async def startup():
     
     if await nats.connect(nats_server):
         logger.info("✓ NATS клиент инициализирован")
+        print("✓ NATS клиент инициализирован")
     else:
         logger.warning("⚠️ NATS не подключен - мероприятия не будут доступны")
 

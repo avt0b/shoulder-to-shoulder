@@ -19,7 +19,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       TZ: ${TZ}
-    # Not exposed publicly
+    ports:
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - ${PROJECT_ROOT}/.docker/postgres:/var/lib/postgresql/data
       - ${PROJECT_ROOT}/ops/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -36,7 +37,8 @@ services:
     container_name: s2s_redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
-    # Not exposed publicly
+    ports:
+      - "${REDIS_PORT}:6379"
     volumes:
       - ${PROJECT_ROOT}/.docker/redis:/data
     healthcheck:
@@ -52,7 +54,9 @@ services:
     container_name: s2s_nats
     restart: unless-stopped
     command: ["-js", "-m", "8222"]
-    # Not exposed publicly
+    ports:
+      - "${NATS_PORT}:4222"
+      - "${NATS_MONITOR_PORT}:8222"
     networks:
       - s2s_network
 
@@ -163,7 +167,8 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DATABASE_URL: ${DATABASE_URL}
       NATS_URL: ${NATS_URL}
-    # Not exposed publicly
+    ports:
+      - "${EVENT_SERVICE_PORT}:8002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -190,7 +195,8 @@ services:
       NATS_URL: ${NATS_URL}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
       EVENT_SERVICE_URL: ${EVENT_SERVICE_URL}
-    # Not exposed publicly
+    ports:
+      - "${ADMIN_SERVICE_PORT}:8003"
     depends_on:
       nats:
         condition: service_started
@@ -277,7 +283,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       ALLOWED_ORIGINS: ${MAPS_ALLOWED_ORIGINS}
       TZ: ${TZ}
-    # Not exposed publicly
+    ports:
+      - "${MAPS_SERVICE_PORT}:8004"
     depends_on:
       postgres:
         condition: service_healthy
