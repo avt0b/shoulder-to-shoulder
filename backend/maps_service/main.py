@@ -10,6 +10,11 @@ from .utils.nats_client import NatsRpcClient
 
 logger = logging.getLogger(__name__)
 
+# Логируем конфигурацию при запуске
+logger.info(f"DATABASE_URL: {settings.DATABASE_URL}")
+logger.info(f"NATS_SERVER: {settings.NATS_SERVER}")
+logger.info(f"POSTGRES_HOST: {settings.POSTGRES_HOST}")
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
@@ -28,19 +33,27 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     """Инициализация при запуске"""
-    # 1. Создаём таблицы БД
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("✓ Таблицы БД инициализированы")
+    try:
+        # 1. Создаём таблицы БД
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("✓ Таблицы БД инициализированы")
+    except Exception as e:
+        logger.error(f"✗ Ошибка при инициализации БД: {e}")
+        raise
     
-    nats = NatsRpcClient.get_instance()
-    nats_server = getattr(settings, 'NATS_SERVER', 'nats://localhost:4222')
-    
-    if await nats.connect(nats_server):
-        logger.info("✓ NATS клиент инициализирован")
-        print("✓ NATS клиент инициализирован")
-    else:
-        logger.warning("⚠️ NATS не подключен - мероприятия не будут доступны")
+    try:
+        # 2. Инициализируем NATS
+        nats = NatsRpcClient.get_instance()
+        nats_server = getattr(settings, 'NATS_SERVER', 'nats://localhost:4222')
+        
+        if await nats.connect(nats_server):
+            logger.info("✓ NATS клиент инициализирован")
+            print("✓ NATS клиент инициализирован")
+        else:
+            logger.warning("⚠️ NATS не подключен - мероприятия не будут доступны")
+    except Exception as e:
+        logger.warning(f"⚠️ Ошибка при подключении к NATS: {e}")
 
 
 @app.on_event("shutdown")
