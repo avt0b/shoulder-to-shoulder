@@ -1,54 +1,34 @@
-from functools import lru_cache
-from typing import Literal
-
-from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from functools import lru_cache
 
-
-class AppSettings(BaseSettings):
-    environment: Literal["dev", "prod"] = "dev"
-    debug: bool = True
-    project_name: str = "Maps Microservice"
-    version: str = "1.0.0"
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-        env_nested_delimiter="__",
-    )
-
-
-class DatabaseConfig(BaseSettings):
-    postgres_url: str = Field(..., description="PostgreSQL connection URL")
-    postgres_user: str = Field(...)
-    postgres_password: str = Field(...)
-    postgres_host: str = Field(...)
-    postgres_db: str = Field(...)
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        extra="ignore",
-        case_sensitive=False,
-    )
-
-
-class CORSConfig(BaseSettings):
-    allowed_origins: list[str] = Field(default_factory=list)
-
-    model_config = SettingsConfigDict(
-        env_prefix="CORS_",
-        env_file=".env",
-        extra="ignore",
-        case_sensitive=False,
-    )
 
 class Settings(BaseSettings):
-    app: AppSettings = Field(default_factory=AppSettings)
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    cors: CORSConfig = Field(default_factory=CORSConfig)
 
+    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/maps_db"
+    DB_ECHO: bool = False
+    
+    API_V1_PREFIX: str = "/api/v1"
+    APP_NAME: str = "Maps Service"
+    APP_VERSION: str = "0.1.0"
+    
+    MIN_LATITUDE: float = -90.0
+    MAX_LATITUDE: float = 90.0
+    MIN_LONGITUDE: float = -180.0
+    MAX_LONGITUDE: float = 180.0
+    
+    DEFAULT_ZOOM: int = 14
+    SEARCH_RADIUS_KM: float = 5.0
+    
+    # Security Route configs
+    OPENROUTER_API_KEY: str = "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"
+    OPENROUTE_SERVICE_API_KEY: str = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjgyYTgzYjc5NDBiNjRlMjE5Njk0MjM1ZmNjMjFkZDlhIiwiaCI6Im11cm11cjY0In0="
+    
+    # Proxy settings (optional)
+    PROXY_ENABLED: bool = False
+    PROXY_URL: str = "socks5h://127.0.0.1:10809"
+    
+    NATS_SERVER: str = "nats://localhost:4222"
+    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

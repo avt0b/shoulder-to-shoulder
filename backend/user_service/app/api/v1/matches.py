@@ -10,11 +10,10 @@ from pydantic import BaseModel, Field
 router = APIRouter(prefix="/pool", tags=["workout-pool"])
 
 
-def get_pool_service(db=Depends(get_db), nats=None):  # nats inject later
+def get_pool_service(db=Depends(get_db), nats=None):
     return PoolService(PoolRepository(db))
 
 
-# --- Схемы ---
 class CreatePoolRequest(BaseModel):
     city: str
     preferred_time: datetime
@@ -34,7 +33,6 @@ async def list_pool(
         city: str | None = Query(None),
         service: PoolService = Depends(get_pool_service),
 ):
-    """👀 Просмотреть пул заявок (публично)."""
     return await service.repo.get_open_requests(city=city)
 
 
@@ -44,7 +42,6 @@ async def create_pool_request(
         user_id: UUID = Depends(get_current_user_id),
         service: PoolService = Depends(get_pool_service),
 ):
-    """📢 Опубликовать свою заявку в пул."""
     req = await service.post_request(UUID(user_id), data.model_dump())
     return {"status": "posted", "request_id": str(req.id)}
 
@@ -56,7 +53,6 @@ async def respond_to_pool_request(
         user_id: UUID = Depends(get_current_user_id),
         service: PoolService = Depends(get_pool_service),
 ):
-    """🙋 Откликнуться на чужую заявку (автору придёт уведомление)."""
     responder_id = user_id
     try:
         resp = await service.respond_to_request(request_id, UUID(responder_id), data.message)
@@ -70,20 +66,4 @@ async def my_incoming_responses(
         user_id: UUID = Depends(get_current_user_id),
         service: PoolService = Depends(get_pool_service),
 ):
-    """📥 Мой ящик: кто откликнулся на МОИ заявки."""
     return await service.repo.get_my_incoming_responses(UUID(user_id))
-
-
-# @router.post("/responses/{response_id}")
-# async def decide_on_response(
-#         response_id: UUID,
-#         accept: bool = Query(...),
-#         user_id: UUID = Depends(get_current_user_id),
-#         service: PoolService = Depends(get_pool_service),
-# ):
-#     """✅ Принять или отклонить отклик (только для автора заявки)."""
-#     # Тут можно добавить проверку: действительно ли текущий юзер - автор заявки
-#     success = await service.handle_response(response_id, user_id, accept)
-#     if not success:
-#         raise HTTPException(404, detail="Response not found")
-#     return {"status": "accepted" if accept else "declined"}
