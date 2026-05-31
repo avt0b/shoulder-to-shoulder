@@ -4,11 +4,6 @@ services:
       file: docker-compose.yml
       service: postgres
 
-  redis:
-    extends:
-      file: docker-compose.yml
-      service: redis
-
   nats:
     extends:
       file: docker-compose.yml

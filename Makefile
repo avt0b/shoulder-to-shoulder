@@ -65,7 +65,6 @@ status:
 	@echo ""
 	@echo "Service Health:"
 	@$(DOCKER_COMPOSE) exec -T postgres pg_isready -U postgres 2>/dev/null && echo "✓ PostgreSQL is healthy" || echo "✗ PostgreSQL is unavailable"
-	@$(DOCKER_COMPOSE) exec -T redis redis-cli ping 2>/dev/null && echo "✓ Redis is healthy" || echo "✗ Redis is unavailable"
 	@curl -s http://localhost:4222/ping > /dev/null 2>&1 && echo "✓ NATS is healthy" || echo "✗ NATS is unavailable"
 	@curl -s http://localhost:8000/health > /dev/null 2>&1 && echo "✓ User Service is healthy" || echo "✗ User Service is unavailable"
 	@curl -s http://localhost:8001/health > /dev/null 2>&1 && echo "✓ Notification Service is healthy" || echo "✗ Notification Service is unavailable"

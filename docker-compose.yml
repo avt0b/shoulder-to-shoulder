@@ -32,23 +32,6 @@ services:
     networks:
       - s2s_network
 
-  redis:
-    image: redis:7-alpine
-    container_name: s2s_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "${REDIS_PORT}:6379"
-    volumes:
-      - ${PROJECT_ROOT}/.docker/redis:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - s2s_network
-
   nats:
     image: nats:2.10-alpine
     container_name: s2s_nats
@@ -103,7 +86,6 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
       NATS_URL: ${NATS_URL}
       FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL}
       FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD}
@@ -111,8 +93,6 @@ services:
       - "${USER_SERVICE_PORT}:8000"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       nats:
         condition: service_started
@@ -134,7 +114,6 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
       DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
       NATS_URL: ${NATS_URL}
       USER_SERVICE_URL: ${USER_SERVICE_URL}
       GATEWAY_URL: ${GATEWAY_URL}
@@ -144,8 +123,6 @@ services:
       - "${NOTIFICATION_SERVICE_PORT}:8001"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       nats:
         condition: service_started
@@ -323,8 +300,6 @@ services:
       - "${MAPS_SERVICE_PORT}:8004"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       nats:
         condition: service_started

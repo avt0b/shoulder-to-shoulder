@@ -1220,93 +1220,8 @@ const filters = ref({
 // Места с бэкенда
 const places = ref([])
 
-// Моковые данные (fallback)
-const mockPlaces = [
-  {
-    id: 1, name: 'Парк Победы',
-    description: 'Отличное место для утренних пробежек и групповых тренировок.',
-    lat: 52.9690, lng: 36.0820, rating: 4.7, emoji: '🏃',
-    image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop',
-    gallery: [
-      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop'
-    ],
-    category: 'park', address: 'ул. Комсомольская, Орёл',
-    activityType: 'running', noiseLevel: 'moderate', lit: true, lockers: false, benches: true, anonymous: false
-  },
-  {
-    id: 2, name: 'Стадион «Центральный»',
-    description: 'Беговые дорожки, тренажёры. Открыт с 6:00 до 22:00.',
-    lat: 52.9620, lng: 36.0740, rating: 4.5, emoji: '🏋️',
-    image: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop',
-    gallery: [
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop'
-    ],
-    category: 'stadium', address: 'ул. Ленина, Орёл',
-    activityType: 'strength', noiseLevel: 'loud', lit: true, lockers: true, benches: true, anonymous: false
-  },
-  {
-    id: 3, name: 'Набережная Оки',
-    description: 'Живописный маршрут вдоль реки. Подходит для прогулок и йоги.',
-    lat: 52.9670, lng: 36.0680, rating: 4.8, emoji: '🧘',
-    image: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop',
-    gallery: [
-      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop'
-    ],
-    category: 'river', address: 'Набережная Оки, Орёл',
-    activityType: 'yoga', noiseLevel: 'quiet', lit: false, lockers: false, benches: true, anonymous: true
-  },
-  {
-    id: 4, name: 'Спортивная площадка',
-    description: 'Турники, брусья, воркаут-зона. Бесплатно, круглосуточно.',
-    lat: 52.9610, lng: 36.0860, rating: 4.3, emoji: '💪',
-    image: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=300&h=200&fit=crop',
-    gallery: [
-      'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&h=200&fit=crop',
-      'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=300&h=200&fit=crop'
-    ],
-    category: 'playground', address: 'ул. Гая, Орёл',
-    activityType: 'workout', noiseLevel: 'moderate', lit: true, lockers: false, benches: false, anonymous: false
-  },
-  {
-    id: 5, name: 'Тихий дворик',
-    description: 'Уютное место во дворе. Ничего особенного — просто тихо и спокойно.',
-    lat: 52.9640, lng: 36.0720, rating: 4.0, emoji: '🏠',
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop',
-    gallery: [
-      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=300&h=200&fit=crop'
-    ],
-    category: 'other', address: 'ул. М. Горького, Орёл',
-    activityType: 'other', noiseLevel: 'quiet', lit: false, lockers: false, benches: true, anonymous: true
-  }
-]
-
-// Фильтрация локально (для fallback)
-const filteredMockPlaces = computed(() => {
-  return mockPlaces.filter(p => {
-    if (filters.value.activityType && p.activityType !== filters.value.activityType) return false
-    if (filters.value.noiseLevel && p.noiseLevel !== filters.value.noiseLevel) return false
-    if (filters.value.lit && !p.lit) return false
-    if (filters.value.lockers && !p.lockers) return false
-    if (filters.value.benches && !p.benches) return false
-    if (filters.value.anonymous && !p.anonymous) return false
-    return true
-  })
-})
-
-// Количество отфильтрованных мест
 const filteredPlacesCount = computed(() => {
-  if (places.value.length > 0) {
-    // Серверная фильтрация — показываем длину ответа
-    return places.value.length
-  }
-  return filteredMockPlaces.value.length
+  return places.value.length
 })
 
 function resetFilters() {
@@ -1438,8 +1353,8 @@ async function fetchPlaces() {
     places.value = filtered
     addPlaceMarkers()
   } catch (e) {
-    if (config.isDebug) console.warn('fetchPlaces: API недоступен, локальная фильтрация', e)
-    places.value = filteredMockPlaces.value
+    if (config.isDebug) console.warn('fetchPlaces: API недоступен', e)
+    places.value = []
     addPlaceMarkers()
   }
 }
