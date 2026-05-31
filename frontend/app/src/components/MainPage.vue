@@ -598,7 +598,7 @@ function stopFactTimer() {
   }
 }
 
-// Ваши мероприятия — заглушка (заменить на API)
+// Ваши мероприятия
 const myMeetups = ref([])
 
 // ============================================
@@ -1191,32 +1191,6 @@ async function fetchRoute(startLat, startLng, endLat, endLng) {
 
 // --- Мероприятия (meetups) ---
 
-// Заглушка данных — мои мероприятия
-const mockMeetups = [
-  {
-    id: 1,
-    name: 'Вечернее кардио',
-    time: '19:00',
-    locationShort: 'Парк',
-    location: 'Парк Победы',
-    level: 'Новичок',
-    description: 'Лёгкое кардио для разогрева перед основной тренировкой.',
-    participants: 3,
-    maxParticipants: 5,
-    isJoined: true,
-    type: 'Бег',
-    quietCompanion: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEPBUmcOdAbbYL66LZ6swLoWGWnM2a8lrbZU_2FeRJB6V09iN7R7gCdvzG70oNaGwQHuTDTuWLxFZIcsCuyPKDTxTTlCa-mIDWw_u6ICDWyE7PTSipMhDpdIaIRBWarjXJOQpXw5xQtV9t9i6PKTqJsG-cMsz5IH400UKj9VD_MVWUHv6Rp7fSO9oCivO9qH9carbZ6v8a4p63_S046k5bphL43U',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxuOKErajv7ODK6tavnPTZcFSFrmOmDrbzzIfPj5GSkjn5JIPc3o782XNLA4rrC7Nwxr80tj710WdoTF327craU0496uTzPJI0jeoDAlN3sgoYDDJfoWqkLus8ZYMhGwciYtEaoLiCc99uhOxpdQXA4D1tUt4kuiNqmec6U7SsoXt0',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541T9PEV2VM1_jsojZRXaVXhRhpu2_3tJNiG2y85-X-dc'
-    ],
-    moreCount: 2
-  }
-]
-
-// 5. Получить мои мероприятия
-// Читаем из localStorage (EventsPage сохраняет при join/leave)
 const MY_MEETUPS_KEY = 'shoulder_my_meetups'
 
 async function fetchMyMeetups() {
@@ -1229,11 +1203,10 @@ async function fetchMyMeetups() {
       return
     }
 
-    // Fallback на моки
-    myMeetups.value = mockMeetups
+    myMeetups.value = []
   } catch (e) {
     if (config.isDebug) console.warn('fetchMyMeetups: ошибка', e)
-    myMeetups.value = mockMeetups
+    myMeetups.value = []
   }
 }
 
@@ -1383,7 +1356,7 @@ onMounted(async () => {
     }
   }
 
-  // Загружаем мероприятия (заглушка или API)
+  // Загружаем мероприятия
   await fetchMyMeetups()
 
   // Запускаем таймер фактов

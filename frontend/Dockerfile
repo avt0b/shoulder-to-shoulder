@@ -2,7 +2,7 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-ARG VITE_API_BASE_URL=http://localhost:8000/api/v1
+ARG VITE_API_BASE_URL=http://localhost:8005/api/v1
 ARG VITE_APP_ENV=production
 ARG VITE_DEBUG=false
 

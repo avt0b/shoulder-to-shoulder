@@ -1,44 +1,34 @@
 import logging
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from typing import Any
 
 import jwt
-from fastapi import HTTPException, Depends, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import HTTPException, Request, status
 
 from ..config import settings
 
 logger = logging.getLogger(__name__)
 
-security = HTTPBearer()
+OPEN_ROUTES = {
+    ("POST", "/api/v1/auth/login"),
+    ("POST", "/api/v1/auth/register"),
+}
+
+PUBLIC_GET_PREFIXES = (
+    "/api/v1/media/avatar/",
+    "/api/v1/media/event/",
+    "/api/v1/media/spot/",
+    "/api/v1/media/badge/",
+)
 
 
 class TokenData:
-    def __init__(self, user_id: int, scopes: list[str] = None):
+    def __init__(self, user_id: str, role: str | None = None, scopes: list[str] | None = None):
         self.user_id = user_id
+        self.role = role
         self.scopes = scopes or []
 
 
-def create_access_token(
-    data: Dict[str, Any],
-    expires_delta: Optional[timedelta] = None
-) -> str:
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(hours=24)
-    
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode,
-        settings.jwt_secret,
-        algorithm=settings.jwt_algorithm
-    )
-    return encoded_jwt
-
-
-def verify_token(token: str) -> Optional[Dict[str, Any]]:
+def verify_token(token: str) -> dict[str, Any] | None:
     try:
         payload = jwt.decode(
             token,
@@ -54,7 +44,7 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def extract_user_from_token(token_data: Dict[str, Any]) -> Optional[TokenData]:
+def extract_user_from_token(token_data: dict[str, Any]) -> TokenData | None:
     user_id = token_data.get("sub")
     role = token_data.get("role")
     
@@ -62,11 +52,37 @@ def extract_user_from_token(token_data: Dict[str, Any]) -> Optional[TokenData]:
         return None
     
     scopes = token_data.get("scopes", [])
-    return TokenData(user_id=user_id, scopes=scopes)
+    return TokenData(user_id=str(user_id), role=role, scopes=scopes)
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> TokenData:
-    token = credentials.credentials
+def is_public_request(method: str, path: str) -> bool:
+    if method.upper() == "OPTIONS":
+        return True
+    if (method.upper(), path) in OPEN_ROUTES:
+        return True
+    return method.upper() == "GET" and path.startswith(PUBLIC_GET_PREFIXES)
+
+
+def get_bearer_token(request: Request) -> str | None:
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        return None
+    scheme, _, token = auth_header.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return None
+    return token
+
+
+async def validate_gateway_request(request: Request) -> TokenData | None:
+    if is_public_request(request.method, request.url.path):
+        return None
+
+    token = get_bearer_token(request)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authorization token",
+        )
     
     token_data = verify_token(token)
     if token_data is None:
@@ -82,4 +98,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             detail="Could not validate credentials"
         )
     
+    return user
+
+
+async def get_current_user(request: Request) -> TokenData:
+    user = await validate_gateway_request(request)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     return user

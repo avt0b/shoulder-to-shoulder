@@ -417,145 +417,6 @@ const typeLabels = {
   other: 'Другое'
 }
 
-// Заглушки всех мероприятий
-// date — строка ISO (YYYY-MM-DD), time — HH:MM
-const mockEvents = [
-  {
-    id: 1,
-    name: 'Утренняя пробежка',
-    emoji: '🏃',
-    date: '2026-04-10',
-    time: '07:00',
-    dateDisplay: 'Сегодня',
-    locationShort: 'Парк Победы',
-    location: 'Парк Победы, ул. Комсомольская',
-    description: 'Лёгкий бег трусцой по парку. Темп разговорный, подойдёт для начинающих.',
-    level: 'Новичок',
-    type: 'running',
-    quietCompanion: false,
-    participants: 3,
-    maxParticipants: 8,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxu',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541'
-    ],
-    moreCount: 2
-  },
-  {
-    id: 2,
-    name: 'Силовая на турниках',
-    emoji: '🏋️',
-    date: '2026-04-10',
-    time: '18:30',
-    dateDisplay: 'Сегодня',
-    locationShort: 'Площадка ул. Гая',
-    location: 'Спортивная площадка, ул. Гая',
-    description: 'Подтягивания, отжимания, выходы силой. Разминка + основная часть.',
-    level: 'Средний',
-    type: 'strength',
-    quietCompanion: false,
-    participants: 2,
-    maxParticipants: 6,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC2URqWk5H4FTDLDLL0v1ywXo2oDhzArVrw_IEetPVa6vnn1NyW1eW8iBJz_J5WnNkQJA1y6sWyVhCQ8dx2z99T',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'
-    ],
-    moreCount: 1
-  },
-  {
-    id: 3,
-    name: 'Йога на набережной',
-    emoji: '🧘',
-    date: '2026-04-11',
-    time: '08:00',
-    dateDisplay: 'Завтра',
-    locationShort: 'Набережная Оки',
-    location: 'Набережная Оки, Орёл',
-    description: 'Утренняя йога на свежем воздухе. Коврик с собой!',
-    level: 'Новичок',
-    type: 'yoga',
-    quietCompanion: true,
-    participants: 5,
-    maxParticipants: 10,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxu',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541'
-    ],
-    moreCount: 3
-  },
-  {
-    id: 4,
-    name: 'Воркаут-батл',
-    emoji: '💪',
-    date: '2026-04-12',
-    time: '15:00',
-    dateDisplay: 'Вс, 12 апр',
-    locationShort: 'Стадион «Центральный»',
-    location: 'Стадион «Центральный», ул. Ленина',
-    description: 'Дружеский батл: подтягивания, брусья, выход силой. Покажи на что способен!',
-    level: 'Профи',
-    type: 'workout',
-    quietCompanion: false,
-    participants: 4,
-    maxParticipants: 12,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC2URqWk5H4FTDLDLL0v1ywXo2oDhzArVrw_IEetPVa6vnn1NyW1eW8iBJz_J5WnNkQJA1y6sWyVhCQ8dx2z99T',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'
-    ],
-    moreCount: 2
-  },
-  {
-    id: 5,
-    name: 'Вечерняя растяжка',
-    emoji: '🎯',
-    date: '2026-04-11',
-    time: '20:00',
-    dateDisplay: 'Завтра',
-    locationShort: 'Парк Победы',
-    location: 'Парк Победы, ул. Комсомольская',
-    description: 'Расслабление и восстановление после тяжёлого дня. Шпагаты, мостики, медитация.',
-    level: 'Открыто',
-    type: 'other',
-    quietCompanion: true,
-    participants: 2,
-    maxParticipants: 6,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0'
-    ],
-    moreCount: 1
-  },
-  {
-    id: 6,
-    name: 'Ночной забег',
-    emoji: '🏃',
-    date: '2026-04-13',
-    time: '23:00',
-    dateDisplay: 'Пн, 13 апр',
-    locationShort: 'Набережная Оки',
-    location: 'Набережная Оки, Орёл',
-    description: 'Ночной забег по набережной. Фонарики обязательно! Темп средний, дистанция 5 км.',
-    level: 'Средний',
-    type: 'running',
-    quietCompanion: false,
-    participants: 7,
-    maxParticipants: 15,
-    isJoined: false,
-    avatars: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCaPrzntHOHOKvG0BIVPpc_3b2THNM8JxRVn-Vy0qppvVs3OLYoEP_NiK5WnNkQJA1y6sWyVhCQ8dx2z99T-AdmkCaWD0LXCxgot0',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuBE_honUQO8Mm-QEHIB3Bz94CyHvcv9VD7wLKYfJGSxND4d3rQNIYkCNg_qVQePsYqUC1Jy4-b1crYdzSN-S7OGgnWogDfbARxu',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDZu_-XWMjzYuGka2A9dsf14T394twZ1a7cCoJh4pgNf66M6xmaf1fy2Y5u_H1MRrf88srxGCmp_Q5ds3_uMC8oyOiF0gh3Hv541'
-    ],
-    moreCount: 5
-  }
-]
-
 // Места (загружаются с сервера через GET /places)
 const meetups = ref([])
 
@@ -801,14 +662,14 @@ async function fetchAllEvents() {
     if (config.isDebug) console.warn('fetchAllEvents: API недоступен, fallback', e)
   }
 
-  // Fallback: localStorage → mocks
+  // Fallback: localStorage only
   const stored = loadFromLocalStorage()
   if (stored && stored.length > 0) {
     allEvents.value = stored
     return stored
   }
-  allEvents.value = mockEvents
-  return mockEvents
+  allEvents.value = []
+  return []
 }
 
 // Записаться на мероприятие

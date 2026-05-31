@@ -4,11 +4,6 @@ services:
       file: docker-compose.yml
       service: postgres
 
-  redis:
-    extends:
-      file: docker-compose.yml
-      service: redis
-
   nats:
     extends:
       file: docker-compose.yml
@@ -82,6 +77,19 @@ services:
       --host 0.0.0.0
       --port 8006
       --reload-dir ${APP_HOME}/backend/media_service
+      --reload"
+
+  gateway_service:
+    extends:
+      file: docker-compose.yml
+      service: gateway_service
+    volumes:
+      - ${PROJECT_ROOT}:${APP_HOME}
+    command: >
+      sh -lc "/opt/shoulder-to-shoulder-venv/bin/python -m uvicorn backend.gateway.main:app
+      --host 0.0.0.0
+      --port 8005
+      --reload-dir ${APP_HOME}/backend/gateway
       --reload"
 
   frontend:
