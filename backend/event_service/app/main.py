@@ -19,11 +19,23 @@ app.include_router(events_router, prefix="/api/v1")
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("ALTER TABLE event_participants ALTER COLUMN id SET DEFAULT gen_random_uuid()"))
         await conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ"))
         await conn.execute(text("ALTER TABLE events ADD COLUMN IF NOT EXISTS anonymous BOOLEAN DEFAULT false NOT NULL"))
         await conn.execute(text("ALTER TABLE events ALTER COLUMN spot_id DROP NOT NULL"))
         await conn.execute(text("ALTER TABLE event_participants ADD COLUMN IF NOT EXISTS photo_url TEXT"))
+        await conn.execute(text("""
+            INSERT INTO event_participants (id, event_id, user_id, status)
+            SELECT gen_random_uuid(), e.id, e.host_id, 'joined'
+            FROM events e
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM event_participants ep
+                WHERE ep.event_id = e.id AND ep.user_id = e.host_id
+            )
+        """))
 
     await connect_nats()
     await setup_admin_event_subscribers()

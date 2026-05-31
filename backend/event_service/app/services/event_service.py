@@ -52,6 +52,20 @@ class EventService:
                 logger.error(f"Failed to publish user_joined event: {e}")
         return success
 
+    async def leave_event(self, user_id: str, event_id: UUID) -> int:
+        event = await self.repo.get_by_id(event_id)
+        if not event:
+            raise ValueError("Event not found")
+
+        if str(event.host_id) == str(user_id):
+            raise ValueError("Host cannot leave own event")
+
+        success = await self.repo.leave(event_id, user_id)
+        if not success:
+            raise ValueError("Participant not found")
+
+        return await self.repo.count_active_participants(event_id)
+
     async def checkin_event(self, user_id: str, event_id: UUID) -> dict:
         event = await self.repo.get_by_id(event_id)
         if not event:
@@ -93,6 +107,7 @@ class EventService:
         events_with_counts = []
         for e in events:
             count = await self.repo.count_participants(e.id)
+            participant_ids = await self.repo.get_participant_ids(e.id)
             events_with_counts.append({
                 "id": e.id,
                 "host_id": e.host_id,
@@ -105,6 +120,7 @@ class EventService:
                 "photo_url": e.photo_url,
                 "created_at": e.created_at,
                 "participant_count": count,
+                "participant_ids": participant_ids,
                 "anonymous": e.anonymous
             })
 

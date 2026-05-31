@@ -13,6 +13,7 @@ class EventRepository:
     async def create(self, event: Event) -> Event:
         self.db.add(event)
         await self.db.flush()
+        self.db.add(EventParticipant(event_id=event.id, user_id=event.host_id))
         await self.db.commit()
         await self.db.refresh(event)
         return event
@@ -53,6 +54,20 @@ class EventRepository:
         await self.db.flush()
         await self.db.commit()
         return True
+
+    async def leave(self, event_id: UUID, user_id: str) -> bool:
+        stmt = (
+            update(EventParticipant)
+            .where(
+                EventParticipant.event_id == event_id,
+                EventParticipant.user_id == user_id,
+                EventParticipant.status.in_([ParticipantStatus.JOINED, ParticipantStatus.CHECKED_IN]),
+            )
+            .values(status=ParticipantStatus.CANCELLED)
+        )
+        result = await self.db.execute(stmt)
+        await self.db.commit()
+        return result.rowcount > 0
 
     async def checkin(self, event_id: UUID, user_id: str) -> bool:
         stmt = update(EventParticipant).where(
@@ -105,6 +120,7 @@ class EventRepository:
         return result.scalar_one_or_none()
 
     async def delete(self, event_id: UUID) -> bool:
+        await self.db.execute(delete(EventParticipant).where(EventParticipant.event_id == event_id))
         stmt = delete(Event).where(Event.id == event_id)
         result = await self.db.execute(stmt)
         await self.db.commit()

@@ -19,23 +19,21 @@ def get_event_service(db=Depends(get_db)) -> EventService:
     return EventService(EventRepository(db))
 
 
-def require_host_or_admin(event_id: UUID):
-    """Dependency factory: проверяет, что пользователь — хост ивента или админ."""
-    async def check(
-            ctx: dict = Depends(get_current_user_context),
-            service: EventService = Depends(get_event_service),
-    ):
-        user_id = ctx["user_id"]
-        role = ctx.get("role", "user")
+async def require_host_or_admin(
+        event_id: UUID,
+        ctx: dict = Depends(get_current_user_context),
+        service: EventService = Depends(get_event_service),
+) -> Event:
+    """Check that current user is the event host or an admin."""
+    user_id = ctx["user_id"]
+    role = ctx.get("role", "user")
 
-        event = await service.repo.get_by_id(event_id)
-        if not event:
-            raise HTTPException(status_code=404, detail="Event not found")
-        if str(event.host_id) != user_id and role not in ("moderator", "superuser"):
-            raise HTTPException(status_code=403, detail="Only host or admin can modify")
-        return event
-
-    return check
+    event = await service.repo.get_by_id(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if str(event.host_id) != user_id and role not in ("moderator", "superuser"):
+        raise HTTPException(status_code=403, detail="Only host or admin can modify")
+    return event
 
 
 @router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
@@ -83,6 +81,21 @@ async def checkin_event(
         raise HTTPException(status_code=503, detail=str(e))
 
 
+@router.get("/{event_id}/cancel")
+async def leave_event(
+        event_id: UUID,
+        ctx: dict = Depends(get_current_user_context),
+        service: EventService = Depends(get_event_service),
+):
+    try:
+        participants = await service.leave_event(ctx["user_id"], event_id)
+        return {"status": "left", "participants": participants}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
 @router.post("/{event_id}/cancel")
 async def cancel_event(
         event_id: UUID,
@@ -114,7 +127,6 @@ async def cancel_event(
 async def update_event(
         event_id: UUID,
         data: EventUpdateRequest,
-        ctx: dict = Depends(get_current_user_context),
         _: Event = Depends(require_host_or_admin),
         service: EventService = Depends(get_event_service),
 ):
@@ -135,7 +147,6 @@ async def update_event(
 @router.delete("/{event_id}")
 async def delete_event(
         event_id: UUID,
-        ctx: dict = Depends(get_current_user_context),
         _: Event = Depends(require_host_or_admin),
         service: EventService = Depends(get_event_service),
 ):
