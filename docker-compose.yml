@@ -241,6 +241,44 @@ services:
       minio:
         condition: service_healthy
 
+  gateway_service:
+    <<: *backend-common
+    container_name: s2s_gateway_service
+    build:
+      context: .
+      dockerfile: ./backend/gateway/Dockerfile
+      args:
+        APP_HOME: ${APP_HOME}
+        SERVICE_MODULE: backend.gateway.main:app
+        SERVICE_PORT: 8005
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      API_V1_PREFIX: ${API_V1_STR}
+      USER_SERVICE_URL: http://user_service:8000
+      NOTIFICATION_SERVICE_URL: http://notification_service:8001
+      EVENT_SERVICE_URL: http://event_service:8002
+      ADMIN_SERVICE_URL: http://admin_service:8003
+      MAPS_SERVICE_URL: http://maps_service:8004
+      MEDIA_SERVICE_URL: http://media_service:8006
+      HTTP_TIMEOUT: 30
+    ports:
+      - "${GATEWAY_SERVICE_PORT}:8005"
+    depends_on:
+      user_service:
+        condition: service_started
+      notification_service:
+        condition: service_started
+      event_service:
+        condition: service_started
+      admin_service:
+        condition: service_started
+      maps_service:
+        condition: service_started
+      media_service:
+        condition: service_started
+
   frontend:
     container_name: s2s_frontend
     restart: unless-stopped
@@ -254,13 +292,7 @@ services:
     ports:
       - "${FRONTEND_PORT}:3000"
     depends_on:
-      user_service:
-        condition: service_started
-      maps_service:
-        condition: service_started
-      event_service:
-        condition: service_started
-      media_service:
+      gateway_service:
         condition: service_started
     networks:
       - s2s_network

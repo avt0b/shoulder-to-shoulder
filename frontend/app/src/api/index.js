@@ -95,11 +95,8 @@ export function toProxyUrl(url) {
   if (url.startsWith('http://minio:9000/')) return url.replace('http://minio:9000/', '/minio-static/')
   if (url.startsWith('http://localhost:9000/')) return url.replace('http://localhost:9000/', '/minio-static/')
 
-  if (url.startsWith('http://localhost:8006/') && typeof window !== 'undefined') {
-    const host = window.location.hostname
-    if (host && host !== 'localhost' && host !== '127.0.0.1') {
-      return url.replace('http://localhost:8006/', `http://${host}:8006/`)
-    }
+  if (url.startsWith('http://localhost:8006/api/v1')) {
+    return url.replace('http://localhost:8006/api/v1', config.mediaBaseURL)
   }
 
   return url
@@ -109,7 +106,7 @@ export function toProxyUrl(url) {
 // Пример: /avatar/{user_id}/{file_name}.png
 export function getMediaUrl(category, userId, fileName) {
   if (!category || !userId || !fileName) return ''
-  return `http://localhost:8006/api/v1/${category}/${userId}/${fileName}`
+  return `${config.mediaBaseURL}/${category}/${userId}/${fileName}`
 }
 
 
@@ -466,7 +463,7 @@ export const authApi = USE_MOCK
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
           body: JSON.stringify(body),
         })
         const data = await response.json()
@@ -497,7 +494,11 @@ export const authApi = USE_MOCK
         formData.append('file', file)
 
         const url = mediaApi('/media/upload')
-        const response = await fetch(url, { method: 'POST', body: formData })
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData
+        })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.detail || 'Ошибка загрузки файла')
         return data
