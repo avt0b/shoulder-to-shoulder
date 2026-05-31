@@ -1322,10 +1322,16 @@ function resetFilters() {
 
 async function applyFilters() {
   await fetchPlaces()
+  // Чтобы ивенты не пропадали после изменения фильтров/places
+  if (isNinjaMode.value) {
+    await fetchEvents()
+    addEventMarkers()
+  }
   showFilters.value = false
 }
 
-// Получить места с бэкенда (с фильтрами)
+
+// Получить места с бэнда (с фильтрами)
 async function fetchPlaces() {
   if (config.isDebug) console.log('🗺 fetchPlaces: запрос к API, фильтры:', JSON.stringify(filters.value))
   try {
@@ -1333,6 +1339,7 @@ async function fetchPlaces() {
     if (config.isDebug) console.log('🗺 fetchPlaces URL:', url)
 
     const res = await fetch(url)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
 
     if (config.isDebug) console.log('📦 fetchPlaces ответ:', JSON.stringify(data, null, 2))
@@ -1537,7 +1544,8 @@ const createPlaceMarker = (place) => {
   const bg = '#fff'
   const textColor = '#1c1917'
   // При инверсии карты маркеры тоже инвертируются — добавляем контр-фильтр
-  const markerFilter = 'invert(1) hue-rotate(180deg)'
+  // Но только в режиме ниндзя! В обычном режиме фильтра не должно быть
+  const markerFilter = isNinjaMode.value ? 'invert(1) hue-rotate(180deg)' : 'none'
 
   const icon = L.divIcon({
     className: 'custom-marker',
@@ -1850,10 +1858,46 @@ onMounted(async () => {
   // Экспортируем функции
   window.__setMapPickMode = setMapPickMode
 
+  // Чтобы маркеры ивентов (my spots / участия) не пропадали после загрузки places,
+  // синхронизируем режим с ниндзя/обычным и перерисовываем при получении точек.
+  // Важно: после fetchPlaces() onMapZoom вызывает addPlaceMarkers(),
+  // но мы хотим, чтобы ивенты тоже показывались.
+  // Отображение ивентов по факту: где-то после загрузки places вызывается onMapZoom,
+  // которое может перерисовать слой ивентов (или скрыть их).
+  // В нашей логике события показываются всегда, когда isNinjaMode === true.
+  const syncEventMarkers = () => {
+    if (!map) return
+    if (isNinjaMode.value) {
+      addEventMarkers()
+    } else {
+      // В обычном режиме события не отрисовываем.
+      removeEventMarkers()
+    }
+  }
+
+
   if (mapRef.value && !map) {
+
     map = L.map(mapRef.value, {
       zoomControl: false
     }).setView([52.9651, 36.0785], 14)
+
+    // Перерисовываем места при изменении places.value
+    watch(
+      () => places.value,
+      () => {
+        if (!map) return
+        if (!isNinjaMode.value) {
+          addPlaceMarkers()
+          // критично: при изменении places слой ивентов мог сброситься
+          // поэтому синхронизируем его обратно по флагу режима
+          syncEventMarkers()
+        }
+      },
+      { deep: false }
+    )
+
+
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,

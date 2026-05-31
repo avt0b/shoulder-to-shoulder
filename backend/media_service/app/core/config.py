@@ -24,16 +24,16 @@ class Settings(BaseSettings):
 
     NATS_URL: str = "nats://localhost:4222"
 
-    AWS_ACCESS_KEY_ID: str
-    AWS_SECRET_ACCESS_KEY: str
-    AWS_S3_BUCKET: str
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_S3_BUCKET: str = "dev-media"
     AWS_S3_REGION: str = "eu-central-1"
-    AWS_S3_ENDPOINT_URL: str | None = "http://localhost:9000"
-    AWS_PUBLIC_URL: str
+    AWS_S3_ENDPOINT_URL: str | None = "http://minio:9000"
+    AWS_PUBLIC_URL: str = "http://localhost:8006"
 
     MAX_FILE_SIZE: int = 10_485_760  # 10 MB
-    ALLOWED_CONTENT_TYPES_STR: str
-    ALLOWED_PURPOSES_STR: str
+    ALLOWED_CONTENT_TYPES_STR: str = "image/jpeg,image/png,application/pdf"
+    ALLOWED_PURPOSES_STR: str = "avatar,event,spot,badge"
 
     @property
     def ALLOWED_CONTENT_TYPES(self) -> List[str]:

@@ -9,6 +9,28 @@ from backend.media_service.app.schemas.media import UploadUrlRequest, FileDelete
 router = APIRouter(prefix="/media", tags=["media"])
 
 
+# Базовый прямой доступ к объектам по MinIO/S3 public URL
+# Ожидаемый формат: /avatar/{owner_id}/{file_name}.png
+# (file_key формируется как avatar/{owner_id}/{file_name})
+
+@router.get("/avatar/{owner_id}/{file_name:path}")
+async def get_avatar(
+        owner_id: str,
+        file_name: str,
+):
+    # purpose=avatar (см. generate_upload_url: f"{req.purpose}/{req.owner_id}/..." )
+    file_key = f"avatar/{owner_id}/{file_name}"
+
+    # Идея: если bucket публичный — отдаём 302 на public_url
+    # Если bucket приватный — этот endpoint нужно будет переключить на presigned GET.
+    try:
+        url = s3.get_public_url(file_key)
+    except Exception as e:
+        raise HTTPException(500, detail=f"Failed to build media URL: {e}")
+
+    return {"url": url, "file_key": file_key}
+
+
 @router.post("/upload-url")
 async def get_upload_url(
         req: UploadUrlRequest,

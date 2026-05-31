@@ -1,7 +1,7 @@
 CREATE TABLE events (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     host_id             UUID NOT NULL,
-    spot_id             UUID NOT NULL,
+    spot_id             UUID,
     title               VARCHAR(100) NOT NULL,
     description         TEXT,
     max_participants    INTEGER DEFAULT 10 NOT NULL,
@@ -9,7 +9,9 @@ CREATE TABLE events (
     status              VARCHAR(20) DEFAULT 'pending' NOT NULL,
     start_time          TIMESTAMPTZ NOT NULL,
     photo_url           TEXT,
-    created_at          TIMESTAMPTZ DEFAULT NOW()
+    created_at          TIMESTAMPTZ DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ,
+    anonymous           BOOLEAN DEFAULT false NOT NULL
 );
 
 CREATE TABLE event_participants (
@@ -31,4 +33,6 @@ CREATE INDEX idx_event_participants_status ON event_participants(status);
 ALTER TABLE event_participants ADD COLUMN photo_url TEXT;
 CREATE INDEX idx_event_participants_photo ON event_participants(photo_url) WHERE photo_url IS NOT NULL;
 
-ALTER TABLE events ADD COLUMN updated_at TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS anonymous BOOLEAN DEFAULT false NOT NULL;
+ALTER TABLE events ALTER COLUMN spot_id DROP NOT NULL;

@@ -175,6 +175,12 @@
           </button>
         </div>
 
+        <!-- Error Message -->
+        <div v-if="formError" class="form-error" style="margin: 16px 20px 0; padding: 12px; background-color: #fee; border-left: 4px solid #ea580c; border-radius: 4px; color: #c00; font-size: 14px;">
+          <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px; margin-right: 8px;">error</span>
+          {{ formError }}
+        </div>
+
         <form class="modal-form" @submit.prevent="submitEvent">
           <!-- Название -->
           <div class="form-group">
@@ -339,6 +345,8 @@ const emit = defineEmits(['close', 'navigate'])
 const router = useRouter()
 const activeTab = ref('all')
 const showCreateModal = ref(false)
+const formError = ref('') // Error message для валидации
+const formErrorTimeout = ref(null)
 
 // ============================================
 // 📋 Детали мероприятия (модалка)
@@ -781,7 +789,10 @@ async function joinEvent(eventId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${eventId}/join`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+      },
       body: JSON.stringify({ user_id: userId })
     })
     const data = await res.json()
@@ -812,7 +823,10 @@ async function leaveEvent(eventId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${eventId}/cancel`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+      },
       body: JSON.stringify({ user_id: userId })
     })
     const data = await res.json()
@@ -873,7 +887,10 @@ async function checkinEvent(eventId, userId = 1) {
   try {
     const res = await fetch(eventsApi(`/events/${eventId}/checkin`), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+      },
       body: JSON.stringify({ user_id: userId })
     })
     const data = await res.json()
@@ -940,7 +957,10 @@ async function submitEventToBackend(eventData) {
 
     const res = await fetch(eventsApi('/events'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+      },
       body: JSON.stringify(eventPayload)
     })
     const data = await res.json()
@@ -995,6 +1015,8 @@ function openCreateModal() {
 // Закрыть модалку
 function closeModal() {
   showCreateModal.value = false
+  formError.value = ''
+  if (formErrorTimeout.value) clearTimeout(formErrorTimeout.value)
   if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
   resetForm()
 }
@@ -1037,6 +1059,22 @@ function openMapForPick() {
 function submitEvent() {
   if (!isFormValid.value) return
 
+  // Валидация: событие должно быть минимум на 30 минут позже текущего времени
+  const now = new Date()
+  const startTime = new Date(`${form.value.date}T${form.value.time}:00`)
+  const minStartTime = new Date(now.getTime() + 30 * 60 * 1000) // сейчас + 30 минут
+  
+  if (startTime < minStartTime) {
+    formError.value = 'Событие должно быть запланировано минимум на 30 минут позже текущего времени'
+    
+    // Очищаем ошибку через 5 секунд
+    if (formErrorTimeout.value) clearTimeout(formErrorTimeout.value)
+    formErrorTimeout.value = setTimeout(() => {
+      formError.value = ''
+    }, 5000)
+    return
+  }
+
   let locationShort = ''
   let location = ''
 
@@ -1053,7 +1091,7 @@ function submitEvent() {
   }
 
   // Формируем ISO datetime для start_time
-  const startTime = new Date(`${form.value.date}T${form.value.time}:00`).toISOString()
+  const startTimeIso = startTime.toISOString()
 
   const eventData = {
     name: form.value.name,
@@ -1061,7 +1099,7 @@ function submitEvent() {
     type: form.value.type,
     date: form.value.date,
     time: form.value.time,
-    startTime,
+    startTime: startTimeIso,
     meetupId: form.value.meetupId,
     customAddress: form.value.customAddress || null,
     customLat: form.value.customLat,

@@ -134,4 +134,5 @@ class EventService:
             "created_at": event.created_at,
             "participant_count": len(participant_ids),
             "participant_ids": participant_ids,
+            "anonymous": event.anonymous,
         }
