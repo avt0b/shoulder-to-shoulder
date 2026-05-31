@@ -59,6 +59,7 @@ class EventListItem(BaseModel):
     photo_url: str | None
     created_at: datetime
     participant_count: int
+    participant_ids: list[UUID] = Field(default_factory=list)
     anonymous: bool
 
 

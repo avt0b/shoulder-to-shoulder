@@ -80,11 +80,12 @@
               <span class="participants-count">{{ event.participants }}/{{ event.maxParticipants }}</span>
               <button
                 class="action-btn"
-                :class="{ 'action-btn-joined': event.isJoined }"
+                :class="{ 'action-btn-joined': event.isJoined || event.isOwner }"
+                :disabled="event.isOwner"
                 @click.stop="event.isJoined ? leaveEvent(event.id) : joinEvent(event.id)"
               >
-                <span class="material-symbols-outlined">{{ event.isJoined ? 'check_circle' : 'person_add' }}</span>
-                <span>{{ event.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
+                <span class="material-symbols-outlined">{{ event.isOwner ? 'stars' : event.isJoined ? 'check_circle' : 'person_add' }}</span>
+                <span>{{ event.isOwner ? 'Вы организатор' : event.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
               </button>
             </div>
           </div>
@@ -148,11 +149,20 @@
           <!-- Кнопка действия -->
           <button
             class="event-detail-action"
-            :class="{ joined: selectedEvent.isJoined }"
+            :class="{ joined: selectedEvent.isJoined || selectedEvent.isOwner }"
+            :disabled="selectedEvent.isOwner"
             @click="selectedEvent.isJoined ? leaveEvent(selectedEvent.id) : joinEvent(selectedEvent.id)"
           >
-            <span class="material-symbols-outlined">{{ selectedEvent.isJoined ? 'check_circle' : 'person_add' }}</span>
-            <span>{{ selectedEvent.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
+            <span class="material-symbols-outlined">{{ selectedEvent.isOwner ? 'stars' : selectedEvent.isJoined ? 'check_circle' : 'person_add' }}</span>
+            <span>{{ selectedEvent.isOwner ? 'Вы организатор' : selectedEvent.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
+          </button>
+          <button
+            v-if="selectedEvent.isOwner"
+            class="event-detail-delete"
+            @click="deleteEvent(selectedEvent.id)"
+          >
+            <span class="material-symbols-outlined">delete</span>
+            <span>Удалить мероприятие</span>
           </button>
         </div>
       </div>
@@ -353,6 +363,17 @@ const formErrorTimeout = ref(null)
 // ============================================
 
 const selectedEvent = ref(null)
+
+function getCurrentUserId() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return payload.sub ? String(payload.sub) : null
+  } catch {
+    return null
+  }
+}
 
 function openEventDetail(event) {
   selectedEvent.value = event
@@ -738,9 +759,13 @@ async function fetchAllEvents() {
       }
 
       // Маппим бэковые events → внутренний формат
+      const currentUserId = getCurrentUserId()
       allEvents.value = data.events.map(ev => {
         const place = placesMap.get(ev.spot_id) || { name: ev.spot_id, address: '', emoji: '📍' }
         const startDate = new Date(ev.start_time)
+        const participantIds = (ev.participant_ids || []).map(String)
+        const isOwner = currentUserId && String(ev.host_id) === currentUserId
+        const isJoined = isOwner || (currentUserId && participantIds.includes(currentUserId))
         return {
           id: ev.id,
           name: ev.title,
@@ -756,8 +781,10 @@ async function fetchAllEvents() {
           quietCompanion: false,
           anonymous: ev.anonymous,
           participants: ev.participant_count || 0,
+          participantIds,
           maxParticipants: ev.max_participants,
-          isJoined: false,
+          isOwner,
+          isJoined,
           avatars: [],
           moreCount: 0,
           spot_id: ev.spot_id,
@@ -787,6 +814,8 @@ async function fetchAllEvents() {
 // Записаться на мероприятие
 async function joinEvent(eventId, userId = 1) {
   try {
+    const event = allEvents.value.find(e => e.id === eventId)
+    if (event?.isOwner) return null
     const res = await fetch(eventsApi(`/events/${eventId}/join`), {
       method: 'POST',
       headers: {
@@ -796,10 +825,9 @@ async function joinEvent(eventId, userId = 1) {
       body: JSON.stringify({ user_id: userId })
     })
     const data = await res.json()
-    const event = allEvents.value.find(e => e.id === eventId)
     if (event) {
       event.isJoined = true
-      event.participants = data.participants
+      event.participants = data.participants || event.participants + 1
     }
     // Синхронизация: сохраняем мои встречи в общий ключ
     syncMyMeetups()
@@ -807,7 +835,7 @@ async function joinEvent(eventId, userId = 1) {
   } catch (e) {
     if (config.isDebug) console.warn(`joinEvent: API недоступен`)
     const event = allEvents.value.find(e => e.id === eventId)
-    if (event && event.participants < event.maxParticipants) {
+    if (event && !event.isOwner && event.participants < event.maxParticipants) {
       event.isJoined = true
       event.participants++
       saveToLocalStorage(allEvents.value)
@@ -821,33 +849,62 @@ async function joinEvent(eventId, userId = 1) {
 // Отписаться от мероприятия
 async function leaveEvent(eventId, userId = 1) {
   try {
+    const event = allEvents.value.find(e => e.id === eventId)
+    if (event?.isOwner) return null
     const res = await fetch(eventsApi(`/events/${eventId}/cancel`), {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
         ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
-      },
-      body: JSON.stringify({ user_id: userId })
+      }
     })
     const data = await res.json()
-    const event = allEvents.value.find(e => e.id === eventId)
+    if (!res.ok) {
+      throw new Error(data.detail || 'Не удалось выйти из мероприятия')
+    }
     if (event) {
       event.isJoined = false
-      event.participants = data.participants
+      event.participants = data.participants || Math.max(0, event.participants - 1)
     }
     syncMyMeetups()
     return data
   } catch (e) {
     if (config.isDebug) console.warn(`leaveEvent: API недоступен`)
     const event = allEvents.value.find(e => e.id === eventId)
-    if (event) {
+    if (event && !event.isOwner) {
       event.isJoined = false
-      event.participants--
+      event.participants = Math.max(0, event.participants - 1)
       saveToLocalStorage(allEvents.value)
     }
     syncMyMeetups()
     return null
   }
+}
+
+async function deleteEvent(eventId) {
+  const event = allEvents.value.find(e => e.id === eventId)
+  if (!event?.isOwner) return
+  if (!window.confirm('Удалить это мероприятие?')) return
+
+  try {
+    const res = await fetch(eventsApi(`/events/${eventId}`), {
+      method: 'DELETE',
+      headers: {
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {})
+      },
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.detail || 'Не удалось удалить мероприятие')
+    }
+  } catch (e) {
+    if (config.isDebug) console.warn('deleteEvent: API недоступен или вернул ошибку', e)
+    if (typeof eventId !== 'number') return
+  }
+
+  allEvents.value = allEvents.value.filter(e => e.id !== eventId)
+  selectedEvent.value = null
+  saveToLocalStorage(allEvents.value)
+  syncMyMeetups()
 }
 
 // Синхронизация: сохраняем «мои встречи» (isJoined=true) для MainPage
@@ -868,6 +925,7 @@ function syncMyMeetups() {
       quietCompanion: e.quietCompanion,
       participants: e.participants,
       maxParticipants: e.maxParticipants,
+      isOwner: e.isOwner,
       isJoined: true,
       avatars: e.avatars || [],
       moreCount: e.moreCount || 0,
@@ -964,12 +1022,36 @@ async function submitEventToBackend(eventData) {
       body: JSON.stringify(eventPayload)
     })
     const data = await res.json()
-    if (data.event) {
-      allEvents.value.unshift(data.event)
+    const created = data.event || data
+    const createdEvent = {
+      id: created.id,
+      name: created.title || eventData.name,
+      emoji: typeEmoji[eventData.type] || '🏋️',
+      date: eventData.date,
+      time: eventData.time,
+      dateDisplay: formatDateDisplay(eventData.date),
+      locationShort: eventData.locationShort,
+      location: eventData.location,
+      description: created.description || eventData.description,
+      level: 'Открыто',
+      type: eventData.type,
+      quietCompanion: eventData.quietCompanion,
+      anonymous: created.anonymous,
+      participants: 1,
+      maxParticipants: created.max_participants || eventData.maxParticipants,
+      participantIds: [getCurrentUserId()].filter(Boolean),
+      isOwner: true,
+      isJoined: true,
+      avatars: [],
+      moreCount: 0,
+      spot_id: created.spot_id || spotId,
+      host_id: created.host_id || getCurrentUserId(),
+      status: created.status || 'pending'
     }
+    allEvents.value.unshift(createdEvent)
     saveToLocalStorage(allEvents.value)
     syncMyMeetups()
-    return data.event
+    return createdEvent
   } catch (e) {
     if (config.isDebug) console.warn('submitEventToBackend: API недоступен, сохраняем локально', e)
 
@@ -990,6 +1072,7 @@ async function submitEventToBackend(eventData) {
       anonymous: eventData.anonymous,
       participants: 1,
       maxParticipants: eventData.maxParticipants,
+      isOwner: true,
       isJoined: true,
       avatars: ['https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'],
       moreCount: 0
@@ -1550,6 +1633,16 @@ onMounted(async () => {
 .action-btn-joined:hover {
   background: #d1d5db;
   color: #dc2626;
+}
+
+.action-btn:disabled {
+  cursor: default;
+  transform: none;
+}
+
+.action-btn:disabled:hover {
+  background: var(--surface-container-high);
+  color: #16a34a;
 }
 
 /* Empty State */
@@ -2425,6 +2518,31 @@ onMounted(async () => {
 
 .event-detail-action.joined:hover {
   background: #dcfce7;
+}
+
+.event-detail-action:disabled {
+  cursor: default;
+}
+
+.event-detail-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 2px solid #dc2626;
+  background: white;
+  color: #dc2626;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.event-detail-delete:hover {
+  background: #fef2f2;
 }
 
 /* Dark mode */

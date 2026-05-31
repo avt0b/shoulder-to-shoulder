@@ -104,11 +104,12 @@
                 <span class="join-count">{{ meetup.participants }}/{{ meetup.maxParticipants }} участников</span>
                 <button
                   class="join-btn"
-                  :class="{ 'join-btn-joined': meetup.isJoined }"
+                  :class="{ 'join-btn-joined': meetup.isJoined || meetup.isOwner }"
+                  :disabled="meetup.isOwner"
                   @click.stop="meetup.isJoined ? handleLeaveMeetup(meetup.id) : handleJoinMeetup(meetup.id)"
                 >
-                  <span class="material-symbols-outlined">{{ meetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
-                  <span>{{ meetup.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
+                  <span class="material-symbols-outlined">{{ meetup.isOwner ? 'stars' : meetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
+                  <span>{{ meetup.isOwner ? 'Вы организатор' : meetup.isJoined ? 'Участвую' : 'Присоединиться' }}</span>
                 </button>
               </div>
             </div>
@@ -401,11 +402,12 @@
           <!-- Кнопка действия -->
           <button
             class="meetup-detail-action"
-            :class="{ joined: selectedMeetup.isJoined }"
+            :class="{ joined: selectedMeetup.isJoined || selectedMeetup.isOwner }"
+            :disabled="selectedMeetup.isOwner"
             @click="selectedMeetup.isJoined ? handleLeaveMeetup(selectedMeetup.id) : handleJoinMeetup(selectedMeetup.id)"
           >
-            <span class="material-symbols-outlined">{{ selectedMeetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
-            <span>{{ selectedMeetup.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
+            <span class="material-symbols-outlined">{{ selectedMeetup.isOwner ? 'stars' : selectedMeetup.isJoined ? 'check_circle' : 'directions_run' }}</span>
+            <span>{{ selectedMeetup.isOwner ? 'Вы организатор' : selectedMeetup.isJoined ? 'Вы участвуете' : 'Присоединиться' }}</span>
           </button>
         </div>
       </div>
@@ -525,6 +527,17 @@ function closeMapLight() {
 // ============================================
 
 const selectedMeetup = ref(null)
+
+function getCurrentUserId() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return payload.sub ? String(payload.sub) : null
+  } catch (e) {
+    return null
+  }
+}
 
 function openMeetupDetail(meetup) {
   selectedMeetup.value = meetup
@@ -868,14 +881,42 @@ async function submitEventToBackend(eventData) {
       body: JSON.stringify(eventPayload)
     })
     const data = await res.json()
-
-    if (data.event) {
-      myMeetups.value.unshift(data.event)
+    if (!res.ok) {
+      throw new Error(data.detail || 'Event create failed')
     }
+
+    const created = data.event || data
+    const createdEvent = {
+      id: created.id,
+      name: created.title || eventData.name,
+      emoji: typeEmoji[eventData.type] || '🏋️',
+      date: eventData.date,
+      time: eventData.time,
+      locationShort: eventData.locationShort,
+      location: eventData.location,
+      description: created.description || eventData.description,
+      level: eventData.level,
+      type: eventData.type,
+      quietCompanion: eventData.quietCompanion,
+      anonymous: created.anonymous ?? eventData.anonymous,
+      participants: 1,
+      participantIds: [getCurrentUserId()].filter(Boolean),
+      maxParticipants: created.max_participants || eventData.maxParticipants,
+      isOwner: true,
+      isJoined: true,
+      avatars: [],
+      moreCount: 0,
+      spot_id: created.spot_id || spotId,
+      host_id: created.host_id || getCurrentUserId(),
+      status: created.status || 'pending'
+    }
+    myMeetups.value.unshift(createdEvent)
+    syncMyMeetupsLocal()
+
     const allStored = loadFromLocalStorage() || []
-    allStored.unshift(data.event)
+    allStored.unshift(createdEvent)
     saveToLocalStorage(allStored)
-    return data.event
+    return createdEvent
   } catch (e) {
     if (config.isDebug) console.warn('submitEventToBackend: API недоступен, localStorage', e)
 
@@ -894,6 +935,7 @@ async function submitEventToBackend(eventData) {
       anonymous: eventData.anonymous,
       participants: 1,
       maxParticipants: eventData.maxParticipants,
+      isOwner: true,
       isJoined: true,
       avatars: ['https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0'],
       moreCount: 0
@@ -972,10 +1014,13 @@ function submitEvent() {
 
 // Бэк эндпоинты (Swagger):
 // POST /api/v1/events/{event_id}/join
-// POST /api/v1/events/{event_id}/cancel  (не DELETE!)
+// GET /api/v1/events/{event_id}/cancel
 // POST /api/v1/events/{event_id}/checkin
 
 async function handleJoinMeetup(meetupId, userId = 1) {
+  const meetup = myMeetups.value.find(m => m.id === meetupId)
+  if (meetup?.isOwner) return null
+
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/join`), {
       method: 'POST',
@@ -984,15 +1029,19 @@ async function handleJoinMeetup(meetupId, userId = 1) {
     })
 
     const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.detail || 'Не удалось выйти из мероприятия')
+    }
 
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
     if (idx !== -1) {
-      myMeetups.value[idx] = { ...myMeetups.value[idx], isJoined: true, participants: data.participants }
+      const current = myMeetups.value[idx]
+      myMeetups.value[idx] = { ...current, isJoined: true, participants: data.participants || current.participants + 1 }
     }
     // Обновляем выбранное мероприятие если оно открыто
     if (selectedMeetup.value && selectedMeetup.value.id === meetupId) {
       selectedMeetup.value.isJoined = true
-      selectedMeetup.value.participants = data.participants
+      selectedMeetup.value.participants = data.participants || selectedMeetup.value.participants + 1
     }
     syncMyMeetupsLocal()
     return data
@@ -1002,7 +1051,7 @@ async function handleJoinMeetup(meetupId, userId = 1) {
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
     if (idx !== -1) {
       const m = myMeetups.value[idx]
-      if (m.participants < m.maxParticipants && !m.isJoined) {
+      if (!m.isOwner && m.participants < m.maxParticipants && !m.isJoined) {
         myMeetups.value[idx] = { ...m, isJoined: true, participants: m.participants + 1 }
       }
     }
@@ -1012,23 +1061,26 @@ async function handleJoinMeetup(meetupId, userId = 1) {
 }
 
 async function handleLeaveMeetup(meetupId, userId = 1) {
+  const meetup = myMeetups.value.find(m => m.id === meetupId)
+  if (meetup?.isOwner) return null
+
   try {
     const res = await fetch(eventsApi(`/events/${meetupId}/cancel`), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) },
-      body: JSON.stringify({ user_id: userId })
+      method: 'GET',
+      headers: { ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}) }
     })
 
     const data = await res.json()
 
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
     if (idx !== -1) {
-      myMeetups.value[idx] = { ...myMeetups.value[idx], isJoined: false, participants: data.participants }
+      const current = myMeetups.value[idx]
+      myMeetups.value[idx] = { ...current, isJoined: false, participants: data.participants || Math.max(0, current.participants - 1) }
     }
     // Обновляем выбранное мероприятие если оно открыто
     if (selectedMeetup.value && selectedMeetup.value.id === meetupId) {
       selectedMeetup.value.isJoined = false
-      selectedMeetup.value.participants = data.participants
+      selectedMeetup.value.participants = data.participants || Math.max(0, selectedMeetup.value.participants - 1)
     }
     syncMyMeetupsLocal()
     return data
@@ -1038,8 +1090,8 @@ async function handleLeaveMeetup(meetupId, userId = 1) {
     const idx = myMeetups.value.findIndex(m => m.id === meetupId)
     if (idx !== -1) {
       const m = myMeetups.value[idx]
-      if (m.isJoined) {
-        myMeetups.value[idx] = { ...m, isJoined: false, participants: m.participants - 1 }
+      if (!m.isOwner && m.isJoined) {
+        myMeetups.value[idx] = { ...m, isJoined: false, participants: Math.max(0, m.participants - 1) }
       }
     }
     syncMyMeetupsLocal()
@@ -1886,6 +1938,16 @@ function clearMiniRoute() {
   transform: scale(1.05);
 }
 
+.join-btn:disabled {
+  cursor: default;
+  transform: none;
+  opacity: 0.9;
+}
+
+.join-btn:disabled:hover {
+  background: var(--surface-container-high);
+}
+
 .join-btn .material-symbols-outlined {
   font-size: 18px;
 }
@@ -2298,12 +2360,19 @@ function clearMiniRoute() {
   box-shadow: 0 4px 16px rgba(234, 88, 12, 0.3);
 }
 
+.meetup-detail-action:disabled {
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.9;
+}
+
 .meetup-detail-action.joined {
   background: var(--surface-container-high);
   color: #16a34a;
 }
 
-.meetup-detail-action.joined:hover {
+.meetup-detail-action.joined:not(:disabled):hover {
   background: #d1d5db;
   color: #dc2626;
 }
