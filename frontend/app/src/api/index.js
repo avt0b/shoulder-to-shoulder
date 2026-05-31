@@ -95,10 +95,11 @@ export function toProxyUrl(url) {
   if (url.startsWith('http://minio:9000/')) return url.replace('http://minio:9000/', '/minio-static/')
   if (url.startsWith('http://localhost:9000/')) return url.replace('http://localhost:9000/', '/minio-static/')
 
-  // Если сервис отдал внешний public URL с внешним IP (например http://93.183.71.160:8006/...) —
-  // конвертируем в localhost для локальной разработки
-  if (url.includes(':8006/')) {
-    return url.replace(/https?:\/\/[^:]+:8006\//, 'http://localhost:8006/')
+  if (url.startsWith('http://localhost:8006/') && typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host && host !== 'localhost' && host !== '127.0.0.1') {
+      return url.replace('http://localhost:8006/', `http://${host}:8006/`)
+    }
   }
 
   return url
@@ -475,21 +476,31 @@ export const authApi = USE_MOCK
 
       // Прямая загрузка файла в S3 через presigned POST
       async uploadToS3({ upload_url, fields, file }) {
-        // Проксируем через Vite dev server — браузер не может напрямую к MinIO
-        // из-за системного HTTP-прокси. Vite работает как обратный прокси.
-        const devServerUrl = upload_url
-          .replace('http://minio:9000', 'http://localhost:5173/minio-upload')
-          .replace('http://localhost:9000', 'http://localhost:5173/minio-upload')
-
         const formData = new FormData()
         Object.entries(fields).forEach(([key, value]) => {
           formData.append(key, value)
         })
         formData.append('file', file)
 
-        const response = await fetch(devServerUrl, { method: 'POST', body: formData })
+        const response = await fetch(upload_url, { method: 'POST', body: formData })
         if (!response.ok) throw new Error('Ошибка загрузки файла в хранилище')
         return response
+      },
+      async uploadMedia({ purpose, file }) {
+        const token = localStorage.getItem('token')
+        const ownerId = token ? decodeTokenPayload(token)?.sub : null
+        if (!ownerId) throw new Error('Не авторизован')
+
+        const formData = new FormData()
+        formData.append('purpose', purpose)
+        formData.append('owner_id', ownerId)
+        formData.append('file', file)
+
+        const url = mediaApi('/media/upload')
+        const response = await fetch(url, { method: 'POST', body: formData })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.detail || 'Ошибка загрузки файла')
+        return data
       },
     }
 
@@ -526,10 +537,7 @@ export const mediaGetApi = {
   // Возвращает готовый URL, скорректированный для localhost
   getMediaUrl(category, userId, fileName) {
     const url = `${config.mediaBaseURL}/${category}/${userId}/${fileName}`
-    // Преобразуем внешний IP в localhost если нужно
-    return url.includes(':8006/') 
-      ? url.replace(/https?:\/\/[^:]+:8006\//, 'http://localhost:8006/')
-      : url
+    return toProxyUrl(url)
   },
 
   // Альтернатива: получить прямой URL для img src

@@ -66,5 +66,25 @@ class S3Manager:
     def get_public_url(self, file_key: str) -> str:
         return f"{self.public_url}/{file_key}"
 
+    def upload_fileobj(self, file_obj, file_key: str, content_type: str) -> None:
+        try:
+            self.client.upload_fileobj(
+                file_obj,
+                self.bucket,
+                file_key,
+                ExtraArgs={"ContentType": content_type},
+            )
+            logger.info(f"Uploaded file to S3: {file_key}")
+        except ClientError as e:
+            logger.error(f"S3 upload failed [{file_key}]: {e}")
+            raise RuntimeError("Failed to upload file")
+
+    def get_object(self, file_key: str):
+        try:
+            return self.client.get_object(Bucket=self.bucket, Key=file_key)
+        except ClientError as e:
+            logger.error(f"S3 get failed [{file_key}]: {e}")
+            raise RuntimeError("Failed to get file")
+
 
 s3 = S3Manager()

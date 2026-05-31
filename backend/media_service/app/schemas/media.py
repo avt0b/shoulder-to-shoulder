@@ -11,3 +11,8 @@ class UploadUrlRequest(BaseModel):
 class FileDeleteResponse(BaseModel):
     status: str
     message: str
+
+
+class MediaUploadResponse(BaseModel):
+    file_key: str
+    public_url: str

@@ -12,6 +12,15 @@ class MediaRepository:
         new_file = MediaFile(**data, status=FileStatus.PENDING)
         self.db.add(new_file)
         await self.db.flush()
+        await self.db.commit()
+        await self.db.refresh(new_file)
+        return new_file
+
+    async def create_uploaded_file(self, data: dict) -> MediaFile:
+        new_file = MediaFile(**data, status=FileStatus.UPLOADED)
+        self.db.add(new_file)
+        await self.db.flush()
+        await self.db.commit()
         await self.db.refresh(new_file)
         return new_file
 
