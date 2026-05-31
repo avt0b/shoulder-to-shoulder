@@ -52,6 +52,14 @@ function clearStorage() {
   console.log(`${LOG_PREFIX} 🗑️ Сессия очищена`)
 }
 
+export function clearAuthSession() {
+  authStore.isAuthenticated = false
+  authStore.user = null
+  authStore.token = null
+  authStore.error = null
+  clearStorage()
+}
+
 // Вызываем при загрузке модуля
 loadFromStorage()
 
@@ -161,11 +169,7 @@ export async function fetchBadges() {
 export function logout() {
   const userName = authStore.user?.display_name || authStore.user?.login || 'Неизвестный'
   console.log(`${LOG_PREFIX} 🚪 Выход пользователя:`, userName)
-  authStore.isAuthenticated = false
-  authStore.user = null
-  authStore.token = null
-  authStore.error = null
-  clearStorage()
+  clearAuthSession()
 }
 
 export function isLoggedIn() {

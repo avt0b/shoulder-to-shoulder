@@ -5,13 +5,13 @@
       <div class="nav-brand">
         <div class="avatar-wrapper">
           <div class="avatar">
-            <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpfv2jdSpqPq9LfvhaIC8_axb5WLqMdlPMo9iVnmCZV8e7fY4XQvMbhDbl0SVzSyfN91CMhBYOC6FX2iGTaTWJ5qQkAwtiWjRwE9blPtdUDmNm-4m8trXbyzsMZRYDbkMcn0tHAEwV7HDDzalxua2JqK3qpMES04PRV9y4wsePZPWgNtwrV-VwSTlTD1f4jdt8EH1Ku4My8rwhXBhs7Zl7kUsQmMG619SEjGC9TCyPrQhaslXv1EAD9w4loswmmyy4-4QVmLnRcF0" alt="Profile" />
+            <img :src="avatarUrl" alt="Profile" />
           </div>
-          <div class="badge">94%</div>
+          <div class="badge">{{ profileData?.reliability_score ? Math.round(profileData.reliability_score) + '%' : '—' }}</div>
         </div>
         <div class="brand-text">
           <span class="brand-title">Плечом к плечу</span>
-          <span class="brand-subtitle">Empathy: 12</span>
+          <span class="brand-subtitle">{{ isLoadingProfile ? 'Загрузка...' : `Empathy: ${empathyScore}` }}</span>
         </div>
       </div>
     </nav>
@@ -167,6 +167,12 @@
           <button class="modal-close" @click="closeModalAndReset">
             <span class="material-symbols-outlined">close</span>
           </button>
+        </div>
+
+        <!-- Error Message -->
+        <div v-if="formError" class="form-error" style="margin: 16px 20px 0; padding: 12px; background-color: #fee; border-left: 4px solid #ea580c; border-radius: 4px; color: #c00; font-size: 14px;">
+          <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 18px; margin-right: 8px;">error</span>
+          {{ formError }}
         </div>
 
         <form class="modal-form" @submit.prevent="submitEvent">
@@ -418,6 +424,7 @@ import { useRouter } from 'vue-router'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { config, placesApi, eventsApi } from '../config'
+import { authApi } from '../api'
 import { navigationStore } from '../stores/navigation'
 import MapLight from './MapLight.vue'
 
@@ -427,6 +434,46 @@ const showMapLight = ref(false)
 let map = null
 let miniRouteLayer = null
 let miniUserLayer = null
+
+// ============================================
+// 👤 Профиль пользователя
+// ============================================
+
+const profileData = ref(null)
+const empathyScore = ref(0)
+const avatarUrl = ref('')
+const isLoadingProfile = ref(true)
+
+// Загрузка профиля пользователя
+async function loadProfile() {
+  try {
+    isLoadingProfile.value = true
+    const [profile, rating] = await Promise.all([
+      authApi.getProfile(),
+      authApi.getRating()
+    ])
+    
+    profileData.value = profile
+    empathyScore.value = rating?.empathy_score || 0
+    
+    // Получаем аватар из профиля
+    if (profile?.avatar_url) {
+      avatarUrl.value = profile.avatar_url
+    } else {
+      // Fallback — дефолтный аватар
+      avatarUrl.value = 'https://via.placeholder.com/48?text=Avatar'
+    }
+    
+    if (config.isDebug) console.log('👤 Profile loaded:', { profile, rating })
+  } catch (e) {
+    if (config.isDebug) console.warn('loadProfile error:', e)
+    // fallback на дефолтные значения
+    empathyScore.value = 0
+    avatarUrl.value = 'https://via.placeholder.com/48?text=Avatar'
+  } finally {
+    isLoadingProfile.value = false
+  }
+}
 
 // Подписка на навигацию из общего стора
 const isNavigating = computed(() => navigationStore.isNavigating)
@@ -600,6 +647,8 @@ const selectedMeetupName = computed(() => {
 // ============================================
 
 const showCreateModal = ref(false)
+const formError = ref('') // Error message для валидации
+const formErrorTimeout = ref(null)
 
 const eventTypes = [
   { key: 'running', emoji: '🏃', label: 'Бег' },
@@ -674,6 +723,8 @@ function openCreateModal() {
 
 function closeModal() {
   showCreateModal.value = false
+  formError.value = ''
+  if (formErrorTimeout.value) clearTimeout(formErrorTimeout.value)
   if (hideDropdownTimer) clearTimeout(hideDropdownTimer)
   // Останавливаем проверку pending location — модалка закрыта
   if (window.__mainPagePendingCheckInterval) {
@@ -857,6 +908,22 @@ async function submitEventToBackend(eventData) {
 function submitEvent() {
   if (!isFormValid.value) return
 
+  // Валидация: событие должно быть минимум на 30 минут позже текущего времени
+  const now = new Date()
+  const startTime = new Date(`${form.value.date}T${form.value.time}:00`)
+  const minStartTime = new Date(now.getTime() + 30 * 60 * 1000) // сейчас + 30 минут
+  
+  if (startTime < minStartTime) {
+    formError.value = 'Событие должно быть запланировано минимум на 30 минут позже текущего времени'
+    
+    // Очищаем ошибку через 5 секунд
+    if (formErrorTimeout.value) clearTimeout(formErrorTimeout.value)
+    formErrorTimeout.value = setTimeout(() => {
+      formError.value = ''
+    }, 5000)
+    return
+  }
+
   let locationShort = ''
   let location = ''
 
@@ -873,7 +940,7 @@ function submitEvent() {
   }
 
   // Формируем ISO datetime для start_time
-  const startTime = new Date(`${form.value.date}T${form.value.time}:00`).toISOString()
+  const startTimeIso = startTime.toISOString()
 
   const eventData = {
     name: form.value.name,
@@ -881,7 +948,7 @@ function submitEvent() {
     type: form.value.type,
     date: form.value.date,
     time: form.value.time,
-    startTime,
+    startTime: startTimeIso,
     meetupId: form.value.meetupId,
     customAddress: form.value.customAddress || null,
     customLat: form.value.customLat,
@@ -1140,6 +1207,9 @@ function syncMyMeetupsLocal() {
 
 onMounted(async () => {
   await nextTick()
+
+  // Загружаем профиль пользователя
+  await loadProfile()
 
   // Экспортируем функцию для MapLight
   window.__setMapPickMode = null

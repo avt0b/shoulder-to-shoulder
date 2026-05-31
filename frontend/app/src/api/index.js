@@ -89,11 +89,28 @@ function decodeTokenPayload(token) {
 
 // Конвертирует MinIO URL в Vite proxy URL (браузер не может напрямую к MinIO)
 export function toProxyUrl(url) {
-  if (!url) return url
+  if (!url || typeof url !== 'string') return url
+
+  // Если это уже абсолютный URL к нашему MinIO/S3 (внутри docker или localhost) — проксируем через Vite
+  if (url.startsWith('http://minio:9000/')) return url.replace('http://minio:9000/', '/minio-static/')
+  if (url.startsWith('http://localhost:9000/')) return url.replace('http://localhost:9000/', '/minio-static/')
+
+  // Если сервис отдал внешний public URL с внешним IP (например http://93.183.71.160:8006/...) —
+  // конвертируем в localhost для локальной разработки
+  if (url.includes(':8006/')) {
+    return url.replace(/https?:\/\/[^:]+:8006\//, 'http://localhost:8006/')
+  }
+
   return url
-    .replace('http://minio:9000/', '/minio-static/')
-    .replace('http://localhost:9000/', '/minio-static/')
 }
+
+// Получить URL медиа файла из media service (8006)
+// Пример: /avatar/{user_id}/{file_name}.png
+export function getMediaUrl(category, userId, fileName) {
+  if (!category || !userId || !fileName) return ''
+  return `http://localhost:8006/api/v1/${category}/${userId}/${fileName}`
+}
+
 
 // ===== Phone Normalizer =====
 function normalizePhone(phone) {
@@ -475,3 +492,49 @@ export const authApi = USE_MOCK
         return response
       },
     }
+
+// ===== Media API =====
+export const mediaGetApi = {
+  // Получить медиа файл по URL
+  // Пример: /avatar/{user_id}/{file_name}.png или /event/{event_id}/{file_name}.jpg
+  async getMedia(category, userId, fileName) {
+    const url = `${config.mediaBaseURL}/${category}/${userId}/${fileName}`
+    if (IS_DEBUG) logRequest('GET', url, null, null)
+    
+    try {
+      const startTime = Date.now()
+      const response = await fetch(url)
+      const duration = Date.now() - startTime
+      
+      if (!response.ok) {
+        const error = new Error(`Ошибка загрузки файла: ${response.status}`)
+        logError('GET', url, error, duration)
+        throw error
+      }
+      
+      const blob = await response.blob()
+      logResponse(response.status, response.statusText, `Файл (${blob.size} bytes)`, duration)
+      return blob
+    } catch (error) {
+      const duration = Date.now() - startTime
+      logError('GET', url, error, duration)
+      throw error
+    }
+  },
+
+  // Получить URL для отображения медиа (для использования в src тега)
+  // Возвращает готовый URL, скорректированный для localhost
+  getMediaUrl(category, userId, fileName) {
+    const url = `${config.mediaBaseURL}/${category}/${userId}/${fileName}`
+    // Преобразуем внешний IP в localhost если нужно
+    return url.includes(':8006/') 
+      ? url.replace(/https?:\/\/[^:]+:8006\//, 'http://localhost:8006/')
+      : url
+  },
+
+  // Альтернатива: получить прямой URL для img src
+  // Пример использования: <img :src="mediaGetApi.getDirectUrl('avatar', userId, fileName)" />
+  getDirectUrl(category, userId, fileName) {
+    return this.getMediaUrl(category, userId, fileName)
+  }
+}

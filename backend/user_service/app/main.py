@@ -4,6 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.user_service.app.core.config import settings
+from backend.user_service.app.core.database import Base, engine
+from backend.user_service.app.models.badge import Badge  # noqa: F401
+from backend.user_service.app.models.match import RequestResponse, WorkoutRequest  # noqa: F401
+from backend.user_service.app.models.profile import UserProfile  # noqa: F401
+from backend.user_service.app.models.rating import UserRating  # noqa: F401
+from backend.user_service.app.models.user import User  # noqa: F401
 from backend.user_service.app.api.v1.auth import router as auth_router
 from backend.user_service.app.api.v1.users import router as users_router
 from backend.user_service.app.api.v1.matches import router as matches_router
@@ -35,6 +41,9 @@ app.include_router(matches_router, prefix="/api/v1")
 
 @app.on_event("startup")
 async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
     await connect_nats()
     await setup_nats_subscribers()
     await setup_admin_subscribers()
