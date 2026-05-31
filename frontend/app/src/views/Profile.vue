@@ -560,21 +560,21 @@ const triggerFileInput = () => {
  * 3. Возврат public_url
  */
 async function uploadAvatarFile(file) {
-  // 1. Получаем presigned URL
+  const uploadResult = await authApi.uploadMedia?.({
+    purpose: 'avatar',
+    file,
+  });
+
+  if (uploadResult?.public_url) {
+    return uploadResult.public_url;
+  }
+
   const uploadUrlData = await authApi.getUploadUrl({
     purpose: 'avatar',
     content_type: file.type || 'image/jpeg',
     file_size: file.size,
   });
-
-  // 2. Загружаем файл напрямую в S3 (через Vite proxy)
-  await authApi.uploadToS3({
-    upload_url: uploadUrlData.upload_url,
-    fields: uploadUrlData.fields,
-    file,
-  });
-
-  // 3. Возвращаем ОРИГИНАЛЬНЫЙ public_url для сохранения на бэкенде
+  await authApi.uploadToS3({ upload_url: uploadUrlData.upload_url, fields: uploadUrlData.fields, file });
   return uploadUrlData.public_url;
 }
 
