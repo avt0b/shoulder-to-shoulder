@@ -34,8 +34,6 @@ class Settings(BaseSettings):
     PROXY_ENABLED: bool = False
     PROXY_URL: str = "socks5h://127.0.0.1:10809"
     
-    NATS_SERVER: str = "nats://localhost:4222"
-    
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -56,7 +54,6 @@ class Settings(BaseSettings):
         print(f"[CONFIG] DATABASE_URL: {self.DATABASE_URL}", file=sys.stderr)
         print(f"[CONFIG] POSTGRES_HOST: {self.POSTGRES_HOST}", file=sys.stderr)
         print(f"[CONFIG] POSTGRES_DB: {self.POSTGRES_DB}", file=sys.stderr)
-        print(f"[CONFIG] NATS_SERVER: {self.NATS_SERVER}", file=sys.stderr)
         return self
 
 

@@ -453,14 +453,12 @@ async function loadProfile() {
     if (profile?.avatar_url) {
       avatarUrl.value = profile.avatar_url
     } else {
-      // Fallback — дефолтный аватар
       avatarUrl.value = 'https://via.placeholder.com/48?text=Avatar'
     }
     
     if (config.isDebug) console.log('👤 Profile loaded:', { profile, rating })
   } catch (e) {
     if (config.isDebug) console.warn('loadProfile error:', e)
-    // fallback на дефолтные значения
     empathyScore.value = 0
     avatarUrl.value = 'https://via.placeholder.com/48?text=Avatar'
   } finally {
@@ -627,8 +625,7 @@ async function fetchMeetups() {
       
     if (config.isDebug) console.log('📍 fetchMeetups: загружено мест:', meetups.value.length)
   } catch (e) {
-    if (config.isDebug) console.warn('fetchMeetups: API недоступен, использую fallback', e)
-    // Fallback — минимум данных
+    if (config.isDebug) console.warn('fetchMeetups: API недоступен', e)
     meetups.value = []
   }
 }
@@ -812,7 +809,7 @@ function saveToLocalStorage(events) {
   }
 }
 
-// Создать мероприятие — бэк (places + events) + localStorage fallback
+// Создать мероприятие через сервисы
 async function submitEventToBackend(eventData) {
   try {
     let spotId = null
@@ -1123,32 +1120,6 @@ async function fetchPlaces() {
     return data.places
   } catch (e) {
     if (config.isDebug) console.warn('fetchPlaces: API недоступен')
-    return []
-  }
-}
-
-// 2. Получить одно место по ID
-async function fetchPlaceById(id) {
-  try {
-    const res = await fetch(placesApi(`/places/${id}`))
-    const data = await res.json()
-    return data.place
-  } catch (e) {
-    if (config.isDebug) console.warn(`fetchPlaceById: не удалось загрузить #${id}`)
-    return null
-  }
-}
-
-// 4. Ближайшие места (геолокация)
-async function fetchNearbyPlaces(lat, lng, radius = 2000) {
-  try {
-    const res = await fetch(
-      placesApi(`/places/nearby?lat=${lat}&lng=${lng}&radius=${radius}`)
-    )
-    const data = await res.json()
-    return data.places
-  } catch (e) {
-    if (config.isDebug) console.warn('fetchNearbyPlaces: API недоступен')
     return []
   }
 }

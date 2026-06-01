@@ -4,7 +4,7 @@ Security Route Calculator
 Анализирует безопасность пешеходных маршрутов используя:
 - OpenRouteService (маршруты)
 - Overpass API (данные OSM - дороги, освещение)
-- OpenRouter AI (комментарии)
+- OpenRouter (комментарии)
 """
 
 import json
@@ -235,7 +235,7 @@ class SecurityRouteCalculator:
         return max(0.0, risk)
     
     def get_ai_comment(self, routes: List[RouteData], safest_idx: int) -> str:
-        """Получить AI комментарий о безопасности маршрута"""
+        """Получить комментарий о безопасности маршрута"""
         try:
             headers = {
                 "Authorization": f"Bearer {self.ai_key}",
@@ -268,7 +268,7 @@ class SecurityRouteCalculator:
                 "max_tokens": 150
             }
             
-            logger.info("🤖 Запрашиваем AI комментарий...")
+            logger.info("Запрашиваем комментарий о маршруте...")
             response = requests.post(
                 self.OPENROUTER_URL,
                 headers=headers,
@@ -283,11 +283,11 @@ class SecurityRouteCalculator:
             parsed = json.loads(content)
             comment = parsed.get("comment", "Маршрут доступен для пешеходов.")
             
-            logger.info(f"✅ AI комментарий получен")
+            logger.info("Комментарий о маршруте получен")
             return comment
             
         except Exception as e:
-            logger.warning(f"⚠️ Ошибка при получении AI комментария: {e}")
+            logger.warning(f"Ошибка при получении комментария о маршруте: {e}")
             return "Маршрут проанализирован. Следите за дорожной обстановкой."
     
     async def calculate_safe_route(self, start_lat: float, start_lon: float, 
@@ -312,7 +312,7 @@ class SecurityRouteCalculator:
             safest_route = min(routes, key=lambda r: r.risk_score)
             shortest_route = min(routes, key=lambda r: r.distance_m)
             
-            # 5. Получить AI комментарий
+            # 5. Получить комментарий
             safest_idx = routes.index(safest_route)
             ai_comment = self.get_ai_comment(routes, safest_idx)
             

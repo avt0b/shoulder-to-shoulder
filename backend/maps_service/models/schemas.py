@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
-from datetime import datetime
 from uuid import UUID
 
 class PlaceCreate(BaseModel):
@@ -41,44 +40,3 @@ class PlaceResponse(BaseModel):
     light_availability: int
     conveniences_availability: bool
 
-
-
-class MeetupCreate(BaseModel):
-    name: str
-    time: str
-    level: str
-    max_participants: int = 8
-    place_id: int
-    created_by: int
-
-
-class MeetupResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    
-    id: int
-    name: str
-    time: str
-    level: str
-    participants_count: int
-    max_participants: int
-    place: Optional[PlaceResponse]
-    avatars: List[str]
-    moreCount: Optional[int] = None
-    isJoined: Optional[bool] = False
-
-
-class RouteStep(BaseModel):
-    instruction: str
-    distance: float
-    duration: float
-
-
-class RouteResponse(BaseModel):
-    distance: float
-    duration: float
-    geometry: dict
-    steps: List[RouteStep]
-
-
-class NearbyPlaceResponse(PlaceResponse):
-    distance: float

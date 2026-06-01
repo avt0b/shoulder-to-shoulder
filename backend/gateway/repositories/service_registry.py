@@ -20,7 +20,6 @@ class ServiceRegistry:
             "media": ServiceTarget("media_service", settings.media_service_url),
             "places": ServiceTarget("maps_service", settings.maps_service_url),
             "route": ServiceTarget("maps_service", settings.maps_service_url),
-            "meetups": ServiceTarget("maps_service", settings.maps_service_url),
             "admin": ServiceTarget("admin_service", settings.admin_service_url),
             "notifications": ServiceTarget("notification_service", settings.notification_service_url),
         }

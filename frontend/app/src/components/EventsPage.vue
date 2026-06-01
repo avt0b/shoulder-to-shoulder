@@ -659,10 +659,9 @@ async function fetchAllEvents() {
       return allEvents.value
     }
   } catch (e) {
-    if (config.isDebug) console.warn('fetchAllEvents: API недоступен, fallback', e)
+    if (config.isDebug) console.warn('fetchAllEvents: API недоступен', e)
   }
 
-  // Fallback: localStorage only
   const stored = loadFromLocalStorage()
   if (stored && stored.length > 0) {
     allEvents.value = stored
@@ -820,7 +819,7 @@ async function checkinEvent(eventId, userId = 1) {
   }
 }
 
-// Создать мероприятие — бэк (places + events) + localStorage fallback
+// Создать мероприятие через сервисы
 async function submitEventToBackend(eventData) {
   try {
     let spotId = null
@@ -916,7 +915,6 @@ async function submitEventToBackend(eventData) {
   } catch (e) {
     if (config.isDebug) console.warn('submitEventToBackend: API недоступен, сохраняем локально', e)
 
-    // LocalStorage fallback
     const newEventObj = {
       id: Date.now(),
       name: eventData.name,

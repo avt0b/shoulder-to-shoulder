@@ -254,7 +254,7 @@ async def handle_admin_award_badge(msg):
     try:
         async with AsyncSessionLocal() as db:
             user_repo = UserRepository(db)
-            badge_repo = UserBadgeRepository(db)  # TODO: добавить, когда сделаем
+            badge_repo = UserBadgeRepository(db)
 
             user = await user_repo.get_by_id(str(user_id))
             if not user:

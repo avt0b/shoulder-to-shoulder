@@ -781,7 +781,6 @@ async function useMyLocation() {
     routeStartQuery.value = 'Моё местоположение'
   } catch (e) {
     if (config.isDebug) console.warn('Геолокация недоступна')
-    // Fallback: центр Орла
     routeStartCoords.value = { lat: 52.9651, lng: 36.0785 }
     routeStartQuery.value = 'Центр города'
   }
@@ -822,10 +821,9 @@ async function buildRoute() {
       if (config.isDebug) console.warn('⚠️ Бэк вернул пустые маршруты:', data)
     }
   } catch (e) {
-    if (config.isDebug) console.warn('buildRoute: бэк недоступен, fallback на OSRM', e)
+    if (config.isDebug) console.warn('buildRoute: бэк недоступен, строим маршрут через OSRM', e)
   }
 
-  // 2. Fallback: прямой запрос к OSRM
   if (!routeBuilt) {
     try {
       const url = `${config.osrmBaseURL}/route/v1/foot/${start.lng},${start.lat};${end.lng},${end.lat}?steps=true&geometries=geojson&overview=full`
@@ -918,7 +916,6 @@ function drawRoute(type) {
   // Если есть готовые coords (наш формат) — используем
   let coords = route.coords
   if (!coords) {
-    // Fallback: парсим GeoJSON
     const geometry = route.geometry
     if (!geometry || !geometry.coordinates) return
     coords = geometry.coordinates.map(c => [c[1], c[0]])
@@ -1338,7 +1335,7 @@ async function fetchPlaces() {
           name: p.name,
           description: typeof p.description === 'string' ? p.description : '',
           lat: p.lat,
-          lng: p.lon || p.lng || 0, // lon от бэка, lng как fallback
+          lng: p.lon || p.lng || 0,
           rating: typeof p.rating === 'number' ? p.rating : 0,
           emoji: typeof p.emoji === 'string' ? p.emoji : '📍',
           category: typeof p.category === 'string' ? p.category : 'other',

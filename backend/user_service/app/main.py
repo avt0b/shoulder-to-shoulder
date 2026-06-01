@@ -27,7 +27,6 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    # TODO: Ксюше - поменять на конкретный домен в production'е
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],

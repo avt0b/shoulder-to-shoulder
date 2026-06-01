@@ -37,48 +37,6 @@ async def get_user_profile(
     return user_info
 
 
-@router.get("/nearby-places", response_model=dict)
-async def get_nearby_places_with_meetups(
-    request: Request,
-    lat: float = Query(...),
-    lng: float = Query(...),
-    radius: float = Query(default=2000),
-    current_user: TokenData = Depends(get_current_user)
-):
-    """Get nearby places and meetups aggregated from multiple services."""
-    logger.info(f"[NEARBY_PLACES] User: {current_user.user_id}, Lat: {lat}, Lng: {lng}")
-    
-    # Forward the authorization token
-    auth_header = request.headers.get("authorization")
-    headers = {"authorization": auth_header} if auth_header else None
-    
-    places = await http_client.get(
-        f"{settings.maps_service_url}/api/v1/places/search/nearby",
-        params={
-            "lat": lat,
-            "lng": lng,
-            "radius": radius
-        },
-        headers=headers
-    )
-    
-    meetups = await http_client.get(
-        f"{settings.forum_service_url}/api/v1/meetups/search",
-        params={
-            "lat": lat,
-            "lng": lng,
-            "radius_m": int(radius)
-        },
-        headers=headers
-    )
-    
-    return {
-        "places": places.get("places", []) if places else [],
-        "meetups": meetups.get("meetups", []) if meetups else [],
-        "user_id": current_user.user_id
-    }
-
-
 @router.get("/user-meetups", response_model=dict)
 async def get_user_meetups(
     request: Request,

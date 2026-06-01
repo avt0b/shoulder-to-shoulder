@@ -9,7 +9,6 @@ from backend.admin_service.app.schemas.spot import (
 
 router = APIRouter(prefix="/spots", tags=["admin:spots"])
 
-#TODO: сделать, когда все споты готовы будут
 @router.get("", response_model=list[AdminSpotResponse])
 async def list_spots(
     status_filter: str | None = None,

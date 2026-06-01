@@ -7,7 +7,6 @@ from backend.media_service.app.api.v1.media import router as media_router
 
 app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs")
 
-#TODO: Ксюше - поменять
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
