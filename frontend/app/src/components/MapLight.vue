@@ -1,5 +1,5 @@
 <template>
-  <div class="map-light" :class="{ dark: isDarkMode || isNinjaMode }">
+  <div class="map-light" :class="{ dark: isDarkMode || isNinjaMode, ninja: isNinjaMode }">
     <!-- Map Canvas -->
     <main class="map-canvas">
       <div ref="mapRef" class="leaflet-map"></div>
@@ -143,9 +143,6 @@
       <button class="control-btn control-btn-ninja" :class="{ active: isNinjaMode }" ref="ninjaBtnRef" @click="toggleNinjaMode" :title="isNinjaMode ? 'Обычный режим' : 'Режим ниндзя'">
         <span class="material-symbols-outlined">{{ isNinjaMode ? 'visibility' : 'sports_martial_arts' }}</span>
       </button>
-      <button class="control-btn control-btn-primary" @click="useMyLocation" title="Моё местоположение">
-        <span class="material-symbols-outlined filled">my_location</span>
-      </button>
     </div>
 
     <!-- FAB Quick Start — скрывается при открытой форме маршрута -->
@@ -180,9 +177,6 @@
             @focus="showStartSuggestions = true"
             @blur="hideStartSuggestionsDelayed"
           />
-          <button class="route-geo-btn" @click="useMyLocation" title="Моё местоположение">
-            <span class="material-symbols-outlined">directions_run</span>
-          </button>
         </div>
         <!-- Подсказки адресов (Nominatim) -->
         <div class="route-dropdown" v-if="showStartSuggestions && startSuggestions.length > 0">
@@ -427,6 +421,33 @@ const isDarkMode = ref(localStorage.getItem('theme') === 'dark')
 const events = ref([])
 let eventMarkers = []
 const selectedEvent = ref(null)
+
+const eventTypeEmoji = {
+  running: '🏃',
+  strength: '🏋️',
+  yoga: '🧘',
+  workout: '💪',
+  other: '🎯'
+}
+
+const eventTypeLabels = {
+  running: 'Бег',
+  strength: 'Силовая',
+  yoga: 'Йога',
+  workout: 'Воркаут',
+  other: 'Другое'
+}
+
+function getCurrentUserId() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return payload.sub ? String(payload.sub) : null
+  } catch {
+    return null
+  }
+}
 
 // ============================================
 // 🔍 Фильтры
@@ -1377,7 +1398,7 @@ const toggleNinjaMode = async () => {
   if (!wasNinja) {
     // Вход в режим ниндзя: круг расширяется
     overlayStyle.value = {
-      background: 'rgba(0, 0, 0, 0.7)',
+      background: 'radial-gradient(circle, rgba(45, 212, 191, 0.18) 0%, rgba(15, 23, 42, 0.84) 62%, rgba(2, 6, 23, 0.94) 100%)',
       clipPath: `circle(0px at ${centerX}px ${centerY}px)`,
       transition: 'none'
     }
@@ -1385,7 +1406,7 @@ const toggleNinjaMode = async () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         overlayStyle.value = {
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'radial-gradient(circle, rgba(45, 212, 191, 0.18) 0%, rgba(15, 23, 42, 0.84) 62%, rgba(2, 6, 23, 0.94) 100%)',
           clipPath: `circle(${maxRadius}px at ${centerX}px ${centerY}px)`,
           transition: 'clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
         }
@@ -1394,9 +1415,10 @@ const toggleNinjaMode = async () => {
 
     setTimeout(async () => {
       isNinjaMode.value = true
-      // Инвертируем карту для тёмного режима
+      // Затемняем только слой карты, не popup и не маркеры
       if (map) {
-        map.getContainer().style.filter = 'invert(1) hue-rotate(180deg) brightness(0.8) contrast(1.2)'
+        map.getContainer().style.filter = 'none'
+        map.getPane('tilePane').style.filter = 'grayscale(0.35) brightness(0.55) contrast(1.18) saturate(0.75)'
       }
       // Скрываем маркеры площадок
       removePlaceMarkers()
@@ -1412,7 +1434,7 @@ const toggleNinjaMode = async () => {
   } else {
     // Выход из режима ниндзя
     overlayStyle.value = {
-      background: 'rgba(0, 0, 0, 0.7)',
+      background: 'radial-gradient(circle, rgba(45, 212, 191, 0.18) 0%, rgba(15, 23, 42, 0.84) 62%, rgba(2, 6, 23, 0.94) 100%)',
       clipPath: `circle(${maxRadius}px at ${centerX}px ${centerY}px)`,
       transition: 'none'
     }
@@ -1420,7 +1442,7 @@ const toggleNinjaMode = async () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         overlayStyle.value = {
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: 'radial-gradient(circle, rgba(45, 212, 191, 0.18) 0%, rgba(15, 23, 42, 0.84) 62%, rgba(2, 6, 23, 0.94) 100%)',
           clipPath: `circle(0px at ${centerX}px ${centerY}px)`,
           transition: 'clip-path 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
         }
@@ -1428,9 +1450,9 @@ const toggleNinjaMode = async () => {
     })
 
     isNinjaMode.value = false
-    // Сбрасываем фильтр карты
     if (map) {
       map.getContainer().style.filter = 'none'
+      map.getPane('tilePane').style.filter = 'none'
     }
     // Скрываем маркеры ивентов
     removeEventMarkers()
@@ -1458,10 +1480,6 @@ const createPlaceMarker = (place) => {
   const { size, font, border } = getMarkerSize(zoom)
   const bg = '#fff'
   const textColor = '#1c1917'
-  // При инверсии карты маркеры тоже инвертируются — добавляем контр-фильтр
-  // Но только в режиме ниндзя! В обычном режиме фильтра не должно быть
-  const markerFilter = isNinjaMode.value ? 'invert(1) hue-rotate(180deg)' : 'none'
-
   const icon = L.divIcon({
     className: 'custom-marker',
     html: `<div class="marker-emoji" style="
@@ -1477,7 +1495,6 @@ const createPlaceMarker = (place) => {
       border: ${border}px solid #ea580c;
       cursor: pointer;
       user-select: none;
-      filter: ${markerFilter};
     ">${place.emoji}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2]
@@ -1538,16 +1555,6 @@ const openPlacePopup = (place) => {
 
   // Обработчик кнопки "Маршрут" после рендера popup
   setTimeout(() => {
-    // Контр-фильтр для popup
-    const popupEl = document.querySelector('.custom-popup .leaflet-popup-content-wrapper')
-    if (popupEl) {
-      popupEl.style.filter = 'invert(1) hue-rotate(180deg)'
-    }
-    const tipEl = document.querySelector('.custom-popup .leaflet-popup-tip')
-    if (tipEl) {
-      tipEl.style.filter = 'invert(1) hue-rotate(180deg)'
-    }
-
     const btn = document.querySelector(`.popup-btn[data-place-id="${place.id}"]`)
     if (btn) {
       btn.addEventListener('click', () => {
@@ -1585,7 +1592,8 @@ async function fetchEvents() {
     const url = eventsApi('/events')
     if (config.isDebug) console.log('🎯 fetchEvents URL:', url)
 
-    const res = await fetch(url)
+    const res = await fetch(`${url}?limit=100&offset=0`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
 
     if (config.isDebug) console.log('📦 fetchEvents ответ:', JSON.stringify(data, null, 2))
@@ -1599,63 +1607,51 @@ async function fetchEvents() {
       rawEvents = [data.event]
     }
 
-    // Маппинг ивентов
+    const placesRes = await fetch(placesApi('/places'))
+    if (!placesRes.ok) throw new Error(`Places HTTP ${placesRes.status}`)
+    const placesData = await placesRes.json()
+    const placesMap = new Map(
+      (placesData.places || []).map(place => [String(place.id), place])
+    )
+    const currentUserId = getCurrentUserId()
+
     events.value = rawEvents
-      .filter(e => e && e.id && e.name && typeof e.lat === 'number' && typeof e.lon === 'number')
-      .map(e => ({
-        id: e.id,
-        name: e.name,
-        description: e.description || '',
-        lat: e.lat,
-        lng: e.lon,
-        emoji: e.emoji || '📍',
-        time: e.time || e.start_time || '',
-        date: e.date || e.start_date || '',
-        level: e.level || 'Любой',
-        type: e.type || e.activity_type || '',
-        participants: e.participants || 0,
-        maxParticipants: e.max_participants || e.maxParticipants || 0,
-        organizer: e.organizer || e.organizer_name || '',
-        quietCompanion: e.quiet_companion || e.quietCompanion || false,
-        address: e.address || '',
-      }))
+      .map(e => {
+        const place = placesMap.get(String(e.spot_id)) || {}
+        const lat = typeof e.lat === 'number' ? e.lat : place.lat
+        const lng = typeof e.lng === 'number' ? e.lng : (typeof e.lon === 'number' ? e.lon : place.lon)
+        const startDate = e.start_time ? new Date(e.start_time) : null
+        const activityType = e.type || e.activity_type || place.activity_type || 'other'
+        const participantIds = (e.participant_ids || []).map(String)
+        const isOwner = currentUserId && String(e.host_id) === currentUserId
+        const isJoined = Boolean(isOwner || (currentUserId && participantIds.includes(currentUserId)))
+
+        return {
+          id: e.id,
+          name: e.title || e.name || 'Тренировка',
+          description: e.description || '',
+          lat,
+          lng,
+          emoji: e.emoji || eventTypeEmoji[activityType] || place.emoji || '📍',
+          time: startDate ? startDate.toTimeString().slice(0, 5) : (e.time || ''),
+          date: startDate ? startDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) : (e.date || ''),
+          level: e.level || 'Открыто',
+          type: eventTypeLabels[activityType] || activityType,
+          participants: e.participant_count ?? e.participants ?? 0,
+          maxParticipants: e.max_participants || e.maxParticipants || 0,
+          organizer: e.organizer || e.organizer_name || '',
+          quietCompanion: e.quiet_companion || e.quietCompanion || e.anonymous || false,
+          address: e.address || place.address || place.name || '',
+          isOwner,
+          isJoined
+        }
+      })
+      .filter(e => e && e.id && typeof e.lat === 'number' && typeof e.lng === 'number')
 
     if (config.isDebug) console.log('🎯 Загружено ивентов:', events.value.length)
   } catch (e) {
-    if (config.isDebug) console.warn('fetchEvents: API недоступен, использую моковые данные', e)
-    // Fallback — моковые ивенты
-    events.value = [
-      {
-        id: 101, name: 'Утренняя пробежка',
-        description: 'Лёгкий бег в парке для всех желающих',
-        lat: 52.9690, lng: 36.0820, emoji: '🏃',
-        time: '07:00', date: '2026-04-11',
-        level: 'Новичок', type: 'running',
-        participants: 5, maxParticipants: 10,
-        organizer: 'Алексей', quietCompanion: false,
-        address: 'Парк Победы, Орёл'
-      },
-      {
-        id: 102, name: 'Йога на закате',
-        description: 'Спокойная практика для расслабления',
-        lat: 52.9650, lng: 36.0790, emoji: '🧘',
-        time: '19:00', date: '2026-04-11',
-        level: 'Средний', type: 'yoga',
-        participants: 3, maxParticipants: 8,
-        organizer: 'Мария', quietCompanion: true,
-        address: 'Набережная, Орёл'
-      },
-      {
-        id: 103, name: 'Силовая тренировка',
-        description: 'Воркаут на турниках и брусьях',
-        lat: 52.9620, lng: 36.0740, emoji: '💪',
-        time: '18:00', date: '2026-04-12',
-        level: 'Профи', type: 'strength',
-        participants: 4, maxParticipants: 6,
-        organizer: 'Дмитрий', quietCompanion: false,
-        address: 'Стадион «Центральный», Орёл'
-      }
-    ]
+    if (config.isDebug) console.warn('fetchEvents: API недоступен', e)
+    events.value = []
   }
 }
 
@@ -1663,9 +1659,6 @@ async function fetchEvents() {
 const createEventMarker = (event) => {
   const zoom = map.getZoom()
   const { size, font, border } = getMarkerSize(zoom)
-  // Контр-фильтр чтобы маркеры не инвертировались
-  const markerFilter = 'invert(1) hue-rotate(180deg)'
-
   const icon = L.divIcon({
     className: 'custom-marker event-marker',
     html: `
@@ -1676,12 +1669,11 @@ const createEventMarker = (event) => {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #ea580c;
+        background: linear-gradient(145deg, #14b8a6, #0f766e);
         border-radius: 50%;
-        border: ${border}px solid #fff;
-        box-shadow: 0 3px 12px rgba(234, 88, 12, 0.5);
+        border: ${border}px solid rgba(240, 253, 250, 0.96);
+        box-shadow: 0 3px 14px rgba(45, 212, 191, 0.42), 0 0 0 4px rgba(15, 23, 42, 0.28);
         color: #fff;
-        filter: ${markerFilter};
       ">${event.emoji || '📍'}</div>
     `,
     iconSize: [size, size],
@@ -1692,6 +1684,10 @@ const createEventMarker = (event) => {
   const marker = L.marker([event.lat, event.lng], { icon })
 
   // Popup с информацией об ивенте
+  const actionLabel = event.isOwner ? 'Вы организатор' : event.isJoined ? 'Вы участвуете' : 'Присоединиться'
+  const actionIcon = event.isOwner ? 'stars' : event.isJoined ? 'check_circle' : 'person_add'
+  const actionDisabled = event.isOwner || event.isJoined
+
   const popupContent = `
     <div class="event-popup">
       <div class="event-popup-header">
@@ -1708,6 +1704,10 @@ const createEventMarker = (event) => {
         <div><span class="material-symbols-outlined">group</span> ${event.participants}/${event.maxParticipants} участников</div>
         ${event.quietCompanion ? '<div class="event-quiet-tag">🤫 Тихий компаньон</div>' : ''}
       </div>
+      <button class="event-popup-join ${actionDisabled ? 'joined' : ''}" data-event-id="${event.id}" ${actionDisabled ? 'disabled' : ''}>
+        <span class="material-symbols-outlined">${actionIcon}</span>
+        <span>${actionLabel}</span>
+      </button>
     </div>
   `
 
@@ -1716,21 +1716,59 @@ const createEventMarker = (event) => {
     className: 'event-popup-wrapper'
   })
 
-  // Контр-фильтр для popup
   marker.on('popupopen', () => {
     setTimeout(() => {
-      const popupEl = document.querySelector('.event-popup-wrapper .leaflet-popup-content-wrapper')
-      if (popupEl) {
-        popupEl.style.filter = 'invert(1) hue-rotate(180deg)'
-      }
-      const tipEl = document.querySelector('.event-popup-wrapper .leaflet-popup-tip')
-      if (tipEl) {
-        tipEl.style.filter = 'invert(1) hue-rotate(180deg)'
+      const btn = document.querySelector(`.event-popup-join[data-event-id="${event.id}"]`)
+      if (btn && !actionDisabled) {
+        btn.addEventListener('click', () => joinEventFromPopup(event))
       }
     }, 10)
   })
 
   return marker
+}
+
+async function joinEventFromPopup(event) {
+  if (!event || event.isOwner || event.isJoined) return
+  try {
+    const res = await fetch(eventsApi(`/events/${event.id}/join`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.detail || 'Не удалось присоединиться')
+
+    event.isJoined = true
+    event.participants = data.participants || event.participants + 1
+    const stored = localStorage.getItem('shoulder_my_meetups')
+    const myMeetups = stored ? JSON.parse(stored) : []
+    if (!myMeetups.some(item => String(item.id) === String(event.id))) {
+      myMeetups.unshift({
+        id: event.id,
+        name: event.name,
+        time: event.time,
+        locationShort: event.address,
+        location: event.address,
+        description: event.description,
+        level: event.level,
+        type: event.type,
+        quietCompanion: event.quietCompanion,
+        participants: event.participants,
+        maxParticipants: event.maxParticipants,
+        isOwner: false,
+        isJoined: true,
+        avatars: [],
+        moreCount: 0,
+        emoji: event.emoji || '📍'
+      })
+      localStorage.setItem('shoulder_my_meetups', JSON.stringify(myMeetups))
+      window.dispatchEvent(new Event('storage'))
+    }
+    map.closePopup()
+    addEventMarkers()
+  } catch (e) {
+    if (config.isDebug) console.warn('joinEventFromPopup failed:', e)
+  }
 }
 
 // Добавление маркеров ивентов
@@ -2023,7 +2061,7 @@ function restoreNavigation() {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #1a1a1a;
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.16) 0%, rgba(15, 23, 42, 0.86) 62%, rgba(2, 6, 23, 0.96) 100%);
   pointer-events: none;
   clip-path: circle(0 at 50% 50%);
 }
@@ -2075,9 +2113,10 @@ function restoreNavigation() {
 }
 
 .map-light.dark .control-btn-ninja {
-  background: #c2410c !important;
+  background: linear-gradient(145deg, #14b8a6, #0f766e) !important;
   color: white !important;
-  border-color: transparent !important;
+  border-color: rgba(240, 253, 250, 0.32) !important;
+  box-shadow: 0 10px 28px rgba(20, 184, 166, 0.28), 0 0 0 1px rgba(15, 118, 110, 0.25) !important;
 }
 
 .map-light.dark .bottom-nav {
@@ -2116,37 +2155,37 @@ function restoreNavigation() {
   background: rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Popup dark mode */
+/* Popup stays light in dark/ninja mode */
 .map-light.dark .leaflet-map :global(.leaflet-popup-content-wrapper) {
-  background: #262626 !important;
+  background: #ffffff !important;
 }
 
 .map-light.dark .leaflet-map :global(.leaflet-popup-tip) {
-  background: #262626 !important;
+  background: #ffffff !important;
 }
 
 .map-light.dark .leaflet-map :global(.leaflet-popup-close-button) {
-  color: #f0f1f2 !important;
+  color: #1c1917 !important;
 }
 
 .map-light.dark :global(.popup-header h3) {
-  color: #f0f1f2;
+  color: #1c1917;
 }
 
 .map-light.dark :global(.popup-address) {
-  color: #a1a1aa;
+  color: #787170;
 }
 
 .map-light.dark :global(.popup-desc) {
-  color: #a1a1aa;
+  color: #57534e;
 }
 
 .map-light.dark :global(.popup-emoji) {
-  background: #333333;
+  background: #ffedd5;
 }
 
 .map-light.dark :global(.popup-rating) {
-  background: rgba(194, 65, 12, 0.2);
+  background: rgba(249, 115, 22, 0.1);
 }
 
 .map-light.dark :global(.popup-btn) {
@@ -2164,10 +2203,12 @@ function restoreNavigation() {
 /* Стилизация Leaflet Popup */
 .leaflet-map :global(.leaflet-popup-content-wrapper) {
   background: white !important;
+  color: #1c1917 !important;
   border-radius: 16px !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
   padding: 0 !important;
   overflow: hidden !important;
+  filter: none !important;
 }
 
 .leaflet-map :global(.leaflet-popup-content) {
@@ -2178,13 +2219,23 @@ function restoreNavigation() {
 .leaflet-map :global(.leaflet-popup-tip-container) .leaflet-popup-tip {
   background: white !important;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+  filter: none !important;
+}
+
+.leaflet-map :global(.custom-popup .leaflet-popup-content-wrapper),
+.leaflet-map :global(.event-popup-wrapper .leaflet-popup-content-wrapper),
+.leaflet-map :global(.custom-popup .leaflet-popup-tip),
+.leaflet-map :global(.event-popup-wrapper .leaflet-popup-tip) {
+  background: #ffffff !important;
+  color: #1c1917 !important;
+  filter: none !important;
 }
 
 .leaflet-map :global(.leaflet-popup-close-button) {
   z-index: 10 !important;
   font-size: 24px !important;
-  color: white !important;
-  background: rgba(0, 0, 0, 0.3) !important;
+  color: #1c1917 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
   border-radius: 50% !important;
   width: 28px !important;
   height: 28px !important;
@@ -2194,12 +2245,14 @@ function restoreNavigation() {
 }
 
 .leaflet-map :global(.leaflet-popup-close-button:hover) {
-  background: rgba(0, 0, 0, 0.5) !important;
+  background: rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Place Popup */
 :global(.place-popup) {
   font-family: 'Inter', sans-serif;
+  background: #ffffff;
+  color: #1c1917;
 }
 
 :global(.popup-gallery) {
@@ -2332,13 +2385,6 @@ function restoreNavigation() {
    🥷 Режим ниндзя — стили
    ============================================ */
 
-/* Кнопка ниндзя в активном состоянии */
-.control-btn-ninja.active {
-  background: rgba(234, 88, 12, 0.2);
-  color: #ea580c;
-  border-color: rgba(234, 88, 12, 0.5);
-}
-
 /* Event marker */
 :global(.event-marker) {
   z-index: 1050 !important;
@@ -2371,6 +2417,8 @@ function restoreNavigation() {
 :global(.event-popup) {
   padding: 16px;
   max-width: 260px;
+  background: #ffffff;
+  color: #1c1917;
 }
 
 :global(.event-popup-header) {
@@ -2437,6 +2485,43 @@ function restoreNavigation() {
   font-size: 11px;
   font-weight: 600;
   margin-top: 4px;
+}
+
+:global(.event-popup-join) {
+  width: 100%;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 12px;
+  background: #ea580c;
+  color: white;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+:global(.event-popup-join:hover) {
+  background: #c2410c;
+  transform: translateY(-1px);
+}
+
+:global(.event-popup-join.joined) {
+  background: #f5f5f4;
+  color: #16a34a;
+  cursor: default;
+}
+
+:global(.event-popup-join.joined:hover) {
+  transform: none;
+}
+
+:global(.event-popup-join .material-symbols-outlined) {
+  font-size: 18px;
 }
 
 @keyframes ping {
@@ -2527,7 +2612,7 @@ function restoreNavigation() {
 /* Map Controls */
 .map-controls {
   position: fixed;
-  bottom: 128px;
+  bottom: 112px;
   right: 24px;
   z-index: 40;
   display: flex;
@@ -2538,7 +2623,7 @@ function restoreNavigation() {
 
 /* Поднятые кнопки при отображении маршрута/навигации */
 .map-controls.raised {
-  bottom: 300px;
+  bottom: 112px;
   z-index: 60;
 }
 
@@ -2572,27 +2657,22 @@ function restoreNavigation() {
 
 /* Кнопка ниндзя */
 .control-btn-ninja {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(16px);
-  color: #ea580c;
-  border: 1px solid rgba(234, 88, 12, 0.3);
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.1);
+  color: #0f766e;
+  border: 1px solid rgba(20, 184, 166, 0.28);
+  box-shadow: 0 6px 18px rgba(15, 118, 110, 0.14);
 }
 
 .control-btn-ninja:hover {
-  background: rgba(234, 88, 12, 0.15);
+  background: rgba(204, 251, 241, 0.86);
 }
 
-/* Кнопка геолокации */
-.control-btn-primary {
-  background: #ea580c;
-  color: #ffffff;
-  border: none;
-  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.4);
-}
-
-.control-btn-primary:hover {
-  background: #c2410c;
+.control-btn-ninja.active {
+  background: linear-gradient(145deg, #14b8a6, #0f766e);
+  color: white;
+  border-color: rgba(240, 253, 250, 0.34);
+  box-shadow: 0 12px 30px rgba(20, 184, 166, 0.3), 0 0 0 1px rgba(15, 118, 110, 0.22);
 }
 
 /* FAB Quick Start */
@@ -3004,29 +3084,6 @@ function restoreNavigation() {
 
 .end-dot {
   color: #ea580c;
-}
-
-.route-geo-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-
-.route-geo-btn:hover {
-  background: rgba(234, 88, 12, 0.1);
-}
-
-.route-geo-btn .material-symbols-outlined {
-  font-size: 20px;
 }
 
 /* Dropdown */

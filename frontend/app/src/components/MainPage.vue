@@ -22,15 +22,6 @@
       <section class="map-card" @click="openMapLight()">
         <div ref="mapRef" class="map-container"></div>
 
-        <!-- Map Overlay -->
-        <div class="map-overlay">
-          <div class="map-controls">
-            <button class="control-btn" title="Моё местоположение">
-              <span class="material-symbols-outlined">my_location</span>
-            </button>
-          </div>
-        </div>
-
         <!-- Expand Icon -->
         <div class="expand-icon">
           <span class="material-symbols-outlined">open_in_full</span>
@@ -1605,39 +1596,6 @@ function clearMiniRoute() {
   width: 100%;
   height: 100%;
   filter: grayscale(30%);
-}
-
-.map-overlay {
-  position: absolute;
-  inset: 0;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.map-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-self: flex-end;
-  pointer-events: auto;
-}
-
-.control-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--surface-container-lowest);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  border: none;
-  cursor: pointer;
-  color: var(--on-surface);
 }
 
 .expand-icon {
