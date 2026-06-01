@@ -5,6 +5,9 @@ import router from './router'
 import { initAuth, clearAuthSession } from './stores/auth'
 import { config } from './config'
 
+const savedTheme = localStorage.getItem('theme')
+document.documentElement.classList.toggle('dark-theme', savedTheme === 'dark')
+
 function installUnauthorizedInterceptor() {
   const nativeFetch = window.fetch.bind(window)
 
