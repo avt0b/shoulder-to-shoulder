@@ -35,6 +35,7 @@ class ProxyService:
         self.registry = registry
 
     async def forward(self, request: Request, path: str) -> Response:
+        self._validate_path(path)
         target = self.registry.resolve(path)
         upstream_url = self._build_upstream_url(target.base_url, path, request)
         headers = self._build_upstream_headers(request)
@@ -66,6 +67,13 @@ class ProxyService:
             headers=self._build_response_headers(upstream_response),
             media_type=upstream_response.headers.get("content-type"),
         )
+
+    def _validate_path(self, path: str) -> None:
+        if "\\" in path or any(segment in {".", ".."} for segment in path.split("/")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid proxy path",
+            )
 
     def _build_upstream_url(self, base_url: str, path: str, request: Request) -> str:
         upstream_path = f"{settings.api_v1_prefix}/{path}".replace("//", "/")

@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
 import logging
 
-from ....core.security import get_current_user, TokenData, create_access_token
+from ....core.security import get_current_user, TokenData
 from ....core.http_client import http_client
 from ....config import settings
 
@@ -40,7 +40,7 @@ router_auth = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router_auth.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def register(data: UserRegisterRequest):
-    logger.info(f"[REGISTER] Request: {data}")
+    logger.info("[REGISTER] Request received")
     payload = {
         "phone_number": data.phone_number,
         "password": data.password,
@@ -48,13 +48,11 @@ async def register(data: UserRegisterRequest):
     }
     if data.email:
         payload["email"] = data.email
-    logger.info(f"[REGISTER] Payload: {payload}")
     logger.info(f"[REGISTER] URL: {settings.user_service_url}/api/v1/auth/register")
     user_response = await http_client.post(
         f"{settings.user_service_url}/api/v1/auth/register",
         json=payload
     )
-    logger.info(f"[REGISTER] Response: {user_response}")
     
     if not user_response:
         raise HTTPException(
@@ -71,21 +69,17 @@ async def register(data: UserRegisterRequest):
 
 @router_auth.post("/login", response_model=dict)
 async def login(data: UserLoginRequest):
-    logger.info(f"[LOGIN] Request: {data}")
+    logger.info("[LOGIN] Request received")
     
     payload = {
         "phone_number": data.phone_number,
         "password": data.password
     }
     
-    logger.info(f"[LOGIN] Payload: {payload}")
-    
     user_response = await http_client.post(
         f"{settings.user_service_url}/api/v1/auth/login",
         json=payload
     )
-    
-    logger.info(f"[LOGIN] Response: {user_response}")
     
     if not user_response:
         raise HTTPException(
@@ -221,7 +215,6 @@ async def get_my_rating(
 @router_users.get("/{user_id}", response_model=dict)
 async def get_public_user_info(user_id: str):
     logger.info(f"[GET_PUBLIC] User: {user_id}")
-    print(user_id)
     user_info = await http_client.get(
         f"{settings.user_service_url}/api/v1/users/{user_id}"
     )

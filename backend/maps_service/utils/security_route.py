@@ -64,6 +64,9 @@ class SecurityRouteCalculator:
     
     def get_routes(self, start_lat: float, start_lon: float, end_lat: float, end_lon: float) -> List[RouteData]:
         """Получить несколько альтернативных маршрутов от OpenRouteService"""
+        if not self.api_key:
+            raise ValueError("OPENROUTE_SERVICE_API_KEY is not configured")
+
         try:
             headers = {
                 "Authorization": self.api_key,
@@ -236,6 +239,9 @@ class SecurityRouteCalculator:
     
     def get_ai_comment(self, routes: List[RouteData], safest_idx: int) -> str:
         """Получить комментарий о безопасности маршрута"""
+        if not self.ai_key:
+            return "Маршрут проанализирован. Следите за дорожной обстановкой."
+
         try:
             headers = {
                 "Authorization": f"Bearer {self.ai_key}",

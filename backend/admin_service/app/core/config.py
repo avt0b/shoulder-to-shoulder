@@ -1,4 +1,5 @@
 from pathlib import Path
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal
 
@@ -28,6 +29,17 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.is_production:
+            weak_values = {
+                "super-secret-key-change-in-production-please-use-64-characters-minimum-please",
+                "CHANGE_ME_GENERATE_64_RANDOM_CHARS",
+            }
+            if self.SECRET_KEY in weak_values or len(self.SECRET_KEY) < 32:
+                raise ValueError("SECRET_KEY must be changed to a strong random value in production")
+        return self
 
 
 settings = Settings()

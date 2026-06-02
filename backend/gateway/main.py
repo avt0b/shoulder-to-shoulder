@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.common.cors import cors_allow_credentials, get_cors_origins
 from .api.v1.endpoints.proxy_router import router as proxy_router
 from .config import settings
 from .core.http_client import http_client
@@ -27,10 +28,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+cors_origins = get_cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials(cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.user_service.app.core.config import settings
+from backend.common.cors import cors_allow_credentials, get_cors_origins
 from backend.user_service.app.core.database import Base, engine
 from backend.user_service.app.models.badge import Badge  # noqa: F401
 from backend.user_service.app.models.match import RequestResponse, WorkoutRequest  # noqa: F401
@@ -25,10 +26,12 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+cors_origins = get_cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials(cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )

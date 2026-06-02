@@ -4,7 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel
 import logging
 
-from ....core.security import get_current_user, TokenData
+from ....core.security import TokenData, require_gateway_role
 from ....core.http_client import http_client
 from ....config import settings
 
@@ -36,6 +36,7 @@ class AdminEventUpdateRequest(BaseModel):
 
 
 router_admin = APIRouter(prefix="/admin", tags=["admin"])
+require_superuser = require_gateway_role("superuser")
 
 
 @router_admin.get("/users", response_model=list[dict])
@@ -44,7 +45,7 @@ async def admin_list_users(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     search: Optional[str] = Query(None),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_LIST_USERS] User: {current_user.user_id}")
     
@@ -78,7 +79,7 @@ async def admin_ban_user(
     request: Request,
     user_id: str,
     data: Optional[UserBanRequest] = None,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_BAN_USER] Current user: {current_user.user_id}, Target: {user_id}")
     
@@ -107,7 +108,7 @@ async def admin_unban_user(
     request: Request,
     user_id: str,
     data: Optional[UserUnbanRequest] = None,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_UNBAN_USER] Current user: {current_user.user_id}, Target: {user_id}")
     
@@ -130,7 +131,7 @@ async def admin_award_badge(
     request: Request,
     user_id: str,
     data: AwardBadgeRequest,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_AWARD_BADGE] Current user: {current_user.user_id}, Target: {user_id}")
     
@@ -162,7 +163,7 @@ async def admin_list_events(
     status_filter: Optional[str] = Query(None),
     host_id: Optional[str] = Query(None),
     spot_id: Optional[str] = Query(None),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_LIST_EVENTS] User: {current_user.user_id}")
     
@@ -199,7 +200,7 @@ async def admin_list_events(
 async def admin_get_event(
     request: Request,
     event_id: UUID,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_GET_EVENT] User: {current_user.user_id}, Event: {event_id}")
     
@@ -225,7 +226,7 @@ async def admin_update_event(
     request: Request,
     event_id: UUID,
     data: AdminEventUpdateRequest,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_UPDATE_EVENT] User: {current_user.user_id}, Event: {event_id}")
     
@@ -253,7 +254,7 @@ async def admin_update_event(
 async def admin_delete_event(
     request: Request,
     event_id: UUID,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_DELETE_EVENT] User: {current_user.user_id}, Event: {event_id}")
     
@@ -278,7 +279,7 @@ async def admin_delete_event(
 async def admin_list_spots(
     request: Request,
     status_filter: Optional[str] = Query(None),
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_LIST_SPOTS] User: {current_user.user_id}")
     
@@ -308,7 +309,7 @@ async def admin_list_spots(
 async def admin_get_spot(
     request: Request,
     spot_id: str,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_GET_SPOT] User: {current_user.user_id}, Spot: {spot_id}")
     
@@ -334,7 +335,7 @@ async def admin_moderate_spot(
     request: Request,
     spot_id: str,
     data: ModerateSpotRequest,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_MODERATE_SPOT] User: {current_user.user_id}, Spot: {spot_id}")
     
@@ -362,7 +363,7 @@ async def admin_moderate_spot(
 async def admin_delete_spot(
     request: Request,
     spot_id: str,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[ADMIN_DELETE_SPOT] User: {current_user.user_id}, Spot: {spot_id}")
     

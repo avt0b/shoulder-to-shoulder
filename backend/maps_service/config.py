@@ -26,9 +26,8 @@ class Settings(BaseSettings):
     DEFAULT_ZOOM: int = 14
     SEARCH_RADIUS_KM: float = 5.0
     
-    # Security Route configs
-    OPENROUTER_API_KEY: str = "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"
-    OPENROUTE_SERVICE_API_KEY: str = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjgyYTgzYjc5NDBiNjRlMjE5Njk0MjM1ZmNjMjFkZDlhIiwiaCI6Im11cm11cjY0In0="
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTE_SERVICE_API_KEY: str = ""
     
     # Proxy settings (optional)
     PROXY_ENABLED: bool = False

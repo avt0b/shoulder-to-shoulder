@@ -2,7 +2,7 @@ import logging
 from typing import Any
 
 import jwt
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, status
 
 from ..config import settings
 
@@ -106,3 +106,24 @@ async def get_current_user(request: Request) -> TokenData:
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     return user
+
+
+ROLE_LEVELS = {
+    "user": 0,
+    "moderator": 1,
+    "superuser": 2,
+}
+
+
+def require_gateway_role(required_role: str):
+    async def role_checker(current_user: TokenData = Depends(get_current_user)) -> TokenData:
+        user_level = ROLE_LEVELS.get(current_user.role or "user", 0)
+        required_level = ROLE_LEVELS.get(required_role, 0)
+        if user_level < required_level:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied. Required role: {required_role}",
+            )
+        return current_user
+
+    return role_checker

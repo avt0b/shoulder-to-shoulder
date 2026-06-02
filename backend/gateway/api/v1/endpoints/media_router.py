@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, status, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import logging
 
 from ....core.security import get_current_user, TokenData
@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 class UploadUrlRequest(BaseModel):
     purpose: str
-    owner_id: str
-    content_type: str
-    file_size: int
+    content_type: str = Field(..., pattern=r"^image/(jpeg|png|webp)$")
+    file_size: int = Field(..., gt=0, le=10_485_760)
+    owner_id: str | None = None
 
 
 class FileDeleteResponse(BaseModel):
@@ -36,6 +36,7 @@ async def get_upload_url(
     headers = {"authorization": auth_header} if auth_header else None
     
     payload = data.model_dump()
+    payload["owner_id"] = current_user.user_id
     
     media_response = await http_client.post(
         f"{settings.media_service_url}/api/v1/media/upload-url",
@@ -56,7 +57,7 @@ async def get_upload_url(
 async def delete_file(
     request: Request,
     file_key: str,
-    owner_id: str = Query(...),
+    owner_id: str | None = Query(None),
     current_user: TokenData = Depends(get_current_user)
 ):
     logger.info(f"[DELETE_FILE] User: {current_user.user_id}, File: {file_key}")
@@ -65,7 +66,7 @@ async def delete_file(
     headers = {"authorization": auth_header} if auth_header else None
     
     params = {
-        "owner_id": owner_id
+        "owner_id": current_user.user_id
     }
     
     media_response = await http_client.delete(

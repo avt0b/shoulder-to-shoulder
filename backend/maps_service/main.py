@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.common.cors import cors_allow_credentials, get_cors_origins
 from .api.v1.endpoints import places_router, routes_router
 from .config import settings
 from .database import Base, engine
@@ -18,10 +19,12 @@ app = FastAPI(
     description="Maps Service для Shoulder to Shoulder",
 )
 
+cors_origins = get_cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials(cors_origins),
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -49,8 +49,6 @@ async def create_event(
     auth_header = request.headers.get("authorization")
     headers = {"authorization": auth_header} if auth_header else None
     
-    print(payload)
-
     event_response = await http_client.post(
         f"{settings.event_service_url}/api/v1/events",
         json=payload,
@@ -94,7 +92,6 @@ async def checkin_event(
         f"{settings.event_service_url}/api/v1/events/{event_id}/checkin",
         headers=headers
     )
-    print(event_response)
     return event_response
 
 
@@ -191,7 +188,6 @@ async def list_events(
 @router_events.get("/{event_id}", response_model=dict)
 async def get_event_detail(event_id: str):
     logger.info(f"[GET_EVENT] Event: {event_id}")
-    print(event_id)
     
     event_response = await http_client.get(
         f"{settings.event_service_url}/api/v1/events/{event_id}"

@@ -78,6 +78,12 @@ async def get_upload_url(
 ):
     if req.purpose not in settings.ALLOWED_PURPOSES:
         raise HTTPException(400, detail="Invalid purpose")
+    if req.content_type not in settings.ALLOWED_CONTENT_TYPES:
+        raise HTTPException(400, detail="Invalid content type")
+    if req.file_size <= 0:
+        raise HTTPException(400, detail="Invalid file size")
+    if req.file_size > settings.MAX_FILE_SIZE:
+        raise HTTPException(413, detail="File is too large")
 
     ext = req.content_type.split("/")[-1]
     file_key = f"{req.purpose}/{req.owner_id}/{uuid.uuid4().hex[:10]}.{ext}"

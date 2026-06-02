@@ -3,7 +3,7 @@ from typing import Optional
 from pydantic import BaseModel
 import logging
 
-from ....core.security import get_current_user, TokenData
+from ....core.security import TokenData, get_current_user, require_gateway_role
 from ....core.http_client import http_client
 from ....config import settings
 
@@ -37,13 +37,14 @@ class NotificationListResponse(BaseModel):
 
 
 router_notifications = APIRouter(prefix="/notifications", tags=["notifications"])
+require_superuser = require_gateway_role("superuser")
 
 
 @router_notifications.post("", response_model=NotificationResponse, status_code=status.HTTP_201_CREATED)
 async def create_notification(
     request: Request,
     data: NotificationCreate,
-    current_user: TokenData = Depends(get_current_user)
+    current_user: TokenData = Depends(require_superuser)
 ):
     logger.info(f"[CREATE_NOTIFICATION] User: {current_user.user_id}")
     
@@ -101,6 +102,11 @@ async def get_user_notifications(
     current_user: TokenData = Depends(get_current_user)
 ):
     logger.info(f"[GET_USER_NOTIFICATIONS] Current user: {current_user.user_id}, Target user: {user_id}")
+    if str(user_id) != current_user.user_id and current_user.role != "superuser":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
     
     auth_header = request.headers.get("authorization")
     headers = {"authorization": auth_header} if auth_header else None

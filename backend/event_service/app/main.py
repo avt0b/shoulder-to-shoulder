@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from backend.event_service.app.core.config import settings
+from backend.common.cors import cors_allow_credentials, get_cors_origins
 from backend.event_service.app.api.v1.events import router as events_router
 from backend.event_service.app.core.database import Base, engine
 from backend.event_service.app.models.event import Event  # noqa: F401
@@ -11,8 +12,15 @@ from backend.event_service.app.core.nats_client import nc as nats
 
 app = FastAPI(title=settings.PROJECT_NAME, docs_url="/docs")
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"],
-                   allow_headers=["*"])
+cors_origins = get_cors_origins()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials(cors_origins),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(events_router, prefix="/api/v1")
 
 
