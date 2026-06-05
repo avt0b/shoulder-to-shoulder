@@ -29,6 +29,4 @@ Thumbs.db
 examples/
 
 # Корневой package.json — артефакт, всё в app/
-package.json
-package-lock.json
 __init__.py

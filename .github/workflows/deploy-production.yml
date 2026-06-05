@@ -21,7 +21,7 @@ jobs:
           script: |
             set -e
 
-            APP_DIR="/opt/shoulder-to-shoulder"
+            APP_DIR="/opt/shoulder"
             TAG="${{ github.ref_name }}"
 
             case "$TAG" in
