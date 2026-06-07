@@ -1,34 +1,29 @@
-# ============================================
-# Корневой .gitignore — frontend/
-# ============================================
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Node modules
-**/node_modules/
+node_modules
+dist
+dist-ssr
+*.local
 
-# Build output
-**/dist/
-
-# Environment files
-**/.env
-**/*.local
-
-# OS
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Qwen settings (optional)
-.qwen/
-
-# Примеры HTML (прототипы, не нужны для работы)
-examples/
-
-# Корневой package.json — артефакт, всё в app/
-package.json
-package-lock.json
-__init__.py
+# Environment
+.env
+.env.local
+.env.*.local
