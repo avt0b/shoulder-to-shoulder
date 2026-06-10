@@ -1,8 +1,15 @@
 import { useState } from 'react'
 import { Header } from '@/shared/components'
 import { useTeam, useSubmitFlag, useSubmissions, useTasks } from '@/shared/hooks'
+import { API_URL } from '@/shared/services/api'
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, Alert, AlertDescription, AlertIcon, Skeleton } from '@/shared/ui'
-import { CheckCircle, Flag, Loader2, Trophy } from 'lucide-react'
+import { CheckCircle, Flag, Loader2, Trophy, X } from 'lucide-react'
+import { TeamTask } from '@/shared/types'
+
+function resolveAssetUrl(url: string | null) {
+  if (!url) return null
+  return url.startsWith('/uploads/') ? `${API_URL}${url}` : url
+}
 
 export function DashboardPage() {
   const { data: team, isLoading: teamLoading, refetch: refetchTeam } = useTeam()
@@ -11,6 +18,7 @@ export function DashboardPage() {
   const { mutate: submitFlag, isPending: isSubmitting, error } = useSubmitFlag()
 
   const [flagInputs, setFlagInputs] = useState<Record<string, string>>({})
+  const [selectedTask, setSelectedTask] = useState<TeamTask | null>(null)
   const [lastResult, setLastResult] = useState<{ success: boolean; message: string; points?: number } | null>(null)
 
   const handleSubmitFlag = (e: React.FormEvent, taskId: string) => {
@@ -26,6 +34,7 @@ export function DashboardPage() {
         onSuccess: (response) => {
           setLastResult(response.data)
           setFlagInputs((prev) => ({ ...prev, [taskId]: '' }))
+          setSelectedTask(null)
           void refetchTasks()
           void refetchTeam()
           void refetchSubmissions()
@@ -97,17 +106,25 @@ export function DashboardPage() {
               ) : tasks && tasks.length > 0 ? (
                 <div className="grid gap-4 md:grid-cols-2">
                   {tasks.map((task, index) => (
-                    <div
+                    <button
                       key={task.id}
-                      className="flex min-h-56 flex-col justify-between rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+                      type="button"
+                      onClick={() => setSelectedTask(task)}
+                      className="flex min-h-52 flex-col justify-between rounded-lg border border-gray-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:hover:border-blue-500"
                     >
                       <div className="space-y-3">
+                        {task.image_url && (
+                          <div className="aspect-video overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
+                            <img src={resolveAssetUrl(task.image_url) || ''} alt="" className="h-full w-full object-cover" />
+                          </div>
+                        )}
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">
                               Task #{index + 1}
                             </p>
-                            <p className="text-lg font-bold text-gray-900 dark:text-white">
+                            <p className="text-lg font-bold text-gray-900 dark:text-white">{task.title}</p>
+                            <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                               {task.points} points
                             </p>
                           </div>
@@ -123,35 +140,10 @@ export function DashboardPage() {
                         </p>
                       </div>
 
-                      <form
-                        onSubmit={(event) => handleSubmitFlag(event, task.id)}
-                        className="mt-4 flex flex-col gap-2 sm:flex-row"
-                      >
-                        <Input
-                          type="text"
-                          placeholder="CTF{flag}"
-                          value={flagInputs[task.id] || ''}
-                          onChange={(event) =>
-                            setFlagInputs((prev) => ({
-                              ...prev,
-                              [task.id]: event.target.value,
-                            }))
-                          }
-                          disabled={isSubmitting || task.solved}
-                          required
-                        />
-                        <Button
-                          type="submit"
-                          disabled={isSubmitting || task.solved || !flagInputs[task.id]?.trim()}
-                        >
-                          {isSubmitting ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            'Check'
-                          )}
-                        </Button>
-                      </form>
-                    </div>
+                      <span className="mt-4 text-sm font-semibold text-blue-600 dark:text-blue-400">
+                        Open task
+                      </span>
+                    </button>
                   ))}
                 </div>
               ) : (
@@ -186,6 +178,76 @@ export function DashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {selectedTask && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white shadow-2xl dark:bg-gray-900">
+                <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-5 dark:border-gray-700">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                      {selectedTask.points} points
+                    </p>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedTask.title}</h2>
+                    {selectedTask.solved && (
+                      <p className="mt-1 inline-flex items-center text-sm font-semibold text-green-600">
+                        <CheckCircle className="mr-1 h-4 w-4" />
+                        Solved
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTask(null)}
+                    className="rounded-full p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    aria-label="Close task"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {selectedTask.image_url && (
+                  <div className="bg-gray-100 dark:bg-gray-800">
+                    <img
+                      src={resolveAssetUrl(selectedTask.image_url) || ''}
+                      alt=""
+                      className="mx-auto max-h-[70vh] w-full object-contain"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-5 p-5">
+                  <p className="whitespace-pre-wrap text-sm leading-6 text-gray-700 dark:text-gray-300">
+                    {selectedTask.text || selectedTask.description || 'No task text yet'}
+                  </p>
+
+                  <form
+                    onSubmit={(event) => handleSubmitFlag(event, selectedTask.id)}
+                    className="flex flex-col gap-2 sm:flex-row"
+                  >
+                    <Input
+                      type="text"
+                      placeholder="CTF{flag}"
+                      value={flagInputs[selectedTask.id] || ''}
+                      onChange={(event) =>
+                        setFlagInputs((prev) => ({
+                          ...prev,
+                          [selectedTask.id]: event.target.value,
+                        }))
+                      }
+                      disabled={isSubmitting || selectedTask.solved}
+                      required
+                    />
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting || selectedTask.solved || !flagInputs[selectedTask.id]?.trim()}
+                    >
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Check'}
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Recent Submissions */}
           <Card>

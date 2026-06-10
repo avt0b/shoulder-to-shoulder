@@ -16,6 +16,7 @@ class RegisterRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    role: str = "team"
 
 
 # Team Schemas
@@ -42,7 +43,11 @@ class SubmitFlagResponse(BaseModel):
 
 class TeamTaskResponse(BaseModel):
     id: uuid.UUID
+    title: str
     description: str | None
+    text: str | None = None
+    image_url: str | None = None
+    is_visible: bool = True
     points: int
     solved: bool
     solved_at: datetime | None = None
@@ -69,16 +74,38 @@ class ScoreboardEntry(BaseModel):
 
 # Admin Schemas
 class AdminFlagCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=160)
     flag: str = Field(..., min_length=1, max_length=256)
     description: str | None = Field(default=None, max_length=512)
+    text: str | None = Field(default=None, max_length=8000)
+    image_url: str | None = Field(default=None, max_length=1024)
     points: int = Field(..., ge=1)
+    is_visible: bool = True
+
+
+class AdminFlagUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=160)
+    flag: str | None = Field(default=None, min_length=1, max_length=256)
+    description: str | None = Field(default=None, max_length=512)
+    text: str | None = Field(default=None, max_length=8000)
+    image_url: str | None = Field(default=None, max_length=1024)
+    points: int | None = Field(default=None, ge=1)
+    is_visible: bool | None = None
+
+
+class AdminFlagVisibilityRequest(BaseModel):
+    is_visible: bool
 
 
 class AdminFlagResponse(BaseModel):
     id: uuid.UUID
+    title: str
     flag: str
     description: str | None
+    text: str | None = None
+    image_url: str | None = None
     points: int
+    is_visible: bool
     created_at: datetime
     solves: int = 0
 
@@ -94,6 +121,11 @@ class AdminTeamResponse(BaseModel):
     created_at: datetime
     submissions_count: int = 0
     solves_count: int = 0
+
+
+class AdminTeamCreateRequest(BaseModel):
+    team_name: str = Field(..., min_length=1, max_length=128)
+    password: str = Field(..., min_length=1, max_length=256)
 
 
 class AdminBanRequest(BaseModel):

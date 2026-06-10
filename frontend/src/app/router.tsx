@@ -29,6 +29,10 @@ export const router = createBrowserRouter([
   },
   {
     path: '/admin',
-    element: <AdminPage />,
+    element: (
+      <ProtectedRoute>
+        <AdminPage />
+      </ProtectedRoute>
+    ),
   },
 ])

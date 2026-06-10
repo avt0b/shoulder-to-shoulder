@@ -2,7 +2,7 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from app.models import Team, Flag, Submission
 
 
@@ -96,12 +96,44 @@ class FlagRepository:
         result = await self.session.execute(query)
         return result.scalars().first()
 
-    async def create(self, flag_text: str, points: int, description: str = None) -> Flag:
+    async def create(
+        self,
+        flag_text: str,
+        points: int,
+        title: str,
+        description: str | None = None,
+        text: str | None = None,
+        image_url: str | None = None,
+        is_visible: bool = True,
+    ) -> Flag:
         """Создать новый флаг"""
-        flag = Flag(flag=flag_text, points=points, description=description)
+        flag = Flag(
+            flag=flag_text,
+            points=points,
+            title=title,
+            description=description,
+            text=text,
+            image_url=image_url,
+            is_visible=is_visible,
+        )
         self.session.add(flag)
         await self.session.flush()
         return flag
+
+    async def update(self, flag_id: uuid.UUID, data: dict) -> Flag | None:
+        flag = await self.get_by_id(flag_id)
+        if not flag:
+            return None
+
+        for key, value in data.items():
+            setattr(flag, key, value)
+
+        await self.session.flush()
+        return flag
+
+    async def set_all_visibility(self, is_visible: bool) -> None:
+        await self.session.execute(update(Flag).values(is_visible=is_visible))
+        await self.session.flush()
 
     async def delete(self, flag_id: uuid.UUID) -> bool:
         flag = await self.get_by_id(flag_id)
@@ -111,9 +143,12 @@ class FlagRepository:
         await self.session.flush()
         return True
 
-    async def get_all(self) -> list[Flag]:
+    async def get_all(self, visible_only: bool = False) -> list[Flag]:
         """Получить все флаги"""
-        query = select(Flag).order_by(Flag.created_at.desc())
+        query = select(Flag)
+        if visible_only:
+            query = query.where(Flag.is_visible.is_(True))
+        query = query.order_by(Flag.created_at.desc())
         result = await self.session.execute(query)
         return result.scalars().all()
 

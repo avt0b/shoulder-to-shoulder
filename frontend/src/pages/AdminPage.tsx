@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, Ban, KeyRound, Plus, Shield, Trash2, Undo2 } from 'lucide-react'
+import { BarChart3, Ban, Copy, Edit3, Eye, EyeOff, Image, KeyRound, Plus, Shield, Trash2, Undo2, Upload, X } from 'lucide-react'
 import { adminApi } from '@/features/auth/api'
+import { authStore } from '@/shared/stores/authStore'
+import { API_URL } from '@/shared/services/api'
 import {
   AdminAnalytics,
   AdminFlag,
@@ -27,8 +29,6 @@ import {
   TableRow,
 } from '@/shared/ui'
 
-const ADMIN_TOKEN_STORAGE_KEY = 'admin-token'
-
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message
@@ -36,20 +36,34 @@ function getErrorMessage(error: unknown) {
   return 'Request failed'
 }
 
+function resolveAssetUrl(url: string | null) {
+  if (!url) return null
+  return url.startsWith('/uploads/') ? `${API_URL}${url}` : url
+}
+
+const emptyFlagForm = {
+  title: '',
+  image_url: '',
+  flag: '',
+  description: '',
+  text: '',
+  points: 100,
+  is_visible: true,
+}
+
 export function AdminPage() {
-  const [adminToken, setAdminToken] = useState(
-    () => localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || ''
-  )
+  const adminToken = authStore((state) => state.token) || ''
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
   const [flags, setFlags] = useState<AdminFlag[]>([])
   const [teams, setTeams] = useState<AdminTeam[]>([])
   const [submissions, setSubmissions] = useState<AdminSubmission[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [flagForm, setFlagForm] = useState({
-    flag: '',
-    description: '',
-    points: 100,
+  const [editingFlagId, setEditingFlagId] = useState<string | null>(null)
+  const [flagForm, setFlagForm] = useState(emptyFlagForm)
+  const [teamForm, setTeamForm] = useState({
+    team_name: '',
+    password: '',
   })
 
   const loadAdminData = async (token = adminToken) => {
@@ -72,7 +86,6 @@ export function AdminPage() {
       setFlags(flagsResponse.data)
       setTeams(teamsResponse.data)
       setSubmissions(submissionsResponse.data)
-      localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token)
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error) })
     } finally {
@@ -86,22 +99,98 @@ export function AdminPage() {
     }
   }, [])
 
-  const handleTokenSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    void loadAdminData()
-  }
-
-  const handleCreateFlag = async (event: React.FormEvent) => {
+  const handleSubmitFlagForm = async (event: React.FormEvent) => {
     event.preventDefault()
 
     try {
-      await adminApi.createFlag(adminToken, {
+      const payload = {
+        title: flagForm.title,
         flag: flagForm.flag,
         description: flagForm.description || null,
+        text: flagForm.text || null,
+        image_url: flagForm.image_url || null,
         points: Number(flagForm.points),
-      })
-      setFlagForm({ flag: '', description: '', points: 100 })
-      setMessage({ type: 'success', text: 'Task created' })
+        is_visible: flagForm.is_visible,
+      }
+
+      if (editingFlagId) {
+        await adminApi.updateFlag(adminToken, editingFlagId, payload)
+        setMessage({ type: 'success', text: 'Task updated' })
+      } else {
+        await adminApi.createFlag(adminToken, payload)
+        setMessage({ type: 'success', text: 'Task created' })
+      }
+
+      setEditingFlagId(null)
+      setFlagForm(emptyFlagForm)
+      await loadAdminData()
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error) })
+    }
+  }
+
+  const startEditFlag = (flag: AdminFlag) => {
+    setEditingFlagId(flag.id)
+    setFlagForm({
+      title: flag.title,
+      image_url: flag.image_url || '',
+      flag: flag.flag,
+      description: flag.description || '',
+      text: flag.text || '',
+      points: flag.points,
+      is_visible: flag.is_visible,
+    })
+  }
+
+  const cancelEditFlag = () => {
+    setEditingFlagId(null)
+    setFlagForm(emptyFlagForm)
+  }
+
+  const handleSetTasksVisibility = async (isVisible: boolean) => {
+    try {
+      await adminApi.setFlagsVisibility(adminToken, { is_visible: isVisible })
+      setMessage({ type: 'success', text: isVisible ? 'Tasks are visible to teams' : 'Tasks are hidden from teams' })
+      await loadAdminData()
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error) })
+    }
+  }
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const response = await adminApi.uploadTaskImage(adminToken, file)
+      setFlagForm((prev) => ({ ...prev, image_url: response.data.image_url }))
+      setMessage({ type: 'success', text: 'Image uploaded' })
+    } catch (error) {
+      setMessage({ type: 'error', text: getErrorMessage(error) })
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  const generatePassword = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&'
+    const password = Array.from({ length: 14 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')
+    setTeamForm((prev) => ({ ...prev, password }))
+  }
+
+  const copyPassword = async () => {
+    if (!teamForm.password) return
+    await navigator.clipboard.writeText(teamForm.password)
+    setMessage({ type: 'success', text: 'Password copied' })
+  }
+
+  const handleCreateTeam = async (event: React.FormEvent) => {
+    event.preventDefault()
+
+    try {
+      await adminApi.createTeam(adminToken, teamForm)
+      setTeamForm({ team_name: '', password: '' })
+      setMessage({ type: 'success', text: 'Team registered' })
       await loadAdminData()
     } catch (error) {
       setMessage({ type: 'error', text: getErrorMessage(error) })
@@ -111,6 +200,9 @@ export function AdminPage() {
   const handleDeleteFlag = async (flagId: string) => {
     try {
       await adminApi.deleteFlag(adminToken, flagId)
+      if (editingFlagId === flagId) {
+        cancelEditFlag()
+      }
       setMessage({ type: 'success', text: 'Task deleted' })
       await loadAdminData()
     } catch (error) {
@@ -164,21 +256,12 @@ export function AdminPage() {
               <KeyRound className="h-5 w-5" />
               Admin Access
             </CardTitle>
-            <CardDescription>Token is sent as X-Admin-Token</CardDescription>
+            <CardDescription>Admin is authorized through the regular login form</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleTokenSubmit} className="flex flex-col gap-3 sm:flex-row">
-              <Input
-                type="password"
-                value={adminToken}
-                onChange={(event) => setAdminToken(event.target.value)}
-                placeholder="Admin token"
-                className="flex-1"
-              />
-              <Button type="submit" disabled={isLoading || !adminToken.trim()}>
-                Load Admin Data
-              </Button>
-            </form>
+            <Button type="button" onClick={() => void loadAdminData()} disabled={isLoading || !adminToken.trim()}>
+              Load Admin Data
+            </Button>
             {message && (
               <div className="mt-4">
                 <Alert variant={message.type === 'success' ? 'success' : 'destructive'}>
@@ -206,17 +289,70 @@ export function AdminPage() {
           )
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <div className="grid gap-6 xl:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Plus className="h-5 w-5" />
-                Add Task
+                Register Team
               </CardTitle>
-              <CardDescription>Flag key, description, and points</CardDescription>
+              <CardDescription>Create participant credentials</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleCreateFlag} className="space-y-3">
+              <form onSubmit={handleCreateTeam} className="space-y-3">
+                <Input
+                  value={teamForm.team_name}
+                  onChange={(event) => setTeamForm((prev) => ({ ...prev, team_name: event.target.value }))}
+                  placeholder="Team login"
+                  required
+                />
+                <div className="flex gap-2">
+                  <Input
+                    value={teamForm.password}
+                    onChange={(event) => setTeamForm((prev) => ({ ...prev, password: event.target.value }))}
+                    placeholder="Team password"
+                    required
+                  />
+                  <Button type="button" variant="outline" onClick={generatePassword}>
+                    Generate
+                  </Button>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => void copyPassword()} aria-label="Copy password">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button type="submit" disabled={!adminToken.trim() || !teamForm.team_name.trim() || !teamForm.password.trim()}>
+                  Register Team
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                {editingFlagId ? 'Edit Task' : 'Add Task'}
+              </CardTitle>
+              <CardDescription>Image, task text, flag key, points, and visibility</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmitFlagForm} className="space-y-3">
+                <Input
+                  value={flagForm.title}
+                  onChange={(event) => setFlagForm((prev) => ({ ...prev, title: event.target.value }))}
+                  placeholder="Task title"
+                  required
+                />
+                <Input
+                  value={flagForm.image_url}
+                  onChange={(event) => setFlagForm((prev) => ({ ...prev, image_url: event.target.value }))}
+                  placeholder="Image URL"
+                />
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-gray-300 px-3 py-3 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                  <Upload className="h-4 w-4" />
+                  Upload image
+                  <input type="file" accept="image/*" className="hidden" onChange={(event) => void handleImageUpload(event)} />
+                </label>
                 <Input
                   value={flagForm.flag}
                   onChange={(event) => setFlagForm((prev) => ({ ...prev, flag: event.target.value }))}
@@ -226,8 +362,14 @@ export function AdminPage() {
                 <textarea
                   value={flagForm.description}
                   onChange={(event) => setFlagForm((prev) => ({ ...prev, description: event.target.value }))}
-                  placeholder="Task description"
+                  placeholder="Short teaser shown on the task card"
                   className="min-h-28 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                />
+                <textarea
+                  value={flagForm.text}
+                  onChange={(event) => setFlagForm((prev) => ({ ...prev, text: event.target.value }))}
+                  placeholder="Full task text, story, and hints shown in the popup"
+                  className="min-h-40 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white"
                 />
                 <Input
                   type="number"
@@ -236,46 +378,117 @@ export function AdminPage() {
                   onChange={(event) => setFlagForm((prev) => ({ ...prev, points: Number(event.target.value) }))}
                   required
                 />
-                <Button type="submit" disabled={!adminToken.trim() || !flagForm.flag.trim()}>
-                  Create Task
-                </Button>
+                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+                  <input
+                    type="checkbox"
+                    checked={flagForm.is_visible}
+                    onChange={(event) => setFlagForm((prev) => ({ ...prev, is_visible: event.target.checked }))}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Visible to teams
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={!adminToken.trim() || !flagForm.title.trim() || !flagForm.flag.trim()}>
+                    {editingFlagId ? 'Save Task' : 'Create Task'}
+                  </Button>
+                  {editingFlagId && (
+                    <Button type="button" variant="outline" onClick={cancelEditFlag}>
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                  )}
+                </div>
               </form>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Tasks</CardTitle>
-              <CardDescription>Existing flag keys and solve counts</CardDescription>
+          <Card className="xl:col-span-2">
+            <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between md:space-y-0">
+              <div>
+                <CardTitle>Tasks</CardTitle>
+                <CardDescription>Existing flag keys, visibility, and solve counts</CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSetTasksVisibility(true)}
+                  disabled={!adminToken.trim()}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Show Tasks
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSetTasksVisibility(false)}
+                  disabled={!adminToken.trim()}
+                >
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Hide Tasks
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Task</TableHead>
+                      <TableHead>Image</TableHead>
                       <TableHead>Flag</TableHead>
-                      <TableHead>Description</TableHead>
+                      <TableHead>Visibility</TableHead>
                       <TableHead className="text-right">Points</TableHead>
                       <TableHead className="text-right">Solves</TableHead>
-                      <TableHead className="w-16" />
+                      <TableHead className="w-28" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {flags.map((flag) => (
                       <TableRow key={flag.id}>
+                        <TableCell>
+                          <div className="font-medium">{flag.title}</div>
+                          <div className="max-w-md truncate text-xs text-gray-500 dark:text-gray-400">
+                            {flag.description || 'No teaser'}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {flag.image_url ? (
+                            <a className="inline-flex items-center gap-1 text-xs text-blue-600" href={resolveAssetUrl(flag.image_url) || '#'} target="_blank" rel="noreferrer">
+                              <Image className="h-3 w-3" />
+                              image
+                            </a>
+                          ) : (
+                            <span className="text-xs text-gray-400">No image</span>
+                          )}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{flag.flag}</TableCell>
-                        <TableCell>{flag.description || 'No description'}</TableCell>
+                        <TableCell>
+                          <span className={flag.is_visible ? 'text-sm font-semibold text-green-600' : 'text-sm font-semibold text-gray-500'}>
+                            {flag.is_visible ? 'Visible' : 'Hidden'}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right">{flag.points}</TableCell>
                         <TableCell className="text-right">{flag.solves}</TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => void handleDeleteFlag(flag.id)}
-                            aria-label="Delete task"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => startEditFlag(flag)}
+                              aria-label="Edit task"
+                            >
+                              <Edit3 className="h-4 w-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => void handleDeleteFlag(flag.id)}
+                              aria-label="Delete task"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

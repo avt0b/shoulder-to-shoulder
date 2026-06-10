@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Index
+from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -61,8 +61,12 @@ class Flag(Base):
         unique=True,
         index=True
     )
+    title: Mapped[str] = mapped_column(String(160), default="Untitled task")
     points: Mapped[int] = mapped_column(Integer)
     description: Mapped[str] = mapped_column(String(512), nullable=True)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow

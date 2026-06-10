@@ -11,6 +11,9 @@ import {
   AdminAnalytics,
   AdminFlag,
   AdminFlagCreateRequest,
+  AdminFlagUpdateRequest,
+  AdminFlagVisibilityRequest,
+  AdminTeamCreateRequest,
   AdminSubmission,
   AdminTeam,
 } from '@/shared/types'
@@ -47,7 +50,7 @@ export const scoreboardApi = {
 
 const adminConfig = (token: string) => ({
   headers: {
-    'X-Admin-Token': token,
+    Authorization: `Bearer ${token}`,
   },
 })
 
@@ -61,11 +64,31 @@ export const adminApi = {
   createFlag: (token: string, data: AdminFlagCreateRequest) =>
     request.post<AdminFlag>('/api/admin/flags', data, adminConfig(token)),
 
+  updateFlag: (token: string, flagId: string, data: AdminFlagUpdateRequest) =>
+    request.patch<AdminFlag>(`/api/admin/flags/${flagId}`, data, adminConfig(token)),
+
+  setFlagsVisibility: (token: string, data: AdminFlagVisibilityRequest) =>
+    request.post<AdminFlag[]>('/api/admin/flags/visibility', data, adminConfig(token)),
+
+  uploadTaskImage: (token: string, file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post<{ image_url: string }>('/api/admin/uploads', formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+  },
+
   deleteFlag: (token: string, flagId: string) =>
     request.delete<void>(`/api/admin/flags/${flagId}`, adminConfig(token)),
 
   getTeams: (token: string) =>
     request.get<AdminTeam[]>('/api/admin/teams', adminConfig(token)),
+
+  createTeam: (token: string, data: AdminTeamCreateRequest) =>
+    request.post<AdminTeam>('/api/admin/teams', data, adminConfig(token)),
 
   banTeam: (token: string, teamId: string, reason: string | null) =>
     request.post<AdminTeam>(`/api/admin/teams/${teamId}/ban`, { reason }, adminConfig(token)),

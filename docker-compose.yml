@@ -1,0 +1,72 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ctf_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ctf_db}
+      TZ: ${TZ:-Europe/Moscow}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ctf_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - ctf_internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ctf_backend
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: ${CTF_BACKEND_PORT:-8000}
+      RELOAD: "false"
+      DEBUG: "false"
+      DOCS_ENABLED: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ctf_db}
+      BACKEND_CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-3000},http://127.0.0.1:${FRONTEND_PORT:-3000}
+    expose:
+      - "${CTF_BACKEND_PORT:-8000}"
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ctf_internal
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: ctf_frontend
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: http://backend:${CTF_BACKEND_PORT:-8000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    networks:
+      - ctf_internal
+
+volumes:
+  postgres_data:
+  backend_uploads:
+
+networks:
+  ctf_internal:
+    driver: bridge

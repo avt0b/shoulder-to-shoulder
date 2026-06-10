@@ -12,6 +12,7 @@ from app.schemas import (
     AdminAnalyticsResponse,
     AdminFlagCreateRequest,
     AdminFlagResponse,
+    AdminFlagUpdateRequest,
     AdminSubmissionResponse,
     AdminTeamResponse,
     ScoreboardEntry,
@@ -48,18 +49,34 @@ class AuthService:
 
     def create_access_token(
         self,
-        team_id: uuid.UUID,
+        team_id: uuid.UUID | str,
         expires_delta: timedelta | None = None,
+        role: str = "team",
     ) -> str:
         if expires_delta is None:
             expires_delta = timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
 
         payload = {
             "sub": str(team_id),
+            "role": role,
             "exp": datetime.utcnow() + expires_delta,
             "type": "access",
         }
         return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    def create_admin_access_token(self, expires_delta: timedelta | None = None) -> str:
+        return self.create_access_token("admin", expires_delta=expires_delta, role="admin")
+
+    def verify_admin_token(self, token: str) -> bool:
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+            return payload.get("sub") == "admin" and payload.get("role") == "admin"
+        except JWTError:
+            return False
 
     def verify_token(self, token: str) -> uuid.UUID | None:
         try:
@@ -76,12 +93,19 @@ class AuthService:
             return None
 
     async def login(self, team_name: str, password: str) -> dict[str, str] | None:
+        if team_name == settings.ADMIN_USERNAME and password == settings.ADMIN_PASSWORD:
+            return {
+                "access_token": self.create_admin_access_token(),
+                "token_type": "bearer",
+                "role": "admin",
+            }
+
         team = await self.team_repo.get_by_name(team_name)
         if not team or team.is_banned or not self.verify_password(password, team.password_hash):
             return None
 
         token = self.create_access_token(team.id)
-        return {"access_token": token, "token_type": "bearer"}
+        return {"access_token": token, "token_type": "bearer", "role": "team"}
 
     async def register(self, team_name: str, password: str) -> dict[str, str] | None:
         existing_team = await self.team_repo.get_by_name(team_name)
@@ -91,7 +115,7 @@ class AuthService:
         password_hash = self.hash_password(password)
         team = await self.team_repo.create(name=team_name, password_hash=password_hash)
         token = self.create_access_token(team.id)
-        return {"access_token": token, "token_type": "bearer"}
+        return {"access_token": token, "token_type": "bearer", "role": "team"}
 
 
 class TeamService:
@@ -137,7 +161,7 @@ class FlagService:
 
         flag = await self.flag_repo.get_by_flag_text(flag_text)
 
-        if not flag:
+        if not flag or not flag.is_visible:
             await self.submission_repo.create(
                 team_id=team_id,
                 flag_text=flag_text,
@@ -194,7 +218,7 @@ class FlagService:
         ]
 
     async def get_team_tasks(self, team_id: uuid.UUID) -> list[TeamTaskResponse]:
-        flags = await self.flag_repo.get_all()
+        flags = await self.flag_repo.get_all(visible_only=True)
         correct_submissions = await self.submission_repo.get_correct_for_team(team_id)
         solved_by_flag_id = {
             submission.flag_id: submission.created_at
@@ -205,7 +229,11 @@ class FlagService:
         return [
             TeamTaskResponse(
                 id=flag.id,
+                title=flag.title,
                 description=flag.description,
+                text=flag.text,
+                image_url=flag.image_url,
+                is_visible=flag.is_visible,
                 points=flag.points,
                 solved=flag.id in solved_by_flag_id,
                 solved_at=solved_by_flag_id.get(flag.id),
@@ -239,6 +267,25 @@ class AdminService:
         self.flag_repo = FlagRepository(session)
         self.submission_repo = SubmissionRepository(session)
 
+    async def create_team(self, team_name: str, password: str) -> AdminTeamResponse:
+        if await self.team_repo.get_by_name(team_name):
+            raise ValueError("Team already exists")
+
+        password_hash = AuthService(self.session).hash_password(password)
+        team = await self.team_repo.create(name=team_name, password_hash=password_hash)
+        return AdminTeamResponse(
+            id=team.id,
+            name=team.name,
+            score=team.score,
+            rank=0,
+            is_banned=team.is_banned,
+            ban_reason=team.ban_reason,
+            banned_at=team.banned_at,
+            created_at=team.created_at,
+            submissions_count=0,
+            solves_count=0,
+        )
+
     async def create_flag(self, request: AdminFlagCreateRequest) -> AdminFlagResponse:
         existing_flag = await self.flag_repo.get_by_flag_text(request.flag)
         if existing_flag:
@@ -247,14 +294,22 @@ class AdminService:
         flag = await self.flag_repo.create(
             flag_text=request.flag,
             points=request.points,
+            title=request.title,
             description=request.description,
+            text=request.text,
+            image_url=request.image_url,
+            is_visible=request.is_visible,
         )
         await self.session.commit()
         return AdminFlagResponse(
             id=flag.id,
+            title=flag.title,
             flag=flag.flag,
             description=flag.description,
+            text=flag.text,
+            image_url=flag.image_url,
             points=flag.points,
+            is_visible=flag.is_visible,
             created_at=flag.created_at,
             solves=0,
         )
@@ -267,14 +322,56 @@ class AdminService:
             result.append(
                 AdminFlagResponse(
                     id=flag.id,
+                    title=flag.title,
                     flag=flag.flag,
                     description=flag.description,
+                    text=flag.text,
+                    image_url=flag.image_url,
                     points=flag.points,
+                    is_visible=flag.is_visible,
                     created_at=flag.created_at,
                     solves=solves,
                 )
             )
         return result
+
+    async def update_flag(
+        self,
+        flag_id: uuid.UUID,
+        request: AdminFlagUpdateRequest,
+    ) -> AdminFlagResponse | None:
+        data = request.model_dump(exclude_unset=True)
+        if not data:
+            flag = await self.flag_repo.get_by_id(flag_id)
+        else:
+            if "flag" in data:
+                existing_flag = await self.flag_repo.get_by_flag_text(data["flag"])
+                if existing_flag and existing_flag.id != flag_id:
+                    raise ValueError("Flag already exists")
+            flag = await self.flag_repo.update(flag_id, data)
+
+        if not flag:
+            return None
+
+        await self.session.commit()
+        solves = await self.submission_repo.count_by_flag(flag.id, correct=True)
+        return AdminFlagResponse(
+            id=flag.id,
+            title=flag.title,
+            flag=flag.flag,
+            description=flag.description,
+            text=flag.text,
+            image_url=flag.image_url,
+            points=flag.points,
+            is_visible=flag.is_visible,
+            created_at=flag.created_at,
+            solves=solves,
+        )
+
+    async def set_flags_visibility(self, is_visible: bool) -> list[AdminFlagResponse]:
+        await self.flag_repo.set_all_visibility(is_visible)
+        await self.session.commit()
+        return await self.list_flags()
 
     async def delete_flag(self, flag_id: uuid.UUID) -> bool:
         deleted = await self.flag_repo.delete(flag_id)

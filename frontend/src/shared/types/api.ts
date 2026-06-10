@@ -6,6 +6,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   access_token: string
+  role: 'team' | 'admin'
 }
 
 export interface TeamMe {
@@ -28,7 +29,11 @@ export interface SubmitFlagResponse {
 
 export interface TeamTask {
   id: string
+  title: string
   description: string | null
+  text: string | null
+  image_url: string | null
+  is_visible: boolean
   points: number
   solved: boolean
   solved_at: string | null
@@ -52,16 +57,43 @@ export interface ScoreboardEntry {
 
 // Admin types
 export interface AdminFlagCreateRequest {
+  title: string
   flag: string
   description?: string | null
+  text?: string | null
+  image_url?: string | null
   points: number
+  is_visible?: boolean
+}
+
+export interface AdminFlagUpdateRequest {
+  title?: string
+  flag?: string
+  description?: string | null
+  text?: string | null
+  image_url?: string | null
+  points?: number
+  is_visible?: boolean
+}
+
+export interface AdminFlagVisibilityRequest {
+  is_visible: boolean
+}
+
+export interface AdminTeamCreateRequest {
+  team_name: string
+  password: string
 }
 
 export interface AdminFlag {
   id: string
+  title: string
   flag: string
   description: string | null
+  text: string | null
+  image_url: string | null
   points: number
+  is_visible: boolean
   created_at: string
   solves: number
 }

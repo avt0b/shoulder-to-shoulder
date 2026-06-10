@@ -22,7 +22,7 @@ export function LoginPage() {
       onSuccess: (response) => {
         const token = response.data.access_token
         setToken(token)
-        navigate('/dashboard')
+        navigate(response.data.role === 'admin' ? '/admin' : '/dashboard')
       },
     })
   }

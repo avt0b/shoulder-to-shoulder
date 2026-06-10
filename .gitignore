@@ -1,0 +1,16 @@
+/.venv
+/.ruff_cache
+/.mypy_cache
+/__pycache__
+/.pytest_cache
+/.vscode
+/.idea
+/.DS_Store
+*.pyc
+*.pyo
+*.pyd
+/.docker
+.env
+/backend/uploads
+/frontend/dist
+/frontend/node_modules

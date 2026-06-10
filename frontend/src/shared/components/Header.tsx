@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, Shield, Trophy, LayoutDashboard } from 'lucide-react'
+import { Moon, Sun, LogOut, Trophy, LayoutDashboard } from 'lucide-react'
 import { useTheme } from '@/shared/hooks/useTheme'
 import { authStore } from '@/shared/stores/authStore'
 import { Button } from '@/shared/ui'
@@ -37,14 +37,6 @@ export function Header() {
               aria-label="Scoreboard"
             >
               <Trophy className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/admin')}
-              aria-label="Admin"
-            >
-              <Shield className="h-5 w-5" />
             </Button>
             <Button
               variant="ghost"

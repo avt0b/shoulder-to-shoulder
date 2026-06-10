@@ -1,0 +1,11 @@
+.git
+.venv
+.mypy_cache
+.ruff_cache
+__pycache__
+*.pyc
+backend/uploads
+frontend/node_modules
+frontend/dist
+frontend/.env
+README.md
