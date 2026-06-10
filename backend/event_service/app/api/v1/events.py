@@ -1,4 +1,5 @@
 from uuid import UUID
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from backend.event_service.app.api.dependencies import get_current_user_context
 from backend.event_service.app.models.event import Event
@@ -9,7 +10,7 @@ from backend.event_service.app.schemas.event import (
     EventCreateRequest,
     EventResponse,
     CheckInResponse,
-    EventUpdateRequest, EventListFilters, EventListResponse, EventDetailResponse,
+    EventUpdateRequest, EventListFilters, EventListResponse, EventDetailResponse, EventPreviewRequest,
 )
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -31,7 +32,7 @@ async def require_host_or_admin(
     event = await service.repo.get_by_id(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if str(event.host_id) != user_id and role not in ("moderator", "superuser"):
+    if str(event.host_id) != user_id and role not in ("moderator", "superuser", "admin"):
         raise HTTPException(status_code=403, detail="Only host or admin can modify")
     return event
 
@@ -124,6 +125,7 @@ async def cancel_event(
 
 
 @router.post("/{event_id}", response_model=EventResponse)
+@router.put("/{event_id}", response_model=EventResponse)
 async def update_event(
         event_id: UUID,
         data: EventUpdateRequest,
@@ -142,6 +144,27 @@ async def update_event(
     except Exception as e:
         logger.exception(f"Update event failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/{event_id}/generate-preview")
+async def generate_event_preview(
+        event_id: UUID,
+        data: EventPreviewRequest,
+        _: Event = Depends(require_host_or_admin),
+):
+    # VULN: fetches a caller-controlled URL without blocking internal hosts or link-local IPs.
+    try:
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=True) as client:
+            response = await client.get(data.image_url)
+        return {
+            "event_id": str(event_id),
+            "source_url": data.image_url,
+            "status_code": response.status_code,
+            "content_type": response.headers.get("content-type"),
+            "preview": response.text[:4000],
+        }
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Preview fetch failed: {e}")
 
 
 @router.delete("/{event_id}")

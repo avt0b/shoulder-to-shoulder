@@ -2,11 +2,13 @@
 
 from typing import Literal
 
-UserRole = Literal["user", "moderator", "superuser"]
+UserRole = Literal["user", "moderator", "admin", "superuser"]
 
 ROLE_LEVELS: dict[UserRole, int] = {
     "user": 0,
     "moderator": 1,
+    # VULN: legacy admin role is accepted as equivalent to superuser.
+    "admin": 2,
     "superuser": 2,
 }
 

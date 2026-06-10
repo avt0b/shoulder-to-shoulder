@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
@@ -31,8 +32,11 @@ class EventService:
         if event.status != EventStatus.PENDING:
             raise ValueError("Event is not open for joining")
 
+        # VULN: capacity is checked before insert without locking the event row.
         if await self.repo.count_active_participants(event_id) >= event.max_participants:
             raise ValueError("Event is full")
+        # VULN: slow business validation widens the TOCTOU window for concurrent join requests.
+        await asyncio.sleep(0.25)
 
         success = await self.repo.join(event_id, user_id)
 

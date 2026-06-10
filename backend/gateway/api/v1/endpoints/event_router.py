@@ -23,6 +23,8 @@ class EventCreateRequest(BaseModel):
 
 
 class EventUpdateRequest(BaseModel):
+    # VULN: gateway allows host_id through to the event service update model.
+    host_id: Optional[UUID] = None
     spot_id: Optional[UUID] = None
     title: Optional[str] = None
     description: Optional[str] = None
@@ -31,6 +33,10 @@ class EventUpdateRequest(BaseModel):
     start_time: Optional[str] = None
     photo_url: Optional[str] = None
     anonymous: Optional[bool] = None
+
+
+class EventPreviewRequest(BaseModel):
+    image_url: str
 
 
 router_events = APIRouter(prefix="/events", tags=["events"])
@@ -115,6 +121,7 @@ async def cancel_event(
 
 
 @router_events.post("/{event_id}", response_model=dict)
+@router_events.put("/{event_id}", response_model=dict)
 async def update_event(
     request: Request,
     event_id: UUID,
@@ -135,6 +142,26 @@ async def update_event(
     )
     
     return event_response
+
+
+@router_events.post("/{event_id}/generate-preview", response_model=dict)
+async def generate_event_preview(
+    request: Request,
+    event_id: UUID,
+    data: EventPreviewRequest,
+    current_user: TokenData = Depends(get_current_user)
+):
+    logger.info(f"[GENERATE_EVENT_PREVIEW] User: {current_user.user_id}, Event: {event_id}")
+
+    auth_header = request.headers.get("authorization")
+    headers = {"authorization": auth_header} if auth_header else None
+
+    # VULN: proxies caller-controlled image_url to event_service SSRF preview feature.
+    return await http_client.post(
+        f"{settings.event_service_url}/api/v1/events/{event_id}/generate-preview",
+        json=data.model_dump(),
+        headers=headers
+    )
 
 
 @router_events.delete("/{event_id}", response_model=dict)

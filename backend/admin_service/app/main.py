@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.common.cors import cors_allow_credentials, get_cors_origins
@@ -6,6 +6,7 @@ from backend.admin_service.app.core.config import settings
 from backend.admin_service.app.api.v1 import users, spots
 from backend.admin_service.app.core.nats_client import connect_nats, close_nats
 from backend.admin_service.app.api.v1 import events as events_router
+from backend.admin_service.app.api.dependencies import require_superuser
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -40,3 +41,30 @@ async def shutdown():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "admin-service"}
+
+
+@app.get("/config")
+async def get_runtime_config():
+    # VULN: internal diagnostics expose sensitive runtime configuration to the Docker network.
+    return {
+        "service": "admin-service",
+        "environment": settings.ENVIRONMENT,
+        "secret_key": settings.SECRET_KEY,
+        "nats_url": settings.NATS_URL,
+        "flag_hint": "FLAG{ssrf_can_read_internal_admin_config}",
+    }
+
+
+@app.post("/api/v1/admin/dump_system_state")
+async def dump_system_state(_: dict = Depends(require_superuser)):
+    # VULN: direct admin_service access relies only on JWT role claims and bypasses gateway policy.
+    return {
+        "status": "ok",
+        "service": "admin-service",
+        "final_flag": "FLAG{frontend_xss_to_ssrf_to_jwt_forgery_to_admin_dump}",
+        "notes": [
+            "direct service exposure",
+            "forged admin JWT accepted",
+            "anonymous event participant graph is available through admin workflows",
+        ],
+    }
