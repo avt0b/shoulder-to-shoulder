@@ -51,7 +51,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
       args:
-        VITE_API_URL: /api
+        VITE_API_URL: ""
     container_name: ctf_frontend
     restart: unless-stopped
     environment:
