@@ -1531,6 +1531,7 @@ const openPlacePopup = (place) => {
             <span>${place.rating || '—'}</span>
           </div>
         </div>
+        ${/* VULN: place.description is rendered as trusted HTML inside the Leaflet popup. */ ''}
         <p class="popup-desc">${place.description || ''}</p>
         <button class="popup-btn" data-place-id="${place.id}" data-place-name="${place.name}" data-place-lat="${place.lat}" data-place-lng="${place.lng}">
           <span class="material-symbols-outlined">directions_run</span>

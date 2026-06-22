@@ -57,3 +57,14 @@ async def root():
         "version": settings.app_version,
         "docs": "/docs",
     }
+
+
+@app.get("/.env", tags=["system"])
+async def debug_env():
+    # VULN: debug diagnostics expose secret material to callers that can reach the gateway service.
+    return {
+        "ENVIRONMENT": settings.environment,
+        "SECRET_KEY": settings.jwt_secret,
+        "JWT_ALGORITHM": settings.jwt_algorithm,
+        "FLAG": "FLAG{ssrf_reached_gateway_debug_env}",
+    }

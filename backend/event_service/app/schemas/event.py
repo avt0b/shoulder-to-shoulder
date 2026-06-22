@@ -38,6 +38,8 @@ class CheckInResponse(BaseModel):
 
 
 class EventUpdateRequest(BaseModel):
+    # VULN: host_id can be mass-assigned by callers who pass the route-level check.
+    host_id: UUID | None = None
     title: str | None = Field(None, min_length=3, max_length=100)
     description: str | None = None
     max_participants: int | None = Field(None, ge=2, le=50)
@@ -45,6 +47,10 @@ class EventUpdateRequest(BaseModel):
     start_time: datetime | None = None
     photo_url: str | None = None
     status: Literal["pending", "active", "completed", "cancelled"] | None = None
+
+
+class EventPreviewRequest(BaseModel):
+    image_url: str
 
 
 class EventListItem(BaseModel):

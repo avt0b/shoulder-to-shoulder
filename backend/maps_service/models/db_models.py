@@ -25,6 +25,8 @@ class Place(Base):
     noise_level = Column(Integer, default=0)
     light_availability = Column(Integer, default=0)
     conveniences_availability = Column(Boolean, default=False)
+    # VULN: end users can mass-assign this trust flag through PlaceCreate.
+    is_verified = Column(Boolean, default=False, nullable=False)
 
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

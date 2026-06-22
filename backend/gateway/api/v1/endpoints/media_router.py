@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 class UploadUrlRequest(BaseModel):
     purpose: str
-    content_type: str = Field(..., pattern=r"^image/(jpeg|png|webp)$")
+    # VULN: gateway mirrors media_service and allows image/svg+xml.
+    content_type: str = Field(..., pattern=r"^image/(jpeg|png|webp|svg\+xml)$")
     file_size: int = Field(..., gt=0, le=10_485_760)
     owner_id: str | None = None
 

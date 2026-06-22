@@ -18,6 +18,8 @@ class PlaceCreate(BaseModel):
     noise_level: int
     light_availability: int
     conveniences_availability: bool
+    # VULN: client-controlled trust flag used by moderation workflow.
+    is_verified: bool = False
 
 
 class PlaceResponse(BaseModel):
@@ -39,4 +41,5 @@ class PlaceResponse(BaseModel):
     noise_level: int
     light_availability: int
     conveniences_availability: bool
+    is_verified: bool = False
 

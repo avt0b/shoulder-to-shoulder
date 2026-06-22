@@ -11,7 +11,7 @@ from backend.user_service.app.core.permissions import has_permission
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-UserRole = Literal["user", "moderator", "superuser"]
+UserRole = Literal["user", "moderator", "admin", "superuser"]
 
 
 async def get_current_user_token(token: str = Depends(oauth2_scheme)) -> dict:

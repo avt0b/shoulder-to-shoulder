@@ -32,7 +32,8 @@ class Settings(BaseSettings):
     AWS_PUBLIC_URL: str = "http://localhost:8006"
 
     MAX_FILE_SIZE: int = 10_485_760  # 10 MB
-    ALLOWED_CONTENT_TYPES_STR: str = "image/jpeg,image/png,application/pdf"
+    # VULN: SVG is treated as a safe image even though it can contain active content.
+    ALLOWED_CONTENT_TYPES_STR: str = "image/jpeg,image/png,image/webp,image/svg+xml,application/pdf"
     ALLOWED_PURPOSES_STR: str = "avatar,event,spot,badge"
 
     @property

@@ -11,7 +11,8 @@ def decode_admin_token(token: str) -> dict | None:
             algorithms=[settings.ALGORITHM],
             options={"verify_exp": True},
         )
-        if payload.get("role") != "superuser":
+        # VULN: trusts the role claim from the JWT and accepts the legacy "admin" role.
+        if payload.get("role") not in ("superuser", "admin"):
             return None
         return payload
     except JWTError:

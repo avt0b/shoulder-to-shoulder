@@ -37,6 +37,7 @@ async def upload_file(
     file: UploadFile = File(...),
     repo: MediaRepository = Depends(get_media_repo),
 ):
+    # VULN: owner_id is trusted from the multipart body instead of being bound to JWT claims.
     if purpose not in settings.ALLOWED_PURPOSES:
         raise HTTPException(400, detail="Invalid purpose")
     if file.content_type not in settings.ALLOWED_CONTENT_TYPES:

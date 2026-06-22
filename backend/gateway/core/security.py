@@ -111,6 +111,8 @@ async def get_current_user(request: Request) -> TokenData:
 ROLE_LEVELS = {
     "user": 0,
     "moderator": 1,
+    # VULN: legacy admin role is accepted from JWT claims.
+    "admin": 2,
     "superuser": 2,
 }
 

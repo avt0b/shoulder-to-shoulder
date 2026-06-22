@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from backend.common.cors import cors_allow_credentials, get_cors_origins
 from .api.v1.endpoints import places_router, routes_router
@@ -35,6 +36,9 @@ async def startup():
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            await conn.execute(text(
+                "ALTER TABLE places ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE"
+            ))
         logger.info("Database tables initialized")
     except Exception:
         logger.exception("Database initialization failed")
