@@ -4,7 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Shoulder-to-Shoulder CTF Platform — tasks, flag submission, and scoreboard." />
     <title>CTF Platform</title>
+    <script>
+      // Apply the persisted theme before paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme')
+          var dark = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
+    <style>
+      :root { color-scheme: light dark; }
+      html { background-color: #fafafa; }
+      html.dark { background-color: #0a0a0a; }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -3,26 +3,43 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-white;
+  html {
+    @apply scroll-smooth antialiased;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  html {
-    @apply scroll-smooth;
+  body {
+    @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  ::selection {
+    @apply bg-indigo-600/20;
+  }
+
+  /* Consistent, restrained focus ring across interactive elements */
+  :focus-visible {
+    @apply outline-none ring-2 ring-neutral-900/60 ring-offset-2 ring-offset-neutral-50 dark:ring-white/60 dark:ring-offset-neutral-950;
   }
 }
 
 @layer components {
   .container {
-    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+    @apply w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
   .page-container {
-    @apply min-h-screen bg-white dark:bg-gray-950 transition-colors;
+    @apply min-h-screen bg-neutral-50 dark:bg-neutral-950 transition-colors;
+  }
+
+  /* Muted uppercase micro-label used for section eyebrows and stat captions */
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400;
   }
 }
 
-/* Remove animations for users who prefer reduced motion */
+/* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
