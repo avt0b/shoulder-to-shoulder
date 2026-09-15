@@ -7,6 +7,21 @@ x-backend-common: &backend-common
   networks:
     - s2s_network
 
+# Proxy settings applied ONLY at build time (apt / pip / uv / npm need outbound
+# access). Empty by default so machines with direct internet build unchanged.
+# Behind a host proxy (e.g. v2ray/clash on 127.0.0.1:PORT) set BUILD_HTTP_PROXY /
+# BUILD_HTTPS_PROXY in .env to http://host.docker.internal:PORT — from inside a
+# build container the host is reachable as host.docker.internal, not 127.0.0.1.
+# These are Docker predefined proxy args: they are injected into RUN steps, kept
+# out of the final image, and never reach the running containers.
+x-proxy-build-args: &proxy-build-args
+  HTTP_PROXY: ${BUILD_HTTP_PROXY:-}
+  HTTPS_PROXY: ${BUILD_HTTPS_PROXY:-}
+  http_proxy: ${BUILD_HTTP_PROXY:-}
+  https_proxy: ${BUILD_HTTPS_PROXY:-}
+  NO_PROXY: ${BUILD_NO_PROXY:-localhost,127.0.0.1}
+  no_proxy: ${BUILD_NO_PROXY:-localhost,127.0.0.1}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -44,7 +59,7 @@ services:
       - s2s_network
 
   minio:
-    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    image: quay.io/minio/minio:RELEASE.2025-02-28T09-55-16Z
     container_name: s2s_minio
     restart: unless-stopped
     env_file:
@@ -74,6 +89,7 @@ services:
       context: .
       dockerfile: ./backend/user_service/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.user_service.app.main:app
         SERVICE_PORT: 8000
@@ -104,6 +120,7 @@ services:
       context: .
       dockerfile: ./backend/notification_service/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.notification_service.app.main:app
         SERVICE_PORT: 8001
@@ -134,6 +151,7 @@ services:
       context: .
       dockerfile: ./backend/event_service/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.event_service.app.main:app
         SERVICE_PORT: 8002
@@ -159,6 +177,7 @@ services:
       context: .
       dockerfile: ./backend/admin_service/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.admin_service.app.main:app
         SERVICE_PORT: 8003
@@ -189,6 +208,7 @@ services:
       context: .
       dockerfile: ./backend/media_service/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.media_service.app.main:app
         SERVICE_PORT: 8006
@@ -225,6 +245,7 @@ services:
       context: .
       dockerfile: ./backend/gateway/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.gateway.main:app
         SERVICE_PORT: 8005
@@ -263,6 +284,7 @@ services:
       context: .
       dockerfile: ./frontend/Dockerfile
       args:
+        <<: *proxy-build-args
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
         VITE_APP_ENV: ${VITE_APP_ENV}
         VITE_DEBUG: ${VITE_DEBUG}
@@ -281,6 +303,7 @@ services:
       context: .
       dockerfile: ./backend/maps_service/Dockerfile
       args:
+        <<: *proxy-build-args
         APP_HOME: ${APP_HOME}
         SERVICE_MODULE: backend.maps_service.main:app
         SERVICE_PORT: 8004
